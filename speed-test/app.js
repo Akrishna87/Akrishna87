@@ -51,17 +51,27 @@ function speedColor(mbps) {
 // /cdn-cgi/trace endpoint (plain text) if /meta is unavailable or returns
 // something unexpected, so the details panel degrades instead of going blank.
 async function fetchMeta() {
+  let meta = null;
   try {
     const res = await fetch(`${BASE}/meta`, { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      if (data && (data.clientIp || data.colo)) return data;
+      if (data && (data.clientIp || data.colo)) meta = data;
     }
-    console.warn(`/meta returned ${res.status}; falling back to /cdn-cgi/trace`);
+    if (!meta) console.warn(`/meta returned ${res.status}; falling back to /cdn-cgi/trace`);
   } catch (err) {
     console.warn("/meta request failed; falling back to /cdn-cgi/trace", err);
   }
-  return fetchTrace();
+  if (!meta) meta = await fetchTrace();
+
+  // Neither Cloudflare endpoint reliably carries the ISP/organization name —
+  // /meta sometimes does, /cdn-cgi/trace never does. Fill the gap from a
+  // dedicated IP lookup service when we don't already have it.
+  if (!meta || !meta.asOrganization) {
+    const isp = await fetchIspInfo();
+    if (isp) meta = { ...isp, ...(meta || {}) };
+  }
+  return meta;
 }
 
 async function fetchTrace() {
@@ -83,6 +93,25 @@ async function fetchTrace() {
     };
   } catch (err) {
     console.error("Connection metadata unavailable:", err);
+    return null;
+  }
+}
+
+async function fetchIspInfo() {
+  try {
+    const res = await fetch("https://ipwho.is/", { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.success === false) return null;
+    return {
+      clientIp: data.ip,
+      asOrganization: (data.connection && (data.connection.isp || data.connection.org)) || undefined,
+      country: data.country_code,
+      city: data.city,
+      region: data.region,
+    };
+  } catch (err) {
+    console.warn("ISP lookup failed:", err);
     return null;
   }
 }
@@ -193,7 +222,15 @@ function detectBrowser() {
 function fillConnectionInfo(meta) {
   if (meta) {
     el.dIp.textContent = meta.clientIp || "—";
-    el.dAsn.textContent = meta.asOrganization ? `${meta.asOrganization} (AS${meta.asn})` : meta.asn ? `AS${meta.asn}` : "—";
+    if (meta.asOrganization && meta.asn) {
+      el.dAsn.textContent = `${meta.asOrganization} (AS${meta.asn})`;
+    } else if (meta.asOrganization) {
+      el.dAsn.textContent = meta.asOrganization;
+    } else if (meta.asn) {
+      el.dAsn.textContent = `AS${meta.asn}`;
+    } else {
+      el.dAsn.textContent = "—";
+    }
     const loc = [meta.city, meta.region, meta.country].filter(Boolean).join(", ");
     el.dLocation.textContent = loc || "—";
     el.dServer.textContent = meta.colo ? `Cloudflare ${meta.colo}` : "—";
@@ -251,6 +288,13 @@ async function runTest() {
 
     el.results.hidden = false;
     el.startBtn.textContent = "Test Again";
+
+    // The final numbers now live in the result cards below — let the dial
+    // settle back to a ready state rather than freezing on the last reading.
+    setTimeout(() => {
+      setGauge(0);
+      el.gaugeFill.style.stroke = "#0a84ff";
+    }, 600);
   } catch (err) {
     setPhase("Connection error", true);
     el.gaugeFill.style.stroke = "#ff453a";
