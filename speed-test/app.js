@@ -11,6 +11,8 @@ const el = {
   rUpload: document.getElementById("rUpload"),
   rPing: document.getElementById("rPing"),
   rJitter: document.getElementById("rJitter"),
+  rPingQuality: document.getElementById("rPingQuality"),
+  rJitterQuality: document.getElementById("rJitterQuality"),
   dIp: document.getElementById("dIp"),
   dAsn: document.getElementById("dAsn"),
   dLocation: document.getElementById("dLocation"),
@@ -44,6 +46,26 @@ function speedColor(mbps) {
   if (mbps >= 25) return "#0a84ff"; // blue
   if (mbps >= 5) return "#ff9f0a"; // orange
   return "#ff453a"; // red
+}
+
+// Thresholds reflect what actually matters for calls/gaming, not raw speed.
+function pingQuality(ms) {
+  if (ms < 20) return { label: "Excellent", color: "#30d158" };
+  if (ms < 50) return { label: "Good", color: "#0a84ff" };
+  if (ms < 100) return { label: "Fair", color: "#ff9f0a" };
+  return { label: "Poor", color: "#ff453a" };
+}
+
+function jitterQuality(ms) {
+  if (ms < 5) return { label: "Excellent", color: "#30d158" };
+  if (ms < 15) return { label: "Good", color: "#0a84ff" };
+  if (ms < 30) return { label: "Fair", color: "#ff9f0a" };
+  return { label: "Poor", color: "#ff453a" };
+}
+
+function setQuality(el, quality) {
+  el.textContent = quality.label;
+  el.style.color = quality.color;
 }
 
 // ---- Metadata ----
@@ -269,6 +291,8 @@ async function runTest() {
     const { ping, jitter } = await testPing();
     el.rPing.textContent = ping.toFixed(0);
     el.rJitter.textContent = jitter.toFixed(1);
+    setQuality(el.rPingQuality, pingQuality(ping));
+    setQuality(el.rJitterQuality, jitterQuality(jitter));
     setGauge(0);
 
     setPhase("Download");
