@@ -4,12 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Speed</title>
+  <meta name="description" content="A precise, honest look at your internet connection — real download/upload/ping measurements plus full connection details." />
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230a84ff'/%3E%3Cstop offset='1' stop-color='%235e5ce6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ccircle cx='32' cy='32' r='16' fill='none' stroke='white' stroke-width='5' stroke-opacity='0.35'/%3E%3Cpath d='M32 16a16 16 0 0 1 13.86 24' fill='none' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="backdrop" aria-hidden="true">
+    <span class="glow glow-a"></span>
+    <span class="glow glow-b"></span>
+  </div>
+
   <main class="page">
     <header class="hero">
-      <h1>Speed</h1>
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="16" fill="url(#brandGradient)"></rect>
+          <circle cx="32" cy="32" r="16" fill="none" stroke="white" stroke-width="5" stroke-opacity="0.35"></circle>
+          <path d="M32 16a16 16 0 0 1 13.86 24" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"></path>
+          <defs>
+            <linearGradient id="brandGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#0a84ff"></stop>
+              <stop offset="1" stop-color="#5e5ce6"></stop>
+            </linearGradient>
+          </defs>
+        </svg>
+        <h1>Speed</h1>
+      </div>
       <p class="tagline">A precise, honest look at your connection.</p>
     </header>
 
@@ -21,13 +43,13 @@
       <div class="gauge-center">
         <div class="gauge-value" id="gaugeValue">0.0</div>
         <div class="gauge-unit">Mbps</div>
-        <div class="gauge-phase" id="gaugePhase">Ready</div>
+        <div class="gauge-phase" id="gaugePhase" role="status" aria-live="polite">Ready</div>
       </div>
     </section>
 
     <button class="start-btn" id="startBtn">Start Test</button>
 
-    <section class="results" id="results" hidden>
+    <section class="results" id="results" hidden aria-live="polite">
       <div class="result-row">
         <div class="result-card">
           <div class="result-label">Download</div>

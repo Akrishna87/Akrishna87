@@ -42,25 +42,25 @@ function setPhase(text, isError = false) {
 }
 
 function speedColor(mbps) {
-  if (mbps >= 100) return "#30d158"; // green
-  if (mbps >= 25) return "#0a84ff"; // blue
-  if (mbps >= 5) return "#ff9f0a"; // orange
-  return "#ff453a"; // red
+  if (mbps >= 100) return "var(--green)";
+  if (mbps >= 25) return "var(--blue)";
+  if (mbps >= 5) return "var(--orange)";
+  return "var(--red)";
 }
 
 // Thresholds reflect what actually matters for calls/gaming, not raw speed.
 function pingQuality(ms) {
-  if (ms < 20) return { label: "Excellent", color: "#30d158" };
-  if (ms < 50) return { label: "Good", color: "#0a84ff" };
-  if (ms < 100) return { label: "Fair", color: "#ff9f0a" };
-  return { label: "Poor", color: "#ff453a" };
+  if (ms < 20) return { label: "Excellent", color: "var(--green)" };
+  if (ms < 50) return { label: "Good", color: "var(--blue)" };
+  if (ms < 100) return { label: "Fair", color: "var(--orange)" };
+  return { label: "Poor", color: "var(--red)" };
 }
 
 function jitterQuality(ms) {
-  if (ms < 5) return { label: "Excellent", color: "#30d158" };
-  if (ms < 15) return { label: "Good", color: "#0a84ff" };
-  if (ms < 30) return { label: "Fair", color: "#ff9f0a" };
-  return { label: "Poor", color: "#ff453a" };
+  if (ms < 5) return { label: "Excellent", color: "var(--green)" };
+  if (ms < 15) return { label: "Good", color: "var(--blue)" };
+  if (ms < 30) return { label: "Fair", color: "var(--orange)" };
+  return { label: "Poor", color: "var(--red)" };
 }
 
 function setQuality(el, quality) {
@@ -282,7 +282,7 @@ async function runTest() {
   el.startBtn.textContent = "Testing…";
   el.results.hidden = true;
   setGauge(0);
-  el.gaugeFill.style.stroke = "#0a84ff";
+  el.gaugeFill.style.stroke = "var(--blue)";
 
   try {
     const metaPromise = fetchMeta();
@@ -301,7 +301,7 @@ async function runTest() {
     setGauge(download, speedColor(download));
 
     setPhase("Upload");
-    setGauge(0, "#0a84ff");
+    setGauge(0, "var(--blue)");
     const upload = await testUpload();
     el.rUpload.textContent = upload >= 100 ? upload.toFixed(0) : upload.toFixed(1);
     setGauge(upload, speedColor(upload));
@@ -317,11 +317,11 @@ async function runTest() {
     // settle back to a ready state rather than freezing on the last reading.
     setTimeout(() => {
       setGauge(0);
-      el.gaugeFill.style.stroke = "#0a84ff";
+      el.gaugeFill.style.stroke = "var(--blue)";
     }, 600);
   } catch (err) {
     setPhase("Connection error", true);
-    el.gaugeFill.style.stroke = "#ff453a";
+    el.gaugeFill.style.stroke = "var(--red)";
     el.startBtn.textContent = "Try Again";
     console.error("Speed test failed:", err);
   } finally {
