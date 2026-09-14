@@ -47,11 +47,42 @@ function speedColor(mbps) {
 }
 
 // ---- Metadata ----
+// Cloudflare's speed-test metadata endpoint. Falls back to the widely-used
+// /cdn-cgi/trace endpoint (plain text) if /meta is unavailable or returns
+// something unexpected, so the details panel degrades instead of going blank.
 async function fetchMeta() {
   try {
     const res = await fetch(`${BASE}/meta`, { cache: "no-store" });
-    return await res.json();
-  } catch {
+    if (res.ok) {
+      const data = await res.json();
+      if (data && (data.clientIp || data.colo)) return data;
+    }
+    console.warn(`/meta returned ${res.status}; falling back to /cdn-cgi/trace`);
+  } catch (err) {
+    console.warn("/meta request failed; falling back to /cdn-cgi/trace", err);
+  }
+  return fetchTrace();
+}
+
+async function fetchTrace() {
+  try {
+    const res = await fetch("https://www.cloudflare.com/cdn-cgi/trace", { cache: "no-store" });
+    if (!res.ok) return null;
+    const text = await res.text();
+    const fields = {};
+    for (const line of text.trim().split("\n")) {
+      const idx = line.indexOf("=");
+      if (idx === -1) continue;
+      fields[line.slice(0, idx)] = line.slice(idx + 1);
+    }
+    return {
+      clientIp: fields.ip,
+      colo: fields.colo,
+      country: fields.loc,
+      httpProtocol: fields.http ? fields.http.toUpperCase() : undefined,
+    };
+  } catch (err) {
+    console.error("Connection metadata unavailable:", err);
     return null;
   }
 }
