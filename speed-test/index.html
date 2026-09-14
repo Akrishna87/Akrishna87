@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Speed</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1>Speed</h1>
+      <p class="tagline">A precise, honest look at your connection.</p>
+    </header>
+
+    <section class="gauge-wrap">
+      <svg class="gauge" viewBox="0 0 240 240" aria-hidden="true">
+        <circle class="gauge-track" cx="120" cy="120" r="104"></circle>
+        <circle class="gauge-fill" cx="120" cy="120" r="104"></circle>
+      </svg>
+      <div class="gauge-center">
+        <div class="gauge-value" id="gaugeValue">0.0</div>
+        <div class="gauge-unit">Mbps</div>
+        <div class="gauge-phase" id="gaugePhase">Ready</div>
+      </div>
+    </section>
+
+    <button class="start-btn" id="startBtn">Start Test</button>
+
+    <section class="results" id="results" hidden>
+      <div class="result-row">
+        <div class="result-card">
+          <div class="result-label">Download</div>
+          <div class="result-value" id="rDownload">—</div>
+          <div class="result-unit">Mbps</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Upload</div>
+          <div class="result-value" id="rUpload">—</div>
+          <div class="result-unit">Mbps</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Ping</div>
+          <div class="result-value" id="rPing">—</div>
+          <div class="result-unit">ms</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Jitter</div>
+          <div class="result-value" id="rJitter">—</div>
+          <div class="result-unit">ms</div>
+        </div>
+      </div>
+
+      <h2 class="section-title">Connection details</h2>
+      <div class="detail-grid" id="detailGrid">
+        <div class="detail-item"><span class="detail-key">IP Address</span><span class="detail-val" id="dIp">—</span></div>
+        <div class="detail-item"><span class="detail-key">Network / ASN</span><span class="detail-val" id="dAsn">—</span></div>
+        <div class="detail-item"><span class="detail-key">Location</span><span class="detail-val" id="dLocation">—</span></div>
+        <div class="detail-item"><span class="detail-key">Test Server</span><span class="detail-val" id="dServer">—</span></div>
+        <div class="detail-item"><span class="detail-key">Connection Type</span><span class="detail-val" id="dConnType">—</span></div>
+        <div class="detail-item"><span class="detail-key">Browser-Reported Speed</span><span class="detail-val" id="dDownlink">—</span></div>
+        <div class="detail-item"><span class="detail-key">Round-Trip (Browser)</span><span class="detail-val" id="dRtt">—</span></div>
+        <div class="detail-item"><span class="detail-key">Protocol</span><span class="detail-val" id="dProtocol">—</span></div>
+        <div class="detail-item"><span class="detail-key">Data Saver</span><span class="detail-val" id="dSaveData">—</span></div>
+        <div class="detail-item"><span class="detail-key">Browser</span><span class="detail-val" id="dBrowser">—</span></div>
+        <div class="detail-item"><span class="detail-key">Tested At</span><span class="detail-val" id="dTimestamp">—</span></div>
+      </div>
+    </section>
+
+    <p class="footnote">Measured against Cloudflare's global network. Results vary with server load, Wi‑Fi conditions, and what else is using your connection right now.</p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
