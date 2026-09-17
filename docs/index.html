@@ -513,6 +513,7 @@
       })
       .catch(function () {
         holidayCache[cacheKey] = null; // fetch failed / unavailable — fail silently, non-blocking
+        render();
       });
   }
 
@@ -534,7 +535,7 @@
   }
 
   function getUpcomingHolidays(countryCode, count) {
-    if (!countryCode) return [];
+    if (!countryCode) return { status: "off", holidays: [] };
     var today = todayDate();
     var year = today.getFullYear();
     var thisYear = holidayCache[countryCode + "-" + year];
@@ -547,7 +548,12 @@
     var todayKey = dateKey(today);
     combined = combined.filter(function (h) { return h.date >= todayKey; });
     combined.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
-    return combined.slice(0, count);
+    combined = combined.slice(0, count);
+
+    var anyLoading = thisYear === undefined || thisYear === "loading" || nextYear === undefined || nextYear === "loading";
+    var anyFailed = thisYear === null || nextYear === null;
+    var status = combined.length ? "ready" : (anyLoading ? "loading" : (anyFailed ? "failed" : "ready"));
+    return { status: status, holidays: combined };
   }
 
   function formatShortDate(key) {
@@ -939,18 +945,22 @@
     if (state.countryCode) {
       var holidayListCard = el("div", "card");
       holidayListCard.appendChild(el("h3", null, "🗓️ Upcoming public holidays"));
-      var upcoming = getUpcomingHolidays(state.countryCode, 6);
-      if (!upcoming.length) {
-        holidayListCard.appendChild(el("div", "empty-hint", "Loading holiday calendar…"));
-      } else {
+      var upcomingResult = getUpcomingHolidays(state.countryCode, 6);
+      if (upcomingResult.holidays.length) {
         var hList = el("div");
-        upcoming.forEach(function (h) {
+        upcomingResult.holidays.forEach(function (h) {
           var row = el("div", "history-item");
           row.appendChild(el("div", "hdate", formatShortDate(h.date)));
           row.appendChild(el("div", null, escapeHtml(h.localName || h.name)));
           hList.appendChild(row);
         });
         holidayListCard.appendChild(hList);
+      } else if (upcomingResult.status === "loading") {
+        holidayListCard.appendChild(el("div", "empty-hint", "Loading holiday calendar…"));
+      } else if (upcomingResult.status === "failed") {
+        holidayListCard.appendChild(el("div", "empty-hint", "Couldn't reach the holiday service — check your internet connection."));
+      } else {
+        holidayListCard.appendChild(el("div", "empty-hint", "No upcoming holidays found for this calendar."));
       }
       app.appendChild(holidayListCard);
     }
