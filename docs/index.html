@@ -481,23 +481,27 @@
   };
   var FIREBASE_SDK_VERSION = "10.14.1";
 
-  // Leave empty to keep the app open to anyone with the URL (current
-  // behavior). Fill in with the Google account emails that should be
-  // allowed in (e.g. ["you@gmail.com", "kid@gmail.com"]) to require
-  // Google Sign-In. IMPORTANT: this list alone is only a client-side
-  // gate for the UI — the Firestore security rule must also be updated
-  // to check request.auth.token.email, otherwise the data itself is
-  // still reachable directly regardless of this list.
-  var AUTHORIZED_EMAILS = [];
+  // Set to true to require Google Sign-In for the whole app. Who's
+  // actually allowed in is NOT listed here — it lives in a Firestore
+  // document (notebookTracker/access) that the parent manages from
+  // inside the app itself (no code changes needed to add/remove
+  // someone). SEED_OWNER_EMAIL is only used once, to bootstrap that
+  // document the very first time — after that, whoever is in the list
+  // can add or remove others from Parent mode. The Firestore security
+  // rule is what actually enforces all of this; REQUIRE_SIGN_IN just
+  // controls whether this client attempts to sign in at all.
+  var REQUIRE_SIGN_IN = false;
+  var SEED_OWNER_EMAIL = "tarapani0416@gmail.com";
 
   var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
   var applyingRemoteUpdate = false;
-  var authApi = { signIn: null, signOut: null };
+  var authApi = { signIn: null, signOut: null, addAccessEmail: null, removeAccessEmail: null };
   var authState = {
-    required: !!(FIREBASE_CONFIG && AUTHORIZED_EMAILS.length),
+    required: !!(FIREBASE_CONFIG && REQUIRE_SIGN_IN),
     ready: false,
     user: null,
-    deniedEmail: null
+    deniedEmail: null,
+    accessEmails: null
   };
 
   function initFirebase() {
@@ -521,31 +525,85 @@
         return;
       }
 
+      var accessRef = fsMod.doc(db, "notebookTracker", "access");
       var authInst = authMod.getAuth(app);
+
       authApi.signIn = function () {
         authMod.signInWithRedirect(authInst, new authMod.GoogleAuthProvider());
       };
       authApi.signOut = function () { authMod.signOut(authInst); };
+      authApi.addAccessEmail = function (email) {
+        email = (email || "").trim().toLowerCase();
+        if (!email) return;
+        fsMod.updateDoc(accessRef, { emails: fsMod.arrayUnion(email) }).catch(function (err) {
+          console.warn("Cloud sync: add access email failed", err);
+        });
+      };
+      authApi.removeAccessEmail = function (email) {
+        fsMod.updateDoc(accessRef, { emails: fsMod.arrayRemove(email) }).catch(function (err) {
+          console.warn("Cloud sync: remove access email failed", err);
+        });
+      };
 
       authMod.getRedirectResult(authInst).catch(function (err) {
         console.warn("Cloud sync: redirect sign-in failed", err);
       });
 
+      function grantAccess(user) {
+        authState.user = user;
+        authState.deniedEmail = null;
+        fsMod.onSnapshot(accessRef, function (snap) {
+          if (snap.exists()) {
+            authState.accessEmails = snap.data().emails || [];
+            render();
+          }
+        }, function (err) {
+          console.warn("Cloud sync: access list listen failed", err);
+        });
+        startFirestoreSync(fsMod);
+      }
+
+      function denyAccess(user) {
+        authState.deniedEmail = user.email;
+        authState.user = null;
+        authMod.signOut(authInst);
+        render();
+      }
+
+      // Bootstraps notebookTracker/access with just this account when it
+      // doesn't exist yet. The security rule only allows this to succeed
+      // for SEED_OWNER_EMAIL — anyone else gets denied here, which is
+      // indistinguishable (by design) from the doc already existing and
+      // this account simply not being on the list.
+      function tryBootstrapOrDeny(user, myEmail) {
+        fsMod.setDoc(accessRef, { emails: [myEmail] })
+          .then(function () { grantAccess(user); })
+          .catch(function () { denyAccess(user); });
+      }
+
       authMod.onAuthStateChanged(authInst, function (user) {
         authState.ready = true;
-        if (user && AUTHORIZED_EMAILS.indexOf(user.email) >= 0) {
-          authState.user = user;
-          authState.deniedEmail = null;
-          startFirestoreSync(fsMod);
-        } else {
-          if (user) {
-            authState.deniedEmail = user.email;
-            authMod.signOut(authInst);
-          }
+        if (!user) {
           authState.user = null;
-          cloud.ready = false;
+          authState.accessEmails = null;
           render();
+          return;
         }
+        var myEmail = (user.email || "").toLowerCase();
+        fsMod.getDoc(accessRef).then(function (snap) {
+          if (snap.exists()) {
+            var emails = (snap.data().emails || []).map(function (e) { return String(e).toLowerCase(); });
+            if (emails.indexOf(myEmail) >= 0) {
+              grantAccess(user);
+            } else {
+              denyAccess(user);
+            }
+          } else {
+            tryBootstrapOrDeny(user, myEmail);
+          }
+        }).catch(function () {
+          tryBootstrapOrDeny(user, myEmail);
+        });
       });
     }).catch(function (err) {
       console.warn("Cloud sync: unavailable", err);
@@ -1092,6 +1150,44 @@
       });
       acctLine.appendChild(signOutLink);
       app.appendChild(acctLine);
+
+      var accessCard = el("div", "card");
+      accessCard.appendChild(el("h3", null, "🔐 Who can access this app"));
+      accessCard.appendChild(el("div", "parent-note", "Anyone added here can sign in with their Google account and see/edit everything, including this list — so only add people you trust with full access."));
+      var accessList = el("div");
+      (authState.accessEmails || []).forEach(function (accEmail) {
+        var isMe = accEmail.toLowerCase() === (authState.user.email || "").toLowerCase();
+        var accChip = el("span", "subject-mini on", escapeHtml(accEmail) + (isMe ? " (you)" : ""));
+        if (!isMe) {
+          var accRm = el("span", "rm", "✕");
+          accRm.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            if (confirm('Remove access for "' + accEmail + '"?') && authApi.removeAccessEmail) {
+              authApi.removeAccessEmail(accEmail);
+            }
+          });
+          accChip.appendChild(accRm);
+        }
+        accessList.appendChild(accChip);
+      });
+      accessCard.appendChild(accessList);
+
+      var accessForm = el("div", "add-subject-form");
+      var accessEmailIn = document.createElement("input");
+      accessEmailIn.type = "email";
+      accessEmailIn.className = "name-in";
+      accessEmailIn.placeholder = "e.g. kid@gmail.com";
+      var accessAddBtn = document.createElement("button");
+      accessAddBtn.textContent = "Add";
+      accessAddBtn.addEventListener("click", function () {
+        if (authApi.addAccessEmail) authApi.addAccessEmail(accessEmailIn.value);
+        accessEmailIn.value = "";
+      });
+      accessForm.appendChild(accessEmailIn);
+      accessForm.appendChild(accessAddBtn);
+      accessCard.appendChild(accessForm);
+
+      app.appendChild(accessCard);
     }
 
     var parentSchoolHoliday = getSchoolHolidayForDate(d);
