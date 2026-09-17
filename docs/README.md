@@ -15,15 +15,20 @@ child needs to bring to school the next day.
   plan** per weekday (so the right subjects are suggested automatically
   each evening), **rename or re-icon any subject** (tap ✏️), add/remove
   subjects, and browse **history** of past days.
-- **Holiday check (best-effort)** 🎉 — pick a country in Parent mode (India
-  by default) and the app checks tomorrow's date against a public holiday
-  calendar ([date.nager.at](https://date.nager.at)), plus shows a list of
-  **upcoming public holidays**. If tomorrow looks like a holiday, both
-  modes show a heads-up banner. This is a *national* public holiday
-  calendar only — it has no concept of a specific city, state, or school
-  (e.g. Gurgaon/Haryana-specific closures won't show up), so always
-  double-check with the school. It needs an internet connection and
-  quietly does nothing if it can't reach the service.
+- **School holidays** 🏫 — pre-loaded with DPS Gurgaon's published 2026–27
+  holiday list, editable in Parent mode (add, rename, or remove any date).
+  Since no public API covers school-specific closures, these are entered
+  once by hand and then take priority over the generic public holiday
+  guess: if tomorrow matches one, both modes show a confident "No school
+  tomorrow" banner instead of the softer "might be a holiday" one.
+- **Public holiday check (best-effort)** 🎉 — pick a country in Parent mode
+  (India by default) and the app checks tomorrow's date against a public
+  holiday calendar ([date.nager.at](https://date.nager.at)), plus shows a
+  list of **upcoming public holidays**. This is a *national* calendar only
+  — it has no concept of a specific city, state, or school, so it's a
+  fallback for whatever isn't already covered by the school holidays list
+  above. It needs an internet connection and clearly reports when it can't
+  reach the service (rather than hanging on "loading").
 
 Everything else is saved locally in the browser (`localStorage`), so the
 app works fully offline and needs no sign-up, account, or server — just

@@ -498,6 +498,46 @@
     { code: "AE", label: "🇦🇪 UAE" }
   ];
 
+  // Seeded from DPS Gurgaon's published "List of Holidays 2026-27"
+  // (dpsgurgaon.org/list-of-holidays.php). Editable/removable in Parent mode.
+  var DEFAULT_SCHOOL_HOLIDAYS = [
+    { date: "2026-03-26", name: "Ram Navami" },
+    { date: "2026-03-31", name: "Mahavir Jayanti" },
+    { date: "2026-04-03", name: "Good Friday" },
+    { date: "2026-04-14", name: "Ambedkar Jayanti / Baisakhi" },
+    { date: "2026-04-19", name: "Parshuram Jayanti" },
+    { date: "2026-05-01", name: "Buddha Purnima" },
+    { date: "2026-05-27", name: "Id-Ul-Zuha (Bakrid)" },
+    { date: "2026-07-31", name: "Shaheed Udham Singh Martyrdom Day" },
+    { date: "2026-08-15", name: "Independence Day" },
+    { date: "2026-08-26", name: "Milad-Un-Nabi" },
+    { date: "2026-08-28", name: "Raksha Bandhan" },
+    { date: "2026-09-04", name: "Janmashtami" },
+    { date: "2026-09-23", name: "Shaheedi Diwas" },
+    { date: "2026-10-02", name: "Gandhi Jayanti" },
+    { date: "2026-10-11", name: "Maharaja Agrasen Jayanti" },
+    { date: "2026-10-20", name: "Dusshera" },
+    { date: "2026-10-26", name: "Valmiki Jayanti" },
+    { date: "2026-11-01", name: "Haryana Day" },
+    { date: "2026-11-08", name: "Diwali" },
+    { date: "2026-11-24", name: "Guru Nanak Birthday" },
+    { date: "2026-12-25", name: "Christmas" },
+    { date: "2027-01-23", name: "Sir Chhotu Ram Jayanti" },
+    { date: "2027-01-26", name: "Republic Day" },
+    { date: "2027-03-06", name: "Maha Shivaratri*" },
+    { date: "2027-03-07", name: "Maha Shivaratri*" },
+    { date: "2027-03-10", name: "Id-Ul-Fitr" },
+    { date: "2027-03-22", name: "Holi" },
+    { date: "2027-03-23", name: "Shaheed Bhagat Singh Martyrdom Day" },
+    { date: "2027-03-26", name: "Good Friday" }
+  ];
+
+  function buildDefaultSchoolHolidays() {
+    return DEFAULT_SCHOOL_HOLIDAYS.map(function (h, i) {
+      return { id: "sh_seed_" + i, date: h.date, name: h.name };
+    });
+  }
+
   // In-memory cache only (not persisted) so holiday data is always fresh next visit.
   var holidayCache = {};
 
@@ -607,8 +647,8 @@
       weeklyPlan: {},
       entries: {},
       countryCode: "IN",
-      profile: { kidName: "", kidClass: "", parentName: "", schoolLocation: "" },
-      schoolHolidays: []
+      profile: { kidName: "", kidClass: "", parentName: "", schoolLocation: "Gurgaon, Haryana" },
+      schoolHolidays: buildDefaultSchoolHolidays()
     };
   }
 
@@ -620,7 +660,7 @@
   if (state.countryCode === undefined) state.countryCode = "IN";
   if (!state.profile) state.profile = { kidName: "", kidClass: "", parentName: "", schoolLocation: "" };
   if (state.profile.schoolLocation === undefined) state.profile.schoolLocation = "";
-  if (!Array.isArray(state.schoolHolidays)) state.schoolHolidays = [];
+  if (!Array.isArray(state.schoolHolidays)) state.schoolHolidays = buildDefaultSchoolHolidays();
   var mode = "kid";
   var draftSelection = null;
   var draftNote = null;
@@ -988,14 +1028,14 @@
     // School holidays (manually entered — no public API covers this)
     var schoolHolCard = el("div", "card");
     schoolHolCard.appendChild(el("h3", null, "🏫 School holidays"));
-    schoolHolCard.appendChild(el("div", "parent-note", "Add the exact dates your child's school is closed, from the school's own calendar or circular. There's no public API for this — add each date once here and the app will remember it and flag it automatically, ahead of the general public holiday guess below."));
+    schoolHolCard.appendChild(el("div", "parent-note", "Pre-loaded with DPS Gurgaon's published 2026–27 holiday list. There's no public API for school-specific holidays — edit names, remove any that don't apply, or add more from the school's own calendar/circular. These take priority over the general public holiday guess below."));
 
-    var sortedSchoolHolidays = state.schoolHolidays.slice().sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
-    if (!sortedSchoolHolidays.length) {
-      schoolHolCard.appendChild(el("div", "empty-hint", "No dates added yet."));
+    var upcomingSchoolHolidays = getUpcomingSchoolHolidays(state.schoolHolidays.length);
+    if (!upcomingSchoolHolidays.length) {
+      schoolHolCard.appendChild(el("div", "empty-hint", "No upcoming dates added yet."));
     } else {
       var shList = el("div");
-      sortedSchoolHolidays.forEach(function (h) {
+      upcomingSchoolHolidays.forEach(function (h) {
         var row = el("span", "subject-mini on", formatShortDate(h.date) + " — " + escapeHtml(h.name));
         var rm = el("span", "rm", "✕");
         rm.addEventListener("click", function (ev) {
