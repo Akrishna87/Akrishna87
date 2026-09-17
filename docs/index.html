@@ -490,7 +490,7 @@
   // can add or remove others from Parent mode. The Firestore security
   // rule is what actually enforces all of this; REQUIRE_SIGN_IN just
   // controls whether this client attempts to sign in at all.
-  var REQUIRE_SIGN_IN = false;
+  var REQUIRE_SIGN_IN = true;
   var SEED_OWNER_EMAIL = "tarapani0416@gmail.com";
 
   var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
