@@ -532,13 +532,11 @@
       var authInst = authMod.getAuth(app);
 
       authApi.signIn = function () {
-        authMod.signInWithRedirect(authInst, new authMod.GoogleAuthProvider());
+        authMod.signInWithPopup(authInst, new authMod.GoogleAuthProvider()).catch(function (err) {
+          console.warn("Cloud sync: sign-in failed", err);
+        });
       };
       authApi.signOut = function () { authMod.signOut(authInst); };
-
-      authMod.getRedirectResult(authInst).catch(function (err) {
-        console.warn("Cloud sync: redirect sign-in failed", err);
-      });
 
       function enterFamily(role, familyId) {
         authState.familyRole = role;
