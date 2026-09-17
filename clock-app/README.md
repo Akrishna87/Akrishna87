@@ -1,6 +1,6 @@
 # World Clock
 
-A small, dependency-free, single-file web app for live world clocks and timezone conversion.
+A small, dependency-free web app for live world clocks and timezone conversion. Installable to the home screen on both iOS and Android.
 
 ## Features
 
@@ -8,10 +8,16 @@ A small, dependency-free, single-file web app for live world clocks and timezone
 - London automatically switches between GMT and BST — daylight saving is handled by the browser's timezone database, not hardcoded.
 - Add any other IANA timezone as an extra clock; your selection is saved in `localStorage` so it's still there next time you open the app.
 - Time converter: pick a date, time, and source timezone (e.g. "10 pm in London"), and see the equivalent time in India and every other clock you've added.
+- Mobile-friendly layout, and installable as a home-screen app (see below).
 
 ## Running it
 
-Everything (markup, CSS, JS) lives in the single `index.html` file — no build step, no server, and no other files it depends on. Just open it directly in a browser, or serve it (e.g. via GitHub Pages, or `python3 -m http.server 8000` locally) if you'd rather visit it as a URL.
+All the markup, CSS, and JS live in the single `index.html` file — no build step required. Just open it directly in a browser. `manifest.json`, `sw.js`, and `icons/` are optional extras that only matter when the app is served over http(s) (e.g. via GitHub Pages or `python3 -m http.server 8000`) — they enable "Add to Home Screen" installability and offline support, and are silently skipped when you open `index.html` straight from disk.
+
+## Installing on your phone
+
+- **iOS (Safari)**: open the site, tap the Share icon, then "Add to Home Screen". It gets its own icon and opens full-screen, no App Store or Apple Developer account needed.
+- **Android (Chrome)**: open the site, tap the ⋮ menu, then "Add to Home screen" / "Install app". Chrome may also offer an install prompt automatically.
 
 ## How the conversion works
 
