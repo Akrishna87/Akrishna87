@@ -533,6 +533,29 @@
     return null;
   }
 
+  function getUpcomingHolidays(countryCode, count) {
+    if (!countryCode) return [];
+    var today = todayDate();
+    var year = today.getFullYear();
+    var thisYear = holidayCache[countryCode + "-" + year];
+    var nextYear = holidayCache[countryCode + "-" + (year + 1)];
+    if (thisYear === undefined) fetchHolidays(year, countryCode);
+    if (nextYear === undefined) fetchHolidays(year + 1, countryCode);
+    var combined = [];
+    if (Array.isArray(thisYear)) combined = combined.concat(thisYear);
+    if (Array.isArray(nextYear)) combined = combined.concat(nextYear);
+    var todayKey = dateKey(today);
+    combined = combined.filter(function (h) { return h.date >= todayKey; });
+    combined.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+    return combined.slice(0, count);
+  }
+
+  function formatShortDate(key) {
+    var parts = key.split("-");
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " (" + WEEKDAY_SHORT[d.getDay()] + ")";
+  }
+
   function loadState() {
     var raw = null;
     try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
@@ -547,7 +570,7 @@
       weeklyPlan: {},
       entries: {},
       countryCode: "IN",
-      profile: { kidName: "", kidClass: "", parentName: "" }
+      profile: { kidName: "", kidClass: "", parentName: "", schoolLocation: "" }
     };
   }
 
@@ -557,7 +580,8 @@
 
   var state = loadState();
   if (state.countryCode === undefined) state.countryCode = "IN";
-  if (!state.profile) state.profile = { kidName: "", kidClass: "", parentName: "" };
+  if (!state.profile) state.profile = { kidName: "", kidClass: "", parentName: "", schoolLocation: "" };
+  if (state.profile.schoolLocation === undefined) state.profile.schoolLocation = "";
   var mode = "kid";
   var draftSelection = null;
   var draftNote = null;
@@ -860,11 +884,21 @@
     parentNameField.appendChild(el("label", null, "🧑 Parent's name"));
     var parentNameIn = document.createElement("input");
     parentNameIn.type = "text";
-    parentNameIn.placeholder = "e.g. Aravind";
+    parentNameIn.placeholder = "e.g. Tanvi";
     parentNameIn.value = state.profile.parentName || "";
     parentNameIn.addEventListener("input", function () { setProfileField("parentName", parentNameIn.value); });
     parentNameField.appendChild(parentNameIn);
     profileGrid.appendChild(parentNameField);
+
+    var schoolLocationField = el("div", "profile-field");
+    schoolLocationField.appendChild(el("label", null, "📍 School location"));
+    var schoolLocationIn = document.createElement("input");
+    schoolLocationIn.type = "text";
+    schoolLocationIn.placeholder = "e.g. Gurgaon, Haryana";
+    schoolLocationIn.value = state.profile.schoolLocation || "";
+    schoolLocationIn.addEventListener("input", function () { setProfileField("schoolLocation", schoolLocationIn.value); });
+    schoolLocationField.appendChild(schoolLocationIn);
+    profileGrid.appendChild(schoolLocationField);
 
     profileCard.appendChild(profileGrid);
     app.appendChild(profileCard);
@@ -898,9 +932,28 @@
     select.addEventListener("change", function () { setCountryCode(select.value); });
     countryField.appendChild(select);
     summary.appendChild(countryField);
-    summary.appendChild(el("div", "parent-note", "Best-effort only — uses a public holiday calendar, not your specific school's calendar."));
+    summary.appendChild(el("div", "parent-note", "Best-effort only — this is a national public holiday calendar, not your specific school's calendar" + (state.profile.schoolLocation ? " for " + escapeHtml(state.profile.schoolLocation) : "") + ", so state/local school holidays won't show up here. Always double-check with the school."));
 
     app.appendChild(summary);
+
+    if (state.countryCode) {
+      var holidayListCard = el("div", "card");
+      holidayListCard.appendChild(el("h3", null, "🗓️ Upcoming public holidays"));
+      var upcoming = getUpcomingHolidays(state.countryCode, 6);
+      if (!upcoming.length) {
+        holidayListCard.appendChild(el("div", "empty-hint", "Loading holiday calendar…"));
+      } else {
+        var hList = el("div");
+        upcoming.forEach(function (h) {
+          var row = el("div", "history-item");
+          row.appendChild(el("div", "hdate", formatShortDate(h.date)));
+          row.appendChild(el("div", null, escapeHtml(h.localName || h.name)));
+          hList.appendChild(row);
+        });
+        holidayListCard.appendChild(hList);
+      }
+      app.appendChild(holidayListCard);
+    }
 
     // Weekly plan editor
     var planCard = el("div", "card");
