@@ -465,6 +465,68 @@
 
   var STORAGE_KEY = "notebookTracker.v1";
 
+  // ---- Optional cross-device sync (Firebase Firestore) ----
+  // Leave this null to keep the app exactly as before: fully local, no
+  // internet dependency, data stays on the one device/browser it's used on.
+  // Fill it in with a Firebase project's config (from the Firebase console
+  // → Project settings → your web app) to sync one shared family record
+  // live across every device that opens this page.
+  var FIREBASE_CONFIG = null;
+  /* Example:
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSy...",
+    authDomain: "your-project.firebaseapp.com",
+    projectId: "your-project",
+    storageBucket: "your-project.appspot.com",
+    messagingSenderId: "...",
+    appId: "..."
+  };
+  */
+  var FIREBASE_SDK_VERSION = "10.14.1";
+
+  var cloud = { docRef: null, setDoc: null, ready: false };
+  var applyingRemoteUpdate = false;
+
+  function initCloudSync() {
+    if (!FIREBASE_CONFIG) return;
+    Promise.all([
+      import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-firestore.js")
+    ]).then(function (mods) {
+      var appMod = mods[0], fsMod = mods[1];
+      var app = appMod.initializeApp(FIREBASE_CONFIG);
+      var db = fsMod.getFirestore(app);
+      cloud.docRef = fsMod.doc(db, "notebookTracker", "family");
+      cloud.setDoc = fsMod.setDoc;
+      cloud.ready = true;
+      render();
+      fsMod.onSnapshot(cloud.docRef, function (snap) {
+        if (!snap.exists()) {
+          pushCloudUpdate();
+          return;
+        }
+        var remote = snap.data();
+        if (JSON.stringify(remote) === JSON.stringify(state)) return;
+        applyingRemoteUpdate = true;
+        state = remote;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+        render();
+        applyingRemoteUpdate = false;
+      }, function (err) {
+        console.warn("Cloud sync: listen failed", err);
+      });
+    }).catch(function (err) {
+      console.warn("Cloud sync: unavailable", err);
+    });
+  }
+
+  function pushCloudUpdate() {
+    if (!cloud.ready || applyingRemoteUpdate) return;
+    cloud.setDoc(cloud.docRef, state).catch(function (err) {
+      console.warn("Cloud sync: push failed", err);
+    });
+  }
+
   var DEFAULT_SUBJECTS = [
     { id: "math", name: "Math", emoji: "🔢" },
     { id: "science", name: "Science", emoji: "🔬" },
@@ -654,6 +716,7 @@
 
   function saveState() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    pushCloudUpdate();
   }
 
   var state = loadState();
@@ -833,6 +896,7 @@
 
     if (justSaved) {
       app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
+    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only")));
       var entry = state.entries[key];
       var card = el("div", "card confirm");
       card.appendChild(el("div", "emoji-row", "🎉🎒✨"));
@@ -868,6 +932,7 @@
     ensureDraft();
 
     app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
+    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only")));
 
     var schoolHoliday = getSchoolHolidayForDate(d);
     if (schoolHoliday) {
@@ -931,6 +996,7 @@
     var entry = state.entries[key];
 
     app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
+    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only")));
 
     var parentSchoolHoliday = getSchoolHolidayForDate(d);
     if (parentSchoolHoliday) {
@@ -1237,6 +1303,7 @@
   }
 
   render();
+  initCloudSync();
 })();
 </script>
 </body>
