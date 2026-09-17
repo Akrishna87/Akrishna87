@@ -274,7 +274,7 @@ button:hover {
 "use strict";
 
 const DEFAULT_ZONES = [
-  { tz: "Asia/Kolkata", city: "India (New Delhi/Mumbai)", removable: false },
+  { tz: "Asia/Kolkata", city: "India", removable: false },
   { tz: "Europe/London", city: "London", removable: false },
 ];
 
@@ -481,35 +481,49 @@ document.getElementById("addZoneBtn").addEventListener("click", () => {
   populateConverterZoneSelect();
 });
 
+// Digits-only parts (no month/weekday names) so the wall-time round-trip
+// below never depends on a locale's abbreviation spelling.
+function numericPartsInZone(date, tz) {
+  const dtf = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = {};
+  for (const p of dtf.formatToParts(date)) {
+    parts[p.type] = p.value;
+  }
+  return parts;
+}
+
 // Converts a wall-clock date/time meant for `tz` into the UTC instant it
 // represents. There's no native API for this, so we guess (treating the
 // wall time as UTC), see what that guess renders as in `tz`, and correct
-// by the difference. One correction pass is enough outside DST-transition
-// instants; a second pass handles those too.
+// by the difference. A couple of correction passes handle DST-transition
+// edges too.
 function zonedWallTimeToUtc(year, month, day, hour, minute, tz) {
-  let guess = Date.UTC(year, month - 1, day, hour, minute, 0);
-  for (let i = 0; i < 2; i++) {
-    const parts = formatParts(new Date(guess), tz);
+  const wanted = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let guess = wanted;
+  for (let i = 0; i < 3; i++) {
+    const p = numericPartsInZone(new Date(guess), tz);
     const shown = Date.UTC(
-      Number(parts.year),
-      monthShortToIndex(parts.month),
-      Number(parts.day),
-      Number(parts.hour),
-      Number(parts.minute),
-      Number(parts.second)
+      Number(p.year),
+      Number(p.month) - 1,
+      Number(p.day),
+      Number(p.hour),
+      Number(p.minute),
+      Number(p.second)
     );
-    const wanted = Date.UTC(year, month - 1, day, hour, minute, 0);
     const diff = wanted - shown;
     if (diff === 0) break;
     guess += diff;
   }
   return new Date(guess);
-}
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function monthShortToIndex(short) {
-  const idx = MONTHS.indexOf(short);
-  return idx === -1 ? 0 : idx;
 }
 
 function renderConverterResults(utcInstant) {
