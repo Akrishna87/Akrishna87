@@ -84,6 +84,30 @@
     font-size: 0.95rem;
     margin-top: 2px;
   }
+  .today-line {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .holiday-banner {
+    background: #fff3cd;
+    border: 2px solid #ffe08a;
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .holiday-banner .small {
+    display: block;
+    font-weight: 500;
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
 
   .subject-grid {
     display: grid;
@@ -295,6 +319,35 @@
     font-weight: 700;
     cursor: pointer;
   }
+  .add-subject-form button.cancel {
+    background: #eee;
+    color: var(--ink);
+  }
+
+  .subject-mini .edit {
+    color: #4a90d9;
+    margin-left: 6px;
+    cursor: pointer;
+  }
+
+  .country-field {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .country-field label {
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .country-field select {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 2px solid #eee;
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
 
   .emoji-palette {
     display: flex;
@@ -398,6 +451,52 @@
 
   var EMOJI_PALETTE = ["📕","📗","📘","📙","📓","📔","🧮","🔬","🎨","🎵","⚽","🏀","💻","🧠","🌍","🌱","✍️","📚","🧪","⭐","🧵","🎭","🗺️","🧩"];
 
+  var COUNTRY_OPTIONS = [
+    { code: "", label: "Off (no holiday check)" },
+    { code: "IN", label: "🇮🇳 India" },
+    { code: "US", label: "🇺🇸 United States" },
+    { code: "GB", label: "🇬🇧 United Kingdom" },
+    { code: "CA", label: "🇨🇦 Canada" },
+    { code: "AU", label: "🇦🇺 Australia" },
+    { code: "SG", label: "🇸🇬 Singapore" },
+    { code: "AE", label: "🇦🇪 UAE" }
+  ];
+
+  // In-memory cache only (not persisted) so holiday data is always fresh next visit.
+  var holidayCache = {};
+
+  function fetchHolidays(year, countryCode) {
+    var cacheKey = countryCode + "-" + year;
+    if (holidayCache[cacheKey] !== undefined) return;
+    holidayCache[cacheKey] = "loading";
+    fetch("https://date.nager.at/api/v3/publicholidays/" + year + "/" + countryCode)
+      .then(function (res) { if (!res.ok) throw new Error("bad response"); return res.json(); })
+      .then(function (data) {
+        holidayCache[cacheKey] = Array.isArray(data) ? data : [];
+        render();
+      })
+      .catch(function () {
+        holidayCache[cacheKey] = null; // fetch failed / unavailable — fail silently, non-blocking
+      });
+  }
+
+  function getHolidayForDate(d, countryCode) {
+    if (!countryCode) return undefined;
+    var year = d.getFullYear();
+    var cacheKey = countryCode + "-" + year;
+    var cached = holidayCache[cacheKey];
+    if (cached === undefined) {
+      fetchHolidays(year, countryCode);
+      return undefined;
+    }
+    if (!cached || cached === "loading") return undefined;
+    var key = dateKey(d);
+    for (var i = 0; i < cached.length; i++) {
+      if (cached[i].date === key) return cached[i];
+    }
+    return null;
+  }
+
   function loadState() {
     var raw = null;
     try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
@@ -410,7 +509,8 @@
     return {
       subjects: DEFAULT_SUBJECTS.slice(),
       weeklyPlan: {},
-      entries: {}
+      entries: {},
+      countryCode: "IN"
     };
   }
 
@@ -419,6 +519,7 @@
   }
 
   var state = loadState();
+  if (state.countryCode === undefined) state.countryCode = "IN";
   var mode = "kid";
   var draftSelection = null;
   var draftNote = null;
@@ -432,7 +533,12 @@
     return d;
   }
   function formatLong(d) {
-    return WEEKDAY_NAMES[d.getDay()] + ", " + d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+    return WEEKDAY_NAMES[d.getDay()] + ", " + d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  }
+  function todayDate() {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
   }
 
   function subjectById(id) {
@@ -515,6 +621,24 @@
     render();
   }
 
+  function renameSubject(id, name, emoji) {
+    name = (name || "").trim();
+    emoji = (emoji || "").trim() || "⭐";
+    if (!name) return;
+    var s = subjectById(id);
+    if (!s) return;
+    s.name = name;
+    s.emoji = emoji;
+    saveState();
+    render();
+  }
+
+  function setCountryCode(code) {
+    state.countryCode = code;
+    saveState();
+    render();
+  }
+
   function toggleWeeklyPlanSubject(day, id) {
     if (!state.weeklyPlan[day]) state.weeklyPlan[day] = [];
     var arr = state.weeklyPlan[day];
@@ -558,6 +682,7 @@
     var alreadySaved = !!state.entries[key];
 
     if (justSaved) {
+      app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
       var entry = state.entries[key];
       var card = el("div", "card confirm");
       card.appendChild(el("div", "emoji-row", "🎉🎒✨"));
@@ -591,6 +716,15 @@
     }
 
     ensureDraft();
+
+    app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
+
+    var holiday = getHolidayForDate(d, state.countryCode);
+    if (holiday) {
+      var hb = el("div", "holiday-banner", "🎉 Tomorrow might be a holiday: " + escapeHtml(holiday.localName || holiday.name));
+      hb.appendChild(el("span", "small", "Double-check with mom — school might still be open!"));
+      app.appendChild(hb);
+    }
 
     var banner = el("div", "card date-banner");
     banner.appendChild(el("div", "big", "🌟 What are you bringing tomorrow?"));
@@ -633,6 +767,15 @@
     var key = dateKey(d);
     var entry = state.entries[key];
 
+    app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
+
+    var holiday = getHolidayForDate(d, state.countryCode);
+    if (holiday) {
+      var hb = el("div", "holiday-banner", "🎉 Tomorrow might be a public holiday: " + escapeHtml(holiday.localName || holiday.name));
+      hb.appendChild(el("span", "small", "Based on a general public holiday calendar — always confirm against your school's own calendar."));
+      app.appendChild(hb);
+    }
+
     var summary = el("div", "card");
     summary.appendChild(el("h3", null, "🎒 Tomorrow — " + formatLong(d)));
     if (entry && entry.items.length) {
@@ -648,6 +791,22 @@
     } else {
       summary.appendChild(el("div", "empty-hint", "Not filled in yet — ask your kid to open Kid mode! 🧒"));
     }
+
+    var countryField = el("div", "country-field");
+    countryField.appendChild(el("label", null, "🌍 Public holiday check:"));
+    var select = document.createElement("select");
+    COUNTRY_OPTIONS.forEach(function (opt) {
+      var o = document.createElement("option");
+      o.value = opt.code;
+      o.textContent = opt.label;
+      if (opt.code === (state.countryCode || "")) o.selected = true;
+      select.appendChild(o);
+    });
+    select.addEventListener("change", function () { setCountryCode(select.value); });
+    countryField.appendChild(select);
+    summary.appendChild(countryField);
+    summary.appendChild(el("div", "mom-note", "Best-effort only — uses a public holiday calendar, not your specific school's calendar."));
+
     app.appendChild(summary);
 
     // Weekly plan editor
@@ -683,9 +842,47 @@
     // Manage subjects
     var subCard = el("div", "card");
     subCard.appendChild(el("h3", null, "🧾 Manage notebook list"));
+    subCard.appendChild(el("div", "mom-note", "Tap ✏️ to rename a subject or change its icon."));
+    var editingId = renderMom._editingId || null;
     var subList = el("div");
     state.subjects.forEach(function (s) {
+      if (s.id === editingId) {
+        var editForm = el("div", "add-subject-form");
+        var eEmojiIn = document.createElement("input");
+        eEmojiIn.className = "emoji-in";
+        eEmojiIn.value = s.emoji;
+        eEmojiIn.maxLength = 4;
+        var eNameIn = document.createElement("input");
+        eNameIn.className = "name-in";
+        eNameIn.value = s.name;
+        var eSaveBtn = document.createElement("button");
+        eSaveBtn.textContent = "Save";
+        eSaveBtn.addEventListener("click", function () {
+          renameSubject(s.id, eNameIn.value, eEmojiIn.value);
+          renderMom._editingId = null;
+        });
+        var eCancelBtn = document.createElement("button");
+        eCancelBtn.className = "cancel";
+        eCancelBtn.textContent = "Cancel";
+        eCancelBtn.addEventListener("click", function () {
+          renderMom._editingId = null;
+          render();
+        });
+        editForm.appendChild(eEmojiIn);
+        editForm.appendChild(eNameIn);
+        editForm.appendChild(eSaveBtn);
+        editForm.appendChild(eCancelBtn);
+        subList.appendChild(editForm);
+        return;
+      }
       var chip = el("span", "subject-mini on", s.emoji + " " + escapeHtml(s.name));
+      var editIcon = el("span", "edit", "✏️");
+      editIcon.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        renderMom._editingId = s.id;
+        render();
+      });
+      chip.appendChild(editIcon);
       var rm = el("span", "rm", "✕");
       rm.addEventListener("click", function (ev) {
         ev.stopPropagation();
