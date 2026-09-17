@@ -471,20 +471,17 @@
   // Fill it in with a Firebase project's config (from the Firebase console
   // → Project settings → your web app) to sync one shared family record
   // live across every device that opens this page.
-  var FIREBASE_CONFIG = null;
-  /* Example:
   var FIREBASE_CONFIG = {
-    apiKey: "AIzaSy...",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "...",
-    appId: "..."
+    apiKey: "AIzaSyCk68zOHD-pn75g63XnJ5NrK6iRSs4e3iw",
+    authDomain: "school-notebook-tracker.firebaseapp.com",
+    projectId: "school-notebook-tracker",
+    storageBucket: "school-notebook-tracker.firebasestorage.app",
+    messagingSenderId: "799196048612",
+    appId: "1:799196048612:web:dd48060af1203e2d1e10f1"
   };
-  */
   var FIREBASE_SDK_VERSION = "10.14.1";
 
-  var cloud = { docRef: null, setDoc: null, ready: false };
+  var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
   var applyingRemoteUpdate = false;
 
   function initCloudSync() {
@@ -499,6 +496,7 @@
       cloud.docRef = fsMod.doc(db, "notebookTracker", "family");
       cloud.setDoc = fsMod.setDoc;
       cloud.ready = true;
+      cloud.failed = false;
       render();
       fsMod.onSnapshot(cloud.docRef, function (snap) {
         if (!snap.exists()) {
@@ -514,9 +512,14 @@
         applyingRemoteUpdate = false;
       }, function (err) {
         console.warn("Cloud sync: listen failed", err);
+        cloud.ready = false;
+        cloud.failed = true;
+        render();
       });
     }).catch(function (err) {
       console.warn("Cloud sync: unavailable", err);
+      cloud.failed = true;
+      render();
     });
   }
 
@@ -896,7 +899,7 @@
 
     if (justSaved) {
       app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
-    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only")));
+    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (cloud.failed ? "💾 Saved on this device only (sync unavailable)" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only"))));
       var entry = state.entries[key];
       var card = el("div", "card confirm");
       card.appendChild(el("div", "emoji-row", "🎉🎒✨"));
@@ -932,7 +935,7 @@
     ensureDraft();
 
     app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
-    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only")));
+    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (cloud.failed ? "💾 Saved on this device only (sync unavailable)" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only"))));
 
     var schoolHoliday = getSchoolHolidayForDate(d);
     if (schoolHoliday) {
@@ -996,7 +999,7 @@
     var entry = state.entries[key];
 
     app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
-    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only")));
+    app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (cloud.failed ? "💾 Saved on this device only (sync unavailable)" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only"))));
 
     var parentSchoolHoliday = getSchoolHolidayForDate(d);
     if (parentSchoolHoliday) {
