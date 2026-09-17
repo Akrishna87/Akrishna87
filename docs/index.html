@@ -481,33 +481,31 @@
   };
   var FIREBASE_SDK_VERSION = "10.14.1";
 
-  // Set to true to require Google Sign-In for the whole app. Who's
-  // actually allowed in is NOT listed here — it lives in a Firestore
-  // document (notebookTracker/access) that the parent manages from
-  // inside the app itself (no code changes needed to add/remove
-  // someone). SEED_OWNER_EMAIL is only used once, to bootstrap that
-  // document the very first time — after that, whoever is in the list
-  // can add or remove others from Parent mode. The Firestore security
-  // rule is what actually enforces all of this; REQUIRE_SIGN_IN just
-  // controls whether this client attempts to sign in at all.
+  // Set to true to require Google Sign-In for the whole app. This is a
+  // public, multi-tenant setup: ANY Google account can sign in, and the
+  // first time a new account signs in it automatically becomes the
+  // "parent" of its own brand-new, private family workspace (keyed by
+  // that account's own email — see the users/{email} + families/{id}
+  // model below). A parent can then add their kid's Gmail from Parent
+  // mode; a family's data is only ever visible to that family's own
+  // parent + kids, enforced by the Firestore security rule (not just
+  // this client). ADMIN_EMAILS is a separate, hardcoded, non-self-service
+  // role: those accounts never get a family at all and never see any
+  // family's data — strictly account management, nothing else.
   var REQUIRE_SIGN_IN = true;
-  var SEED_OWNER_EMAIL = "tarapani0416@gmail.com";
+  var ADMIN_EMAILS = ["raravindkrishna@gmail.com"];
 
   var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
   var applyingRemoteUpdate = false;
-  var authApi = {
-    signIn: null, signOut: null,
-    addMember: null, removeMember: null,
-    addAdmin: null, removeAdmin: null
-  };
+  var authApi = { signIn: null, signOut: null, addKid: null };
   var authState = {
     required: !!(FIREBASE_CONFIG && REQUIRE_SIGN_IN),
     ready: false,
     user: null,
-    role: null, // 'member' (full access) | 'admin' (manages access list only)
+    isAdmin: false,
+    familyRole: null, // 'parent' | 'kid'
     deniedEmail: null,
-    members: null,
-    admins: null
+    kidAddStatus: null // { ok: true/false, text: "..." } — transient UI feedback
   };
 
   function initFirebase() {
@@ -523,133 +521,91 @@
       var appMod = mods[0], fsMod = mods[1], authMod = mods[2];
       var app = appMod.initializeApp(FIREBASE_CONFIG);
       var db = fsMod.getFirestore(app);
-      cloud.docRef = fsMod.doc(db, "notebookTracker", "family");
-      cloud.setDoc = fsMod.setDoc;
 
       if (!authState.required) {
+        cloud.docRef = fsMod.doc(db, "notebookTracker", "family");
+        cloud.setDoc = fsMod.setDoc;
         startFirestoreSync(fsMod);
         return;
       }
 
-      var accessRef = fsMod.doc(db, "notebookTracker", "access");
       var authInst = authMod.getAuth(app);
 
       authApi.signIn = function () {
         authMod.signInWithRedirect(authInst, new authMod.GoogleAuthProvider());
       };
       authApi.signOut = function () { authMod.signOut(authInst); };
-      authApi.addMember = function (email) {
-        email = (email || "").trim().toLowerCase();
-        if (!email) return;
-        fsMod.updateDoc(accessRef, { members: fsMod.arrayUnion(email) }).catch(function (err) {
-          console.warn("Cloud sync: add member failed", err);
-        });
-      };
-      authApi.removeMember = function (email) {
-        fsMod.updateDoc(accessRef, { members: fsMod.arrayRemove(email) }).catch(function (err) {
-          console.warn("Cloud sync: remove member failed", err);
-        });
-      };
-      authApi.addAdmin = function (email) {
-        email = (email || "").trim().toLowerCase();
-        if (!email) return;
-        fsMod.updateDoc(accessRef, { admins: fsMod.arrayUnion(email) }).catch(function (err) {
-          console.warn("Cloud sync: add admin failed", err);
-        });
-      };
-      authApi.removeAdmin = function (email) {
-        fsMod.updateDoc(accessRef, { admins: fsMod.arrayRemove(email) }).catch(function (err) {
-          console.warn("Cloud sync: remove admin failed", err);
-        });
-      };
 
       authMod.getRedirectResult(authInst).catch(function (err) {
         console.warn("Cloud sync: redirect sign-in failed", err);
       });
 
-      // A pre-existing doc from before roles existed only has `emails`
-      // (everyone had full access). Copy it into `members` once so
-      // nobody loses access; harmless to run more than once.
-      function migrateLegacyEmailsIfNeeded(data) {
-        if (!data.members && data.emails) {
-          fsMod.updateDoc(accessRef, {
-            members: data.emails.map(function (e) { return String(e).toLowerCase(); }),
-            admins: data.admins || []
-          }).catch(function (err) {
-            console.warn("Cloud sync: legacy access-list migration failed", err);
-          });
-        }
-      }
-
-      function grantAccess(user, role) {
-        authState.user = user;
-        authState.role = role;
-        authState.deniedEmail = null;
-        fsMod.onSnapshot(accessRef, function (snap) {
-          if (snap.exists()) {
-            var data = snap.data();
-            authState.members = data.members || data.emails || [];
-            authState.admins = data.admins || [];
+      function enterFamily(role, familyId) {
+        authState.familyRole = role;
+        cloud.docRef = fsMod.doc(db, "families", familyId);
+        cloud.setDoc = fsMod.setDoc;
+        authApi.addKid = function (kidEmail) {
+          kidEmail = (kidEmail || "").trim().toLowerCase();
+          if (!kidEmail) return;
+          var kidRef = fsMod.doc(db, "users", kidEmail);
+          fsMod.setDoc(kidRef, { role: "kid", familyId: familyId }).then(function () {
+            authState.kidAddStatus = { ok: true, text: "Added " + kidEmail + "." };
             render();
-          }
-        }, function (err) {
-          console.warn("Cloud sync: access list listen failed", err);
-        });
-        if (role === "member") {
-          startFirestoreSync(fsMod);
-        } else {
-          render();
-        }
+          }).catch(function (err) {
+            console.warn("Cloud sync: add kid failed", err);
+            authState.kidAddStatus = { ok: false, text: "Couldn't add " + kidEmail + " — that email may already belong to another family." };
+            render();
+          });
+        };
+        startFirestoreSync(fsMod);
       }
 
       function denyAccess(user) {
         authState.deniedEmail = user.email;
         authState.user = null;
-        authState.role = null;
         authMod.signOut(authInst);
         render();
-      }
-
-      // Bootstraps notebookTracker/access with just this account when it
-      // doesn't exist yet. The security rule only allows this to succeed
-      // for SEED_OWNER_EMAIL — anyone else gets denied here, which is
-      // indistinguishable (by design) from the doc already existing and
-      // this account simply not being on the list.
-      function tryBootstrapOrDeny(user, myEmail) {
-        fsMod.setDoc(accessRef, { members: [myEmail], admins: [] })
-          .then(function () { grantAccess(user, "member"); })
-          .catch(function () { denyAccess(user); });
       }
 
       authMod.onAuthStateChanged(authInst, function (user) {
         authState.ready = true;
         if (!user) {
           authState.user = null;
-          authState.role = null;
-          authState.members = null;
-          authState.admins = null;
+          authState.isAdmin = false;
+          authState.familyRole = null;
           render();
           return;
         }
         var myEmail = (user.email || "").toLowerCase();
-        fsMod.getDoc(accessRef).then(function (snap) {
+        authState.user = user;
+        authState.deniedEmail = null;
+
+        if (ADMIN_EMAILS.indexOf(myEmail) >= 0) {
+          authState.isAdmin = true;
+          authState.familyRole = null;
+          render();
+          return;
+        }
+        authState.isAdmin = false;
+
+        var userRef = fsMod.doc(db, "users", myEmail);
+        fsMod.getDoc(userRef).then(function (snap) {
           if (snap.exists()) {
             var data = snap.data();
-            migrateLegacyEmailsIfNeeded(data);
-            var members = (data.members || data.emails || []).map(function (e) { return String(e).toLowerCase(); });
-            var admins = (data.admins || []).map(function (e) { return String(e).toLowerCase(); });
-            if (members.indexOf(myEmail) >= 0) {
-              grantAccess(user, "member");
-            } else if (admins.indexOf(myEmail) >= 0) {
-              grantAccess(user, "admin");
-            } else {
-              denyAccess(user);
-            }
+            enterFamily(data.role, data.familyId);
           } else {
-            tryBootstrapOrDeny(user, myEmail);
+            // Brand new account — self-register as the parent/owner of a
+            // fresh, private family keyed by this account's own email.
+            fsMod.setDoc(userRef, { role: "parent", familyId: myEmail })
+              .then(function () { enterFamily("parent", myEmail); })
+              .catch(function (err) {
+                console.warn("Cloud sync: self-registration failed", err);
+                denyAccess(user);
+              });
           }
-        }).catch(function () {
-          tryBootstrapOrDeny(user, myEmail);
+        }).catch(function (err) {
+          console.warn("Cloud sync: user lookup failed", err);
+          denyAccess(user);
         });
       });
     }).catch(function (err) {
@@ -723,46 +679,6 @@
     { code: "SG", label: "🇸🇬 Singapore" },
     { code: "AE", label: "🇦🇪 UAE" }
   ];
-
-  // Seeded from DPS Gurgaon's published "List of Holidays 2026-27"
-  // (dpsgurgaon.org/list-of-holidays.php). Editable/removable in Parent mode.
-  var DEFAULT_SCHOOL_HOLIDAYS = [
-    { date: "2026-03-26", name: "Ram Navami" },
-    { date: "2026-03-31", name: "Mahavir Jayanti" },
-    { date: "2026-04-03", name: "Good Friday" },
-    { date: "2026-04-14", name: "Ambedkar Jayanti / Baisakhi" },
-    { date: "2026-04-19", name: "Parshuram Jayanti" },
-    { date: "2026-05-01", name: "Buddha Purnima" },
-    { date: "2026-05-27", name: "Id-Ul-Zuha (Bakrid)" },
-    { date: "2026-07-31", name: "Shaheed Udham Singh Martyrdom Day" },
-    { date: "2026-08-15", name: "Independence Day" },
-    { date: "2026-08-26", name: "Milad-Un-Nabi" },
-    { date: "2026-08-28", name: "Raksha Bandhan" },
-    { date: "2026-09-04", name: "Janmashtami" },
-    { date: "2026-09-23", name: "Shaheedi Diwas" },
-    { date: "2026-10-02", name: "Gandhi Jayanti" },
-    { date: "2026-10-11", name: "Maharaja Agrasen Jayanti" },
-    { date: "2026-10-20", name: "Dusshera" },
-    { date: "2026-10-26", name: "Valmiki Jayanti" },
-    { date: "2026-11-01", name: "Haryana Day" },
-    { date: "2026-11-08", name: "Diwali" },
-    { date: "2026-11-24", name: "Guru Nanak Birthday" },
-    { date: "2026-12-25", name: "Christmas" },
-    { date: "2027-01-23", name: "Sir Chhotu Ram Jayanti" },
-    { date: "2027-01-26", name: "Republic Day" },
-    { date: "2027-03-06", name: "Maha Shivaratri*" },
-    { date: "2027-03-07", name: "Maha Shivaratri*" },
-    { date: "2027-03-10", name: "Id-Ul-Fitr" },
-    { date: "2027-03-22", name: "Holi" },
-    { date: "2027-03-23", name: "Shaheed Bhagat Singh Martyrdom Day" },
-    { date: "2027-03-26", name: "Good Friday" }
-  ];
-
-  function buildDefaultSchoolHolidays() {
-    return DEFAULT_SCHOOL_HOLIDAYS.map(function (h, i) {
-      return { id: "sh_seed_" + i, date: h.date, name: h.name };
-    });
-  }
 
   // In-memory cache only (not persisted) so holiday data is always fresh next visit.
   var holidayCache = {};
@@ -873,8 +789,8 @@
       weeklyPlan: {},
       entries: {},
       countryCode: "IN",
-      profile: { kidName: "", kidClass: "", parentName: "", schoolLocation: "Gurgaon, Haryana" },
-      schoolHolidays: buildDefaultSchoolHolidays()
+      profile: { kidName: "", kidClass: "", parentName: "", schoolLocation: "" },
+      schoolHolidays: []
     };
   }
 
@@ -887,7 +803,7 @@
   if (state.countryCode === undefined) state.countryCode = "IN";
   if (!state.profile) state.profile = { kidName: "", kidClass: "", parentName: "", schoolLocation: "" };
   if (state.profile.schoolLocation === undefined) state.profile.schoolLocation = "";
-  if (!Array.isArray(state.schoolHolidays)) state.schoolHolidays = buildDefaultSchoolHolidays();
+  if (!Array.isArray(state.schoolHolidays)) state.schoolHolidays = [];
   var mode = "kid";
   var draftSelection = null;
   var draftNote = null;
@@ -1039,13 +955,13 @@
     btnKid.classList.toggle("active", mode === "kid");
     btnParent.classList.toggle("active", mode === "parent");
     titleEl.textContent = state.profile.kidName ? "🎒 " + state.profile.kidName + "'s Bag" : "🎒 Tomorrow's Bag";
-    modeToggleEl.style.display = (authState.required && (!authState.user || authState.role === "admin")) ? "none" : "flex";
+    modeToggleEl.style.display = (authState.required && (!authState.user || authState.isAdmin)) ? "none" : "flex";
     app.innerHTML = "";
     if (authState.required && !authState.user) {
       renderSignIn();
       return;
     }
-    if (authState.required && authState.role === "admin") {
+    if (authState.required && authState.isAdmin) {
       renderAdminOnly();
       return;
     }
@@ -1056,78 +972,27 @@
     }
   }
 
-  function renderAccessManagementCard() {
+  function renderAddKidCard() {
     var card = el("div", "card");
-    card.appendChild(el("h3", null, "🔐 Who can access this app"));
-
-    card.appendChild(el("div", "parent-note", "Full access — can see and edit everything, including this list:"));
-    var memberList = el("div");
-    (authState.members || []).forEach(function (memberEmail) {
-      var isMe = memberEmail.toLowerCase() === (authState.user.email || "").toLowerCase();
-      var chip = el("span", "subject-mini on", escapeHtml(memberEmail) + (isMe ? " (you)" : ""));
-      if (!isMe) {
-        var rm = el("span", "rm", "✕");
-        rm.addEventListener("click", function (ev) {
-          ev.stopPropagation();
-          if (confirm('Remove full access for "' + memberEmail + '"?') && authApi.removeMember) {
-            authApi.removeMember(memberEmail);
-          }
-        });
-        chip.appendChild(rm);
-      }
-      memberList.appendChild(chip);
+    card.appendChild(el("h3", null, "👨‍👩‍👧 Add your kid"));
+    card.appendChild(el("div", "parent-note", "Add your child's Gmail so they can sign in on their own device and see this same family's data."));
+    if (authState.kidAddStatus) {
+      card.appendChild(el("div", "parent-note", (authState.kidAddStatus.ok ? "✅ " : "⚠️ ") + escapeHtml(authState.kidAddStatus.text)));
+    }
+    var kidForm = el("div", "add-subject-form");
+    var kidIn = document.createElement("input");
+    kidIn.type = "email";
+    kidIn.className = "name-in";
+    kidIn.placeholder = "e.g. kid@gmail.com";
+    var kidBtn = document.createElement("button");
+    kidBtn.textContent = "Add";
+    kidBtn.addEventListener("click", function () {
+      if (authApi.addKid) authApi.addKid(kidIn.value);
+      kidIn.value = "";
     });
-    card.appendChild(memberList);
-
-    var memberForm = el("div", "add-subject-form");
-    var memberIn = document.createElement("input");
-    memberIn.type = "email";
-    memberIn.className = "name-in";
-    memberIn.placeholder = "e.g. kid@gmail.com";
-    var memberAddBtn = document.createElement("button");
-    memberAddBtn.textContent = "Add";
-    memberAddBtn.addEventListener("click", function () {
-      if (authApi.addMember) authApi.addMember(memberIn.value);
-      memberIn.value = "";
-    });
-    memberForm.appendChild(memberIn);
-    memberForm.appendChild(memberAddBtn);
-    card.appendChild(memberForm);
-
-    card.appendChild(el("div", "parent-note", "Manage-access only — can add/remove people here, but can't see the day-to-day notebook data:"));
-    var adminList = el("div");
-    (authState.admins || []).forEach(function (adminEmail) {
-      var isMe = adminEmail.toLowerCase() === (authState.user.email || "").toLowerCase();
-      var chip = el("span", "subject-mini on", escapeHtml(adminEmail) + (isMe ? " (you)" : ""));
-      if (!isMe) {
-        var rm = el("span", "rm", "✕");
-        rm.addEventListener("click", function (ev) {
-          ev.stopPropagation();
-          if (confirm('Remove access for "' + adminEmail + '"?') && authApi.removeAdmin) {
-            authApi.removeAdmin(adminEmail);
-          }
-        });
-        chip.appendChild(rm);
-      }
-      adminList.appendChild(chip);
-    });
-    card.appendChild(adminList);
-
-    var adminForm = el("div", "add-subject-form");
-    var adminIn = document.createElement("input");
-    adminIn.type = "email";
-    adminIn.className = "name-in";
-    adminIn.placeholder = "e.g. you@gmail.com";
-    var adminAddBtn = document.createElement("button");
-    adminAddBtn.textContent = "Add";
-    adminAddBtn.addEventListener("click", function () {
-      if (authApi.addAdmin) authApi.addAdmin(adminIn.value);
-      adminIn.value = "";
-    });
-    adminForm.appendChild(adminIn);
-    adminForm.appendChild(adminAddBtn);
-    card.appendChild(adminForm);
-
+    kidForm.appendChild(kidIn);
+    kidForm.appendChild(kidBtn);
+    card.appendChild(kidForm);
     return card;
   }
 
@@ -1135,15 +1000,14 @@
     var acctCard = el("div", "card");
     acctCard.style.textAlign = "center";
     acctCard.appendChild(el("div", "emoji-row", "🔐"));
-    acctCard.appendChild(el("h2", null, "Access management"));
-    acctCard.appendChild(el("div", "parent-note", "Signed in as " + escapeHtml(authState.user.email) + ". This account manages who's allowed in, but doesn't see the family's day-to-day notebook data."));
+    acctCard.appendChild(el("h2", null, "Admin"));
+    acctCard.appendChild(el("div", "parent-note", "Signed in as " + escapeHtml(authState.user.email) + ". This account is admin-only — it doesn't belong to any family and has no access to anyone's notebook data."));
     var signOutBtn = el("button", "big-btn secondary", "Sign out");
     signOutBtn.addEventListener("click", function () {
       if (authApi.signOut) authApi.signOut();
     });
     acctCard.appendChild(signOutBtn);
     app.appendChild(acctCard);
-    app.appendChild(renderAccessManagementCard());
   }
 
   function renderSignIn() {
@@ -1153,10 +1017,10 @@
       card.appendChild(el("div", null, "🔐 Checking sign-in…"));
     } else {
       card.appendChild(el("div", "emoji-row", "🔐"));
-      card.appendChild(el("h2", null, "Sign in required"));
-      card.appendChild(el("div", "parent-note", "This app is private to your family. Sign in with an authorized Google account to continue."));
+      card.appendChild(el("h2", null, "Sign in with Google"));
+      card.appendChild(el("div", "parent-note", "Sign in to get your own private family space — only you and whoever you add (like your kid) can see it."));
       if (authState.deniedEmail) {
-        card.appendChild(el("div", "parent-note", "⚠️ " + escapeHtml(authState.deniedEmail) + " isn't authorized for this app."));
+        card.appendChild(el("div", "parent-note", "⚠️ Something went wrong for " + escapeHtml(authState.deniedEmail) + " — please try again."));
       }
       var signInBtn = el("button", "big-btn", "Sign in with Google");
       signInBtn.addEventListener("click", function () {
@@ -1293,7 +1157,9 @@
       });
       acctLine.appendChild(signOutLink);
       app.appendChild(acctLine);
-      app.appendChild(renderAccessManagementCard());
+      if (authState.familyRole === "parent") {
+        app.appendChild(renderAddKidCard());
+      }
     }
 
     var parentSchoolHoliday = getSchoolHolidayForDate(d);
