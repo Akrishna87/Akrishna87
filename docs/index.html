@@ -229,23 +229,59 @@
     font-size: 1.05rem;
   }
 
-  .mom-summary-list {
+  .parent-summary-list {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin: 8px 0 0;
   }
-  .mom-summary-list span {
+  .parent-summary-list span {
     background: #f2f2f2;
     padding: 6px 12px;
     border-radius: 999px;
     font-weight: 700;
     font-size: 0.88rem;
   }
-  .mom-note {
+  .parent-note {
     margin-top: 10px;
     font-style: italic;
     color: var(--muted);
+  }
+
+  .profile-field {
+    margin-top: 10px;
+  }
+  .profile-field label {
+    display: block;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+  }
+  .profile-field input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 2px solid #eee;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  @media (min-width: 480px) {
+    .profile-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .kid-greet {
+    font-size: 1.1rem;
+    font-weight: 800;
+    text-align: center;
+  }
+  .class-tag {
+    color: var(--muted);
+    font-weight: 700;
   }
 
   .weekday-row {
@@ -414,7 +450,7 @@
     <h1>🎒 Tomorrow's Bag</h1>
     <div class="mode-toggle">
       <button id="btnKid" class="active">🧒 Kid</button>
-      <button id="btnMom">👩 Mom</button>
+      <button id="btnParent">🧑 Parent</button>
     </div>
   </header>
 
@@ -510,7 +546,8 @@
       subjects: DEFAULT_SUBJECTS.slice(),
       weeklyPlan: {},
       entries: {},
-      countryCode: "IN"
+      countryCode: "IN",
+      profile: { kidName: "", kidClass: "", parentName: "" }
     };
   }
 
@@ -520,6 +557,7 @@
 
   var state = loadState();
   if (state.countryCode === undefined) state.countryCode = "IN";
+  if (!state.profile) state.profile = { kidName: "", kidClass: "", parentName: "" };
   var mode = "kid";
   var draftSelection = null;
   var draftNote = null;
@@ -639,6 +677,13 @@
     render();
   }
 
+  function setProfileField(field, value) {
+    state.profile[field] = value;
+    saveState();
+    // No render() here on purpose — these fields are edited via free text input,
+    // and re-rendering on every keystroke would rebuild the DOM and drop focus.
+  }
+
   function toggleWeeklyPlanSubject(day, id) {
     if (!state.weeklyPlan[day]) state.weeklyPlan[day] = [];
     var arr = state.weeklyPlan[day];
@@ -652,20 +697,22 @@
   // ---------- Rendering ----------
 
   var app = document.getElementById("app");
+  var titleEl = document.querySelector("header h1");
   var btnKid = document.getElementById("btnKid");
-  var btnMom = document.getElementById("btnMom");
+  var btnParent = document.getElementById("btnParent");
 
   btnKid.addEventListener("click", function () { mode = "kid"; render(); });
-  btnMom.addEventListener("click", function () { mode = "mom"; render(); });
+  btnParent.addEventListener("click", function () { mode = "parent"; render(); });
 
   function render(justSaved) {
     btnKid.classList.toggle("active", mode === "kid");
-    btnMom.classList.toggle("active", mode === "mom");
+    btnParent.classList.toggle("active", mode === "parent");
+    titleEl.textContent = state.profile.kidName ? "🎒 " + state.profile.kidName + "'s Bag" : "🎒 Tomorrow's Bag";
     app.innerHTML = "";
     if (mode === "kid") {
       renderKid(justSaved);
     } else {
-      renderMom();
+      renderParent();
     }
   }
 
@@ -698,7 +745,7 @@
       }
       card.appendChild(ul);
       if (entry.note) {
-        var noteP = el("div", "mom-note", "📝 " + escapeHtml(entry.note));
+        var noteP = el("div", "parent-note", "📝 " + escapeHtml(entry.note));
         card.appendChild(noteP);
       }
       var editBtn = el("button", "big-btn secondary", "✏️ Change my answer");
@@ -722,13 +769,21 @@
     var holiday = getHolidayForDate(d, state.countryCode);
     if (holiday) {
       var hb = el("div", "holiday-banner", "🎉 Tomorrow might be a holiday: " + escapeHtml(holiday.localName || holiday.name));
-      hb.appendChild(el("span", "small", "Double-check with mom — school might still be open!"));
+      hb.appendChild(el("span", "small", "Double-check with a parent — school might still be open!"));
       app.appendChild(hb);
     }
 
     var banner = el("div", "card date-banner");
+    if (state.profile.kidName) {
+      banner.appendChild(el("div", "kid-greet", "👋 Hi, " + escapeHtml(state.profile.kidName) + "!"));
+    }
     banner.appendChild(el("div", "big", "🌟 What are you bringing tomorrow?"));
-    banner.appendChild(el("div", "sub", formatLong(d)));
+    var subText = formatLong(d);
+    var subLine = el("div", "sub", escapeHtml(subText));
+    if (state.profile.kidClass) {
+      subLine.appendChild(el("span", "class-tag", " · 🏫 " + escapeHtml(state.profile.kidClass)));
+    }
+    banner.appendChild(subLine);
     app.appendChild(banner);
 
     var gridCard = el("div", "card");
@@ -762,7 +817,7 @@
     app.appendChild(gridCard);
   }
 
-  function renderMom() {
+  function renderParent() {
     var d = tomorrowDate();
     var key = dateKey(d);
     var entry = state.entries[key];
@@ -776,16 +831,54 @@
       app.appendChild(hb);
     }
 
+    // Names & class
+    var profileCard = el("div", "card");
+    profileCard.appendChild(el("h3", null, "👤 Names & class"));
+    var profileGrid = el("div", "profile-grid");
+
+    var kidNameField = el("div", "profile-field");
+    kidNameField.appendChild(el("label", null, "🧒 Kid's name"));
+    var kidNameIn = document.createElement("input");
+    kidNameIn.type = "text";
+    kidNameIn.placeholder = "e.g. Zara";
+    kidNameIn.value = state.profile.kidName || "";
+    kidNameIn.addEventListener("input", function () { setProfileField("kidName", kidNameIn.value); titleEl.textContent = kidNameIn.value ? "🎒 " + kidNameIn.value + "'s Bag" : "🎒 Tomorrow's Bag"; });
+    kidNameField.appendChild(kidNameIn);
+    profileGrid.appendChild(kidNameField);
+
+    var kidClassField = el("div", "profile-field");
+    kidClassField.appendChild(el("label", null, "🏫 Kid's class / grade"));
+    var kidClassIn = document.createElement("input");
+    kidClassIn.type = "text";
+    kidClassIn.placeholder = "e.g. Grade 4B";
+    kidClassIn.value = state.profile.kidClass || "";
+    kidClassIn.addEventListener("input", function () { setProfileField("kidClass", kidClassIn.value); });
+    kidClassField.appendChild(kidClassIn);
+    profileGrid.appendChild(kidClassField);
+
+    var parentNameField = el("div", "profile-field");
+    parentNameField.appendChild(el("label", null, "🧑 Parent's name"));
+    var parentNameIn = document.createElement("input");
+    parentNameIn.type = "text";
+    parentNameIn.placeholder = "e.g. Aravind";
+    parentNameIn.value = state.profile.parentName || "";
+    parentNameIn.addEventListener("input", function () { setProfileField("parentName", parentNameIn.value); });
+    parentNameField.appendChild(parentNameIn);
+    profileGrid.appendChild(parentNameField);
+
+    profileCard.appendChild(profileGrid);
+    app.appendChild(profileCard);
+
     var summary = el("div", "card");
     summary.appendChild(el("h3", null, "🎒 Tomorrow — " + formatLong(d)));
     if (entry && entry.items.length) {
-      var list = el("div", "mom-summary-list");
+      var list = el("div", "parent-summary-list");
       entry.items.forEach(function (id) {
         var s = subjectById(id);
         if (s) list.appendChild(el("span", null, s.emoji + " " + s.name));
       });
       summary.appendChild(list);
-      if (entry.note) summary.appendChild(el("div", "mom-note", "📝 " + escapeHtml(entry.note)));
+      if (entry.note) summary.appendChild(el("div", "parent-note", "📝 " + escapeHtml(entry.note)));
     } else if (entry) {
       summary.appendChild(el("div", "empty-hint", "Nothing selected yet — nudge your little one! 😊"));
     } else {
@@ -805,23 +898,23 @@
     select.addEventListener("change", function () { setCountryCode(select.value); });
     countryField.appendChild(select);
     summary.appendChild(countryField);
-    summary.appendChild(el("div", "mom-note", "Best-effort only — uses a public holiday calendar, not your specific school's calendar."));
+    summary.appendChild(el("div", "parent-note", "Best-effort only — uses a public holiday calendar, not your specific school's calendar."));
 
     app.appendChild(summary);
 
     // Weekly plan editor
     var planCard = el("div", "card");
     planCard.appendChild(el("h3", null, "📅 Usual weekly plan"));
-    planCard.appendChild(el("div", "mom-note", "Set what's usually needed each day — it'll be suggested to your kid automatically."));
+    planCard.appendChild(el("div", "parent-note", "Set what's usually needed each day — it'll be suggested to your kid automatically."));
     var dayRow = el("div", "weekday-row");
-    var selectedDay = renderMom._selectedDay;
+    var selectedDay = renderParent._selectedDay;
     if (selectedDay === undefined) selectedDay = new Date().getDay();
     WEEKDAY_SHORT.forEach(function (label, idx) {
       var b = document.createElement("button");
       b.textContent = label;
       if (idx === selectedDay) b.classList.add("active");
       b.addEventListener("click", function () {
-        renderMom._selectedDay = idx;
+        renderParent._selectedDay = idx;
         render();
       });
       dayRow.appendChild(b);
@@ -842,8 +935,8 @@
     // Manage subjects
     var subCard = el("div", "card");
     subCard.appendChild(el("h3", null, "🧾 Manage notebook list"));
-    subCard.appendChild(el("div", "mom-note", "Tap ✏️ to rename a subject or change its icon."));
-    var editingId = renderMom._editingId || null;
+    subCard.appendChild(el("div", "parent-note", "Tap ✏️ to rename a subject or change its icon."));
+    var editingId = renderParent._editingId || null;
     var subList = el("div");
     state.subjects.forEach(function (s) {
       if (s.id === editingId) {
@@ -859,13 +952,13 @@
         eSaveBtn.textContent = "Save";
         eSaveBtn.addEventListener("click", function () {
           renameSubject(s.id, eNameIn.value, eEmojiIn.value);
-          renderMom._editingId = null;
+          renderParent._editingId = null;
         });
         var eCancelBtn = document.createElement("button");
         eCancelBtn.className = "cancel";
         eCancelBtn.textContent = "Cancel";
         eCancelBtn.addEventListener("click", function () {
-          renderMom._editingId = null;
+          renderParent._editingId = null;
           render();
         });
         editForm.appendChild(eEmojiIn);
@@ -879,7 +972,7 @@
       var editIcon = el("span", "edit", "✏️");
       editIcon.addEventListener("click", function (ev) {
         ev.stopPropagation();
-        renderMom._editingId = s.id;
+        renderParent._editingId = s.id;
         render();
       });
       chip.appendChild(editIcon);
@@ -894,12 +987,12 @@
     subCard.appendChild(subList);
 
     var palette = el("div", "emoji-palette");
-    var chosenEmoji = renderMom._chosenEmoji || "⭐";
+    var chosenEmoji = renderParent._chosenEmoji || "⭐";
     EMOJI_PALETTE.forEach(function (e) {
       var b = document.createElement("button");
       b.textContent = e;
       b.addEventListener("click", function () {
-        renderMom._chosenEmoji = e;
+        renderParent._chosenEmoji = e;
         render();
       });
       palette.appendChild(b);
@@ -918,7 +1011,7 @@
     addBtn.textContent = "Add";
     addBtn.addEventListener("click", function () {
       addSubject(nameIn.value, emojiIn.value);
-      renderMom._chosenEmoji = "⭐";
+      renderParent._chosenEmoji = "⭐";
     });
     form.appendChild(emojiIn);
     form.appendChild(nameIn);
