@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Tomorrow's Bag 🎒</title>
+<style>
+  :root {
+    --bg1: #fff4e0;
+    --bg2: #e0f7ff;
+    --card: #ffffff;
+    --ink: #2d2a3d;
+    --muted: #7a7690;
+    --accent: #ff8fab;
+    --accent2: #6fd6ff;
+    --good: #58c66b;
+    --radius: 22px;
+    --shadow: 0 6px 0 rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Comic Sans MS", sans-serif;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    color: var(--ink);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 4px 18px;
+  }
+  header h1 {
+    font-size: 1.5rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mode-toggle {
+    display: flex;
+    background: var(--card);
+    border-radius: 999px;
+    padding: 4px;
+    box-shadow: var(--shadow);
+  }
+  .mode-toggle button {
+    border: none;
+    background: transparent;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .mode-toggle button.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+
+  .date-banner {
+    text-align: center;
+    padding: 6px 0 2px;
+  }
+  .date-banner .big {
+    font-size: 1.6rem;
+    font-weight: 800;
+  }
+  .date-banner .sub {
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin-top: 2px;
+  }
+
+  .subject-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  @media (min-width: 480px) {
+    .subject-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .subject-card {
+    position: relative;
+    border: 3px solid transparent;
+    border-radius: 18px;
+    padding: 14px 6px 10px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--tint, #f2f2f2);
+    user-select: none;
+    transition: transform .08s ease;
+  }
+  .subject-card:active { transform: scale(0.95); }
+  .subject-card .emoji {
+    font-size: 2.1rem;
+    line-height: 1;
+    display: block;
+  }
+  .subject-card .name {
+    margin-top: 6px;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+  .subject-card.selected {
+    border-color: var(--good);
+    background: #e9fbee;
+  }
+  .subject-card .check {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--good);
+    color: white;
+    font-size: 0.9rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.15);
+  }
+  .subject-card.selected .check { display: flex; }
+
+  .note-field {
+    margin-top: 18px;
+  }
+  .note-field label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+  }
+  .note-field input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 2px solid #eee;
+    font-size: 1rem;
+    font-family: inherit;
+  }
+
+  .big-btn {
+    display: block;
+    width: 100%;
+    margin-top: 20px;
+    padding: 16px;
+    border: none;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--accent), #ff6b8b);
+    color: white;
+    font-size: 1.15rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #c94f6d;
+  }
+  .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #c94f6d; }
+  .big-btn.secondary {
+    background: linear-gradient(135deg, var(--accent2), #4fb8e8);
+    box-shadow: 0 5px 0 #3a8fb8;
+  }
+  .big-btn.secondary:active { box-shadow: 0 2px 0 #3a8fb8; }
+
+  .confirm {
+    text-align: center;
+    padding: 10px;
+  }
+  .confirm .emoji-row { font-size: 2.4rem; margin-bottom: 6px; }
+  .confirm h2 { margin: 6px 0; }
+  .confirm ul {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .confirm li {
+    background: #f2f2f2;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+
+  section h3 {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+  }
+
+  .mom-summary-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 0;
+  }
+  .mom-summary-list span {
+    background: #f2f2f2;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.88rem;
+  }
+  .mom-note {
+    margin-top: 10px;
+    font-style: italic;
+    color: var(--muted);
+  }
+
+  .weekday-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 10px;
+  }
+  .weekday-row button {
+    flex: 0 0 auto;
+    border: 2px solid #eee;
+    background: white;
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .weekday-row button.active {
+    border-color: var(--accent2);
+    color: var(--ink);
+    background: #eafaff;
+  }
+
+  .subject-mini {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f2f2f2;
+    border-radius: 999px;
+    padding: 6px 10px 6px 10px;
+    margin: 4px 4px 0 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .subject-mini.on {
+    border-color: var(--good);
+    background: #e9fbee;
+  }
+  .subject-mini .rm {
+    color: #c0392b;
+    margin-left: 4px;
+    cursor: pointer;
+  }
+
+  .add-subject-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .add-subject-form input {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 2px solid #eee;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .add-subject-form input.emoji-in { width: 60px; text-align: center; font-size: 1.2rem; }
+  .add-subject-form input.name-in { flex: 1; min-width: 120px; }
+  .add-subject-form button {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: none;
+    background: var(--ink);
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .emoji-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 4px;
+  }
+  .emoji-palette button {
+    font-size: 1.2rem;
+    border: none;
+    background: #f2f2f2;
+    border-radius: 10px;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+
+  .history-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item .hdate {
+    font-weight: 800;
+    font-size: 0.9rem;
+  }
+  .history-item .hnote {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .empty-hint {
+    color: var(--muted);
+    text-align: center;
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 10px;
+  }
+
+  .confetti-piece {
+    position: fixed;
+    top: -10px;
+    width: 8px;
+    height: 14px;
+    z-index: 999;
+    pointer-events: none;
+    animation: fall linear forwards;
+    border-radius: 2px;
+  }
+  @keyframes fall {
+    to { transform: translateY(110vh) rotate(360deg); opacity: 0.9; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎒 Tomorrow's Bag</h1>
+    <div class="mode-toggle">
+      <button id="btnKid" class="active">🧒 Kid</button>
+      <button id="btnMom">👩 Mom</button>
+    </div>
+  </header>
+
+  <div id="app"></div>
+
+  <footer>Saved on this device only 💾 · Made with ❤️ for packing bags without the morning rush</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "notebookTracker.v1";
+
+  var DEFAULT_SUBJECTS = [
+    { id: "math", name: "Math", emoji: "🔢" },
+    { id: "science", name: "Science", emoji: "🔬" },
+    { id: "english", name: "English", emoji: "📖" },
+    { id: "hindi", name: "Hindi", emoji: "✍️" },
+    { id: "social", name: "Social Studies", emoji: "🌍" },
+    { id: "computer", name: "Computer", emoji: "💻" },
+    { id: "art", name: "Art", emoji: "🎨" },
+    { id: "evs", name: "EVS", emoji: "🌱" },
+    { id: "gk", name: "GK", emoji: "🧠" },
+    { id: "library", name: "Library", emoji: "📚" },
+    { id: "pe", name: "PE / Sports", emoji: "⚽" },
+    { id: "music", name: "Music", emoji: "🎵" }
+  ];
+
+  var TINTS = ["#ffe3ec", "#e3f7ff", "#fff4d6", "#e8ffe3", "#efe3ff", "#ffe9e0", "#e3fff6", "#fdeaff"];
+
+  var WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  var EMOJI_PALETTE = ["📕","📗","📘","📙","📓","📔","🧮","🔬","🎨","🎵","⚽","🏀","💻","🧠","🌍","🌱","✍️","📚","🧪","⭐","🧵","🎭","🗺️","🧩"];
+
+  function loadState() {
+    var raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    if (raw) {
+      try {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.subjects) return parsed;
+      } catch (e) {}
+    }
+    return {
+      subjects: DEFAULT_SUBJECTS.slice(),
+      weeklyPlan: {},
+      entries: {}
+    };
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = loadState();
+  var mode = "kid";
+  var draftSelection = null;
+  var draftNote = null;
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function dateKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function tomorrowDate() {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+  function formatLong(d) {
+    return WEEKDAY_NAMES[d.getDay()] + ", " + d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  }
+
+  function subjectById(id) {
+    for (var i = 0; i < state.subjects.length; i++) {
+      if (state.subjects[i].id === id) return state.subjects[i];
+    }
+    return null;
+  }
+
+  function ensureDraft() {
+    var d = tomorrowDate();
+    var key = dateKey(d);
+    var existing = state.entries[key];
+    if (draftSelection === null) {
+      draftSelection = existing ? existing.items.slice() : suggestForDate(d);
+    }
+    if (draftNote === null) {
+      draftNote = existing ? (existing.note || "") : "";
+    }
+    return key;
+  }
+
+  function suggestForDate(d) {
+    var plan = state.weeklyPlan[d.getDay()];
+    if (plan && plan.length) {
+      return plan.filter(function (id) { return !!subjectById(id); });
+    }
+    return [];
+  }
+
+  function toggleDraftSubject(id) {
+    var idx = draftSelection.indexOf(id);
+    if (idx >= 0) draftSelection.splice(idx, 1);
+    else draftSelection.push(id);
+    render();
+  }
+
+  function saveEntry() {
+    var key = ensureDraft();
+    state.entries[key] = { items: draftSelection.slice(), note: draftNote, savedAt: Date.now() };
+    saveState();
+    draftSelection = null;
+    draftNote = null;
+    render(true);
+    launchConfetti();
+  }
+
+  function launchConfetti() {
+    var colors = ["#ff8fab", "#6fd6ff", "#ffd166", "#58c66b", "#c792ea"];
+    for (var i = 0; i < 26; i++) {
+      (function () {
+        var piece = document.createElement("div");
+        piece.className = "confetti-piece";
+        piece.style.left = (Math.random() * 100) + "vw";
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        var duration = 1.4 + Math.random() * 1.2;
+        piece.style.animationDuration = duration + "s";
+        document.body.appendChild(piece);
+        setTimeout(function () { piece.remove(); }, duration * 1000 + 100);
+      })();
+    }
+  }
+
+  function addSubject(name, emoji) {
+    name = (name || "").trim();
+    emoji = (emoji || "").trim() || "⭐";
+    if (!name) return;
+    var id = "s_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+    state.subjects.push({ id: id, name: name, emoji: emoji });
+    saveState();
+    render();
+  }
+
+  function removeSubject(id) {
+    state.subjects = state.subjects.filter(function (s) { return s.id !== id; });
+    Object.keys(state.weeklyPlan).forEach(function (day) {
+      state.weeklyPlan[day] = (state.weeklyPlan[day] || []).filter(function (sid) { return sid !== id; });
+    });
+    saveState();
+    render();
+  }
+
+  function toggleWeeklyPlanSubject(day, id) {
+    if (!state.weeklyPlan[day]) state.weeklyPlan[day] = [];
+    var arr = state.weeklyPlan[day];
+    var idx = arr.indexOf(id);
+    if (idx >= 0) arr.splice(idx, 1);
+    else arr.push(id);
+    saveState();
+    render();
+  }
+
+  // ---------- Rendering ----------
+
+  var app = document.getElementById("app");
+  var btnKid = document.getElementById("btnKid");
+  var btnMom = document.getElementById("btnMom");
+
+  btnKid.addEventListener("click", function () { mode = "kid"; render(); });
+  btnMom.addEventListener("click", function () { mode = "mom"; render(); });
+
+  function render(justSaved) {
+    btnKid.classList.toggle("active", mode === "kid");
+    btnMom.classList.toggle("active", mode === "mom");
+    app.innerHTML = "";
+    if (mode === "kid") {
+      renderKid(justSaved);
+    } else {
+      renderMom();
+    }
+  }
+
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  }
+
+  function renderKid(justSaved) {
+    var d = tomorrowDate();
+    var key = dateKey(d);
+    var alreadySaved = !!state.entries[key];
+
+    if (justSaved) {
+      var entry = state.entries[key];
+      var card = el("div", "card confirm");
+      card.appendChild(el("div", "emoji-row", "🎉🎒✨"));
+      card.appendChild(el("h2", null, "All packed for tomorrow!"));
+      card.appendChild(el("div", null, formatLong(d)));
+      var ul = el("ul");
+      entry.items.forEach(function (id) {
+        var s = subjectById(id);
+        if (s) ul.appendChild(el("li", null, s.emoji + " " + s.name));
+      });
+      if (entry.items.length === 0) {
+        ul.appendChild(el("li", null, "Nothing selected"));
+      }
+      card.appendChild(ul);
+      if (entry.note) {
+        var noteP = el("div", "mom-note", "📝 " + escapeHtml(entry.note));
+        card.appendChild(noteP);
+      }
+      var editBtn = el("button", "big-btn secondary", "✏️ Change my answer");
+      editBtn.addEventListener("click", function () {
+        draftSelection = entry.items.slice();
+        draftNote = entry.note || "";
+        state.entries[key] = undefined;
+        delete state.entries[key];
+        saveState();
+        render();
+      });
+      card.appendChild(editBtn);
+      app.appendChild(card);
+      return;
+    }
+
+    ensureDraft();
+
+    var banner = el("div", "card date-banner");
+    banner.appendChild(el("div", "big", "🌟 What are you bringing tomorrow?"));
+    banner.appendChild(el("div", "sub", formatLong(d)));
+    app.appendChild(banner);
+
+    var gridCard = el("div", "card");
+    var grid = el("div", "subject-grid");
+    state.subjects.forEach(function (s, i) {
+      var selected = draftSelection.indexOf(s.id) >= 0;
+      var c = el("div", "subject-card" + (selected ? " selected" : ""));
+      c.style.setProperty("--tint", TINTS[i % TINTS.length]);
+      c.appendChild(el("div", "check", "✓"));
+      c.appendChild(el("span", "emoji", s.emoji));
+      c.appendChild(el("span", "name", escapeHtml(s.name)));
+      c.addEventListener("click", function () { toggleDraftSubject(s.id); });
+      grid.appendChild(c);
+    });
+    gridCard.appendChild(grid);
+
+    var noteWrap = el("div", "note-field");
+    noteWrap.appendChild(el("label", null, "📝 Anything else to remember?"));
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "like PE shoes or a water bottle";
+    input.value = draftNote || "";
+    input.addEventListener("input", function () { draftNote = input.value; });
+    noteWrap.appendChild(input);
+    gridCard.appendChild(noteWrap);
+
+    var saveBtn = el("button", "big-btn", alreadySaved ? "🎒 Save my changes!" : "🎒 All Packed!");
+    saveBtn.addEventListener("click", saveEntry);
+    gridCard.appendChild(saveBtn);
+
+    app.appendChild(gridCard);
+  }
+
+  function renderMom() {
+    var d = tomorrowDate();
+    var key = dateKey(d);
+    var entry = state.entries[key];
+
+    var summary = el("div", "card");
+    summary.appendChild(el("h3", null, "🎒 Tomorrow — " + formatLong(d)));
+    if (entry && entry.items.length) {
+      var list = el("div", "mom-summary-list");
+      entry.items.forEach(function (id) {
+        var s = subjectById(id);
+        if (s) list.appendChild(el("span", null, s.emoji + " " + s.name));
+      });
+      summary.appendChild(list);
+      if (entry.note) summary.appendChild(el("div", "mom-note", "📝 " + escapeHtml(entry.note)));
+    } else if (entry) {
+      summary.appendChild(el("div", "empty-hint", "Nothing selected yet — nudge your little one! 😊"));
+    } else {
+      summary.appendChild(el("div", "empty-hint", "Not filled in yet — ask your kid to open Kid mode! 🧒"));
+    }
+    app.appendChild(summary);
+
+    // Weekly plan editor
+    var planCard = el("div", "card");
+    planCard.appendChild(el("h3", null, "📅 Usual weekly plan"));
+    planCard.appendChild(el("div", "mom-note", "Set what's usually needed each day — it'll be suggested to your kid automatically."));
+    var dayRow = el("div", "weekday-row");
+    var selectedDay = renderMom._selectedDay;
+    if (selectedDay === undefined) selectedDay = new Date().getDay();
+    WEEKDAY_SHORT.forEach(function (label, idx) {
+      var b = document.createElement("button");
+      b.textContent = label;
+      if (idx === selectedDay) b.classList.add("active");
+      b.addEventListener("click", function () {
+        renderMom._selectedDay = idx;
+        render();
+      });
+      dayRow.appendChild(b);
+    });
+    planCard.appendChild(dayRow);
+
+    var planList = el("div");
+    var dayPlan = state.weeklyPlan[selectedDay] || [];
+    state.subjects.forEach(function (s) {
+      var on = dayPlan.indexOf(s.id) >= 0;
+      var chip = el("span", "subject-mini" + (on ? " on" : ""), s.emoji + " " + escapeHtml(s.name));
+      chip.addEventListener("click", function () { toggleWeeklyPlanSubject(selectedDay, s.id); });
+      planList.appendChild(chip);
+    });
+    planCard.appendChild(planList);
+    app.appendChild(planCard);
+
+    // Manage subjects
+    var subCard = el("div", "card");
+    subCard.appendChild(el("h3", null, "🧾 Manage notebook list"));
+    var subList = el("div");
+    state.subjects.forEach(function (s) {
+      var chip = el("span", "subject-mini on", s.emoji + " " + escapeHtml(s.name));
+      var rm = el("span", "rm", "✕");
+      rm.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        if (confirm('Remove "' + s.name + '"?')) removeSubject(s.id);
+      });
+      chip.appendChild(rm);
+      subList.appendChild(chip);
+    });
+    subCard.appendChild(subList);
+
+    var palette = el("div", "emoji-palette");
+    var chosenEmoji = renderMom._chosenEmoji || "⭐";
+    EMOJI_PALETTE.forEach(function (e) {
+      var b = document.createElement("button");
+      b.textContent = e;
+      b.addEventListener("click", function () {
+        renderMom._chosenEmoji = e;
+        render();
+      });
+      palette.appendChild(b);
+    });
+    subCard.appendChild(palette);
+
+    var form = el("div", "add-subject-form");
+    var emojiIn = document.createElement("input");
+    emojiIn.className = "emoji-in";
+    emojiIn.value = chosenEmoji;
+    emojiIn.maxLength = 4;
+    var nameIn = document.createElement("input");
+    nameIn.className = "name-in";
+    nameIn.placeholder = "New subject name";
+    var addBtn = document.createElement("button");
+    addBtn.textContent = "Add";
+    addBtn.addEventListener("click", function () {
+      addSubject(nameIn.value, emojiIn.value);
+      renderMom._chosenEmoji = "⭐";
+    });
+    form.appendChild(emojiIn);
+    form.appendChild(nameIn);
+    form.appendChild(addBtn);
+    subCard.appendChild(form);
+    app.appendChild(subCard);
+
+    // History
+    var histCard = el("div", "card");
+    histCard.appendChild(el("h3", null, "📜 History"));
+    var keys = Object.keys(state.entries).filter(function (k) { return state.entries[k]; }).sort().reverse();
+    if (!keys.length) {
+      histCard.appendChild(el("div", "empty-hint", "No history yet."));
+    } else {
+      keys.slice(0, 21).forEach(function (k) {
+        var e = state.entries[k];
+        var parts = k.split("-");
+        var dd = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        var item = el("div", "history-item");
+        var names = e.items.map(function (id) {
+          var s = subjectById(id);
+          return s ? s.emoji + " " + s.name : null;
+        }).filter(Boolean).join("  ");
+        item.appendChild(el("div", "hdate", formatLong(dd)));
+        item.appendChild(el("div", null, names || "Nothing selected"));
+        if (e.note) item.appendChild(el("div", "hnote", "📝 " + escapeHtml(e.note)));
+        histCard.appendChild(item);
+      });
+    }
+    app.appendChild(histCard);
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
