@@ -495,13 +495,19 @@
 
   var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
   var applyingRemoteUpdate = false;
-  var authApi = { signIn: null, signOut: null, addAccessEmail: null, removeAccessEmail: null };
+  var authApi = {
+    signIn: null, signOut: null,
+    addMember: null, removeMember: null,
+    addAdmin: null, removeAdmin: null
+  };
   var authState = {
     required: !!(FIREBASE_CONFIG && REQUIRE_SIGN_IN),
     ready: false,
     user: null,
+    role: null, // 'member' (full access) | 'admin' (manages access list only)
     deniedEmail: null,
-    accessEmails: null
+    members: null,
+    admins: null
   };
 
   function initFirebase() {
@@ -532,16 +538,28 @@
         authMod.signInWithRedirect(authInst, new authMod.GoogleAuthProvider());
       };
       authApi.signOut = function () { authMod.signOut(authInst); };
-      authApi.addAccessEmail = function (email) {
+      authApi.addMember = function (email) {
         email = (email || "").trim().toLowerCase();
         if (!email) return;
-        fsMod.updateDoc(accessRef, { emails: fsMod.arrayUnion(email) }).catch(function (err) {
-          console.warn("Cloud sync: add access email failed", err);
+        fsMod.updateDoc(accessRef, { members: fsMod.arrayUnion(email) }).catch(function (err) {
+          console.warn("Cloud sync: add member failed", err);
         });
       };
-      authApi.removeAccessEmail = function (email) {
-        fsMod.updateDoc(accessRef, { emails: fsMod.arrayRemove(email) }).catch(function (err) {
-          console.warn("Cloud sync: remove access email failed", err);
+      authApi.removeMember = function (email) {
+        fsMod.updateDoc(accessRef, { members: fsMod.arrayRemove(email) }).catch(function (err) {
+          console.warn("Cloud sync: remove member failed", err);
+        });
+      };
+      authApi.addAdmin = function (email) {
+        email = (email || "").trim().toLowerCase();
+        if (!email) return;
+        fsMod.updateDoc(accessRef, { admins: fsMod.arrayUnion(email) }).catch(function (err) {
+          console.warn("Cloud sync: add admin failed", err);
+        });
+      };
+      authApi.removeAdmin = function (email) {
+        fsMod.updateDoc(accessRef, { admins: fsMod.arrayRemove(email) }).catch(function (err) {
+          console.warn("Cloud sync: remove admin failed", err);
         });
       };
 
@@ -549,23 +567,45 @@
         console.warn("Cloud sync: redirect sign-in failed", err);
       });
 
-      function grantAccess(user) {
+      // A pre-existing doc from before roles existed only has `emails`
+      // (everyone had full access). Copy it into `members` once so
+      // nobody loses access; harmless to run more than once.
+      function migrateLegacyEmailsIfNeeded(data) {
+        if (!data.members && data.emails) {
+          fsMod.updateDoc(accessRef, {
+            members: data.emails.map(function (e) { return String(e).toLowerCase(); }),
+            admins: data.admins || []
+          }).catch(function (err) {
+            console.warn("Cloud sync: legacy access-list migration failed", err);
+          });
+        }
+      }
+
+      function grantAccess(user, role) {
         authState.user = user;
+        authState.role = role;
         authState.deniedEmail = null;
         fsMod.onSnapshot(accessRef, function (snap) {
           if (snap.exists()) {
-            authState.accessEmails = snap.data().emails || [];
+            var data = snap.data();
+            authState.members = data.members || data.emails || [];
+            authState.admins = data.admins || [];
             render();
           }
         }, function (err) {
           console.warn("Cloud sync: access list listen failed", err);
         });
-        startFirestoreSync(fsMod);
+        if (role === "member") {
+          startFirestoreSync(fsMod);
+        } else {
+          render();
+        }
       }
 
       function denyAccess(user) {
         authState.deniedEmail = user.email;
         authState.user = null;
+        authState.role = null;
         authMod.signOut(authInst);
         render();
       }
@@ -576,8 +616,8 @@
       // indistinguishable (by design) from the doc already existing and
       // this account simply not being on the list.
       function tryBootstrapOrDeny(user, myEmail) {
-        fsMod.setDoc(accessRef, { emails: [myEmail] })
-          .then(function () { grantAccess(user); })
+        fsMod.setDoc(accessRef, { members: [myEmail], admins: [] })
+          .then(function () { grantAccess(user, "member"); })
           .catch(function () { denyAccess(user); });
       }
 
@@ -585,16 +625,23 @@
         authState.ready = true;
         if (!user) {
           authState.user = null;
-          authState.accessEmails = null;
+          authState.role = null;
+          authState.members = null;
+          authState.admins = null;
           render();
           return;
         }
         var myEmail = (user.email || "").toLowerCase();
         fsMod.getDoc(accessRef).then(function (snap) {
           if (snap.exists()) {
-            var emails = (snap.data().emails || []).map(function (e) { return String(e).toLowerCase(); });
-            if (emails.indexOf(myEmail) >= 0) {
-              grantAccess(user);
+            var data = snap.data();
+            migrateLegacyEmailsIfNeeded(data);
+            var members = (data.members || data.emails || []).map(function (e) { return String(e).toLowerCase(); });
+            var admins = (data.admins || []).map(function (e) { return String(e).toLowerCase(); });
+            if (members.indexOf(myEmail) >= 0) {
+              grantAccess(user, "member");
+            } else if (admins.indexOf(myEmail) >= 0) {
+              grantAccess(user, "admin");
             } else {
               denyAccess(user);
             }
@@ -981,6 +1028,7 @@
 
   var app = document.getElementById("app");
   var titleEl = document.querySelector("header h1");
+  var modeToggleEl = document.querySelector(".mode-toggle");
   var btnKid = document.getElementById("btnKid");
   var btnParent = document.getElementById("btnParent");
 
@@ -991,9 +1039,14 @@
     btnKid.classList.toggle("active", mode === "kid");
     btnParent.classList.toggle("active", mode === "parent");
     titleEl.textContent = state.profile.kidName ? "🎒 " + state.profile.kidName + "'s Bag" : "🎒 Tomorrow's Bag";
+    modeToggleEl.style.display = (authState.required && (!authState.user || authState.role === "admin")) ? "none" : "flex";
     app.innerHTML = "";
     if (authState.required && !authState.user) {
       renderSignIn();
+      return;
+    }
+    if (authState.required && authState.role === "admin") {
+      renderAdminOnly();
       return;
     }
     if (mode === "kid") {
@@ -1001,6 +1054,96 @@
     } else {
       renderParent();
     }
+  }
+
+  function renderAccessManagementCard() {
+    var card = el("div", "card");
+    card.appendChild(el("h3", null, "🔐 Who can access this app"));
+
+    card.appendChild(el("div", "parent-note", "Full access — can see and edit everything, including this list:"));
+    var memberList = el("div");
+    (authState.members || []).forEach(function (memberEmail) {
+      var isMe = memberEmail.toLowerCase() === (authState.user.email || "").toLowerCase();
+      var chip = el("span", "subject-mini on", escapeHtml(memberEmail) + (isMe ? " (you)" : ""));
+      if (!isMe) {
+        var rm = el("span", "rm", "✕");
+        rm.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          if (confirm('Remove full access for "' + memberEmail + '"?') && authApi.removeMember) {
+            authApi.removeMember(memberEmail);
+          }
+        });
+        chip.appendChild(rm);
+      }
+      memberList.appendChild(chip);
+    });
+    card.appendChild(memberList);
+
+    var memberForm = el("div", "add-subject-form");
+    var memberIn = document.createElement("input");
+    memberIn.type = "email";
+    memberIn.className = "name-in";
+    memberIn.placeholder = "e.g. kid@gmail.com";
+    var memberAddBtn = document.createElement("button");
+    memberAddBtn.textContent = "Add";
+    memberAddBtn.addEventListener("click", function () {
+      if (authApi.addMember) authApi.addMember(memberIn.value);
+      memberIn.value = "";
+    });
+    memberForm.appendChild(memberIn);
+    memberForm.appendChild(memberAddBtn);
+    card.appendChild(memberForm);
+
+    card.appendChild(el("div", "parent-note", "Manage-access only — can add/remove people here, but can't see the day-to-day notebook data:"));
+    var adminList = el("div");
+    (authState.admins || []).forEach(function (adminEmail) {
+      var isMe = adminEmail.toLowerCase() === (authState.user.email || "").toLowerCase();
+      var chip = el("span", "subject-mini on", escapeHtml(adminEmail) + (isMe ? " (you)" : ""));
+      if (!isMe) {
+        var rm = el("span", "rm", "✕");
+        rm.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          if (confirm('Remove access for "' + adminEmail + '"?') && authApi.removeAdmin) {
+            authApi.removeAdmin(adminEmail);
+          }
+        });
+        chip.appendChild(rm);
+      }
+      adminList.appendChild(chip);
+    });
+    card.appendChild(adminList);
+
+    var adminForm = el("div", "add-subject-form");
+    var adminIn = document.createElement("input");
+    adminIn.type = "email";
+    adminIn.className = "name-in";
+    adminIn.placeholder = "e.g. you@gmail.com";
+    var adminAddBtn = document.createElement("button");
+    adminAddBtn.textContent = "Add";
+    adminAddBtn.addEventListener("click", function () {
+      if (authApi.addAdmin) authApi.addAdmin(adminIn.value);
+      adminIn.value = "";
+    });
+    adminForm.appendChild(adminIn);
+    adminForm.appendChild(adminAddBtn);
+    card.appendChild(adminForm);
+
+    return card;
+  }
+
+  function renderAdminOnly() {
+    var acctCard = el("div", "card");
+    acctCard.style.textAlign = "center";
+    acctCard.appendChild(el("div", "emoji-row", "🔐"));
+    acctCard.appendChild(el("h2", null, "Access management"));
+    acctCard.appendChild(el("div", "parent-note", "Signed in as " + escapeHtml(authState.user.email) + ". This account manages who's allowed in, but doesn't see the family's day-to-day notebook data."));
+    var signOutBtn = el("button", "big-btn secondary", "Sign out");
+    signOutBtn.addEventListener("click", function () {
+      if (authApi.signOut) authApi.signOut();
+    });
+    acctCard.appendChild(signOutBtn);
+    app.appendChild(acctCard);
+    app.appendChild(renderAccessManagementCard());
   }
 
   function renderSignIn() {
@@ -1150,44 +1293,7 @@
       });
       acctLine.appendChild(signOutLink);
       app.appendChild(acctLine);
-
-      var accessCard = el("div", "card");
-      accessCard.appendChild(el("h3", null, "🔐 Who can access this app"));
-      accessCard.appendChild(el("div", "parent-note", "Anyone added here can sign in with their Google account and see/edit everything, including this list — so only add people you trust with full access."));
-      var accessList = el("div");
-      (authState.accessEmails || []).forEach(function (accEmail) {
-        var isMe = accEmail.toLowerCase() === (authState.user.email || "").toLowerCase();
-        var accChip = el("span", "subject-mini on", escapeHtml(accEmail) + (isMe ? " (you)" : ""));
-        if (!isMe) {
-          var accRm = el("span", "rm", "✕");
-          accRm.addEventListener("click", function (ev) {
-            ev.stopPropagation();
-            if (confirm('Remove access for "' + accEmail + '"?') && authApi.removeAccessEmail) {
-              authApi.removeAccessEmail(accEmail);
-            }
-          });
-          accChip.appendChild(accRm);
-        }
-        accessList.appendChild(accChip);
-      });
-      accessCard.appendChild(accessList);
-
-      var accessForm = el("div", "add-subject-form");
-      var accessEmailIn = document.createElement("input");
-      accessEmailIn.type = "email";
-      accessEmailIn.className = "name-in";
-      accessEmailIn.placeholder = "e.g. kid@gmail.com";
-      var accessAddBtn = document.createElement("button");
-      accessAddBtn.textContent = "Add";
-      accessAddBtn.addEventListener("click", function () {
-        if (authApi.addAccessEmail) authApi.addAccessEmail(accessEmailIn.value);
-        accessEmailIn.value = "";
-      });
-      accessForm.appendChild(accessEmailIn);
-      accessForm.appendChild(accessAddBtn);
-      accessCard.appendChild(accessForm);
-
-      app.appendChild(accessCard);
+      app.appendChild(renderAccessManagementCard());
     }
 
     var parentSchoolHoliday = getSchoolHolidayForDate(d);
