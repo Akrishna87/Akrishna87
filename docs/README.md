@@ -27,7 +27,8 @@ open it on a shared family phone or tablet.
 
 ## Running it
 
-Just open `index.html` in any browser, or host the file (e.g. via GitHub
-Pages) so it's easy for the kid to bookmark on their device.
+Just open `index.html` in any browser — no build step, no dependencies.
 
-No build step, no dependencies.
+This folder is also set up to be served directly by **GitHub Pages** (see
+the repo root README for the one-time setup step), so the kid can bookmark
+a real URL on their phone instead of a local file.
