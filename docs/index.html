@@ -562,6 +562,37 @@
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " (" + WEEKDAY_SHORT[d.getDay()] + ")";
   }
 
+  function getSchoolHolidayForDate(d) {
+    var key = dateKey(d);
+    for (var i = 0; i < state.schoolHolidays.length; i++) {
+      if (state.schoolHolidays[i].date === key) return state.schoolHolidays[i];
+    }
+    return null;
+  }
+
+  function getUpcomingSchoolHolidays(count) {
+    var todayKey = dateKey(todayDate());
+    return state.schoolHolidays
+      .filter(function (h) { return h.date >= todayKey; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); })
+      .slice(0, count);
+  }
+
+  function addSchoolHoliday(dateStr, name) {
+    name = (name || "").trim();
+    if (!dateStr || !name) return;
+    state.schoolHolidays = state.schoolHolidays.filter(function (h) { return h.date !== dateStr; });
+    state.schoolHolidays.push({ id: "sh_" + Date.now() + "_" + Math.floor(Math.random() * 1000), date: dateStr, name: name });
+    saveState();
+    render();
+  }
+
+  function removeSchoolHoliday(id) {
+    state.schoolHolidays = state.schoolHolidays.filter(function (h) { return h.id !== id; });
+    saveState();
+    render();
+  }
+
   function loadState() {
     var raw = null;
     try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
@@ -576,7 +607,8 @@
       weeklyPlan: {},
       entries: {},
       countryCode: "IN",
-      profile: { kidName: "", kidClass: "", parentName: "", schoolLocation: "" }
+      profile: { kidName: "", kidClass: "", parentName: "", schoolLocation: "" },
+      schoolHolidays: []
     };
   }
 
@@ -588,6 +620,7 @@
   if (state.countryCode === undefined) state.countryCode = "IN";
   if (!state.profile) state.profile = { kidName: "", kidClass: "", parentName: "", schoolLocation: "" };
   if (state.profile.schoolLocation === undefined) state.profile.schoolLocation = "";
+  if (!Array.isArray(state.schoolHolidays)) state.schoolHolidays = [];
   var mode = "kid";
   var draftSelection = null;
   var draftNote = null;
@@ -796,11 +829,16 @@
 
     app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
 
-    var holiday = getHolidayForDate(d, state.countryCode);
-    if (holiday) {
-      var hb = el("div", "holiday-banner", "🎉 Tomorrow might be a holiday: " + escapeHtml(holiday.localName || holiday.name));
-      hb.appendChild(el("span", "small", "Double-check with a parent — school might still be open!"));
-      app.appendChild(hb);
+    var schoolHoliday = getSchoolHolidayForDate(d);
+    if (schoolHoliday) {
+      app.appendChild(el("div", "holiday-banner", "🏫 No school tomorrow: " + escapeHtml(schoolHoliday.name)));
+    } else {
+      var holiday = getHolidayForDate(d, state.countryCode);
+      if (holiday) {
+        var hb = el("div", "holiday-banner", "🎉 Tomorrow might be a holiday: " + escapeHtml(holiday.localName || holiday.name));
+        hb.appendChild(el("span", "small", "Double-check with a parent — school might still be open!"));
+        app.appendChild(hb);
+      }
     }
 
     var banner = el("div", "card date-banner");
@@ -854,11 +892,16 @@
 
     app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
 
-    var holiday = getHolidayForDate(d, state.countryCode);
-    if (holiday) {
-      var hb = el("div", "holiday-banner", "🎉 Tomorrow might be a public holiday: " + escapeHtml(holiday.localName || holiday.name));
-      hb.appendChild(el("span", "small", "Based on a general public holiday calendar — always confirm against your school's own calendar."));
-      app.appendChild(hb);
+    var parentSchoolHoliday = getSchoolHolidayForDate(d);
+    if (parentSchoolHoliday) {
+      app.appendChild(el("div", "holiday-banner", "🏫 No school tomorrow: " + escapeHtml(parentSchoolHoliday.name)));
+    } else {
+      var holiday = getHolidayForDate(d, state.countryCode);
+      if (holiday) {
+        var hb = el("div", "holiday-banner", "🎉 Tomorrow might be a public holiday: " + escapeHtml(holiday.localName || holiday.name));
+        hb.appendChild(el("span", "small", "Based on a general public holiday calendar — always confirm against your school's own calendar."));
+        app.appendChild(hb);
+      }
     }
 
     // Names & class
@@ -941,6 +984,46 @@
     summary.appendChild(el("div", "parent-note", "Best-effort only — this is a national public holiday calendar, not your specific school's calendar" + (state.profile.schoolLocation ? " for " + escapeHtml(state.profile.schoolLocation) : "") + ", so state/local school holidays won't show up here. Always double-check with the school."));
 
     app.appendChild(summary);
+
+    // School holidays (manually entered — no public API covers this)
+    var schoolHolCard = el("div", "card");
+    schoolHolCard.appendChild(el("h3", null, "🏫 School holidays"));
+    schoolHolCard.appendChild(el("div", "parent-note", "Add the exact dates your child's school is closed, from the school's own calendar or circular. There's no public API for this — add each date once here and the app will remember it and flag it automatically, ahead of the general public holiday guess below."));
+
+    var sortedSchoolHolidays = state.schoolHolidays.slice().sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+    if (!sortedSchoolHolidays.length) {
+      schoolHolCard.appendChild(el("div", "empty-hint", "No dates added yet."));
+    } else {
+      var shList = el("div");
+      sortedSchoolHolidays.forEach(function (h) {
+        var row = el("span", "subject-mini on", formatShortDate(h.date) + " — " + escapeHtml(h.name));
+        var rm = el("span", "rm", "✕");
+        rm.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          removeSchoolHoliday(h.id);
+        });
+        row.appendChild(rm);
+        shList.appendChild(row);
+      });
+      schoolHolCard.appendChild(shList);
+    }
+
+    var shForm = el("div", "add-subject-form");
+    var shDateIn = document.createElement("input");
+    shDateIn.type = "date";
+    var shNameIn = document.createElement("input");
+    shNameIn.className = "name-in";
+    shNameIn.placeholder = "Occasion (e.g. Diwali Break)";
+    var shAddBtn = document.createElement("button");
+    shAddBtn.textContent = "Add";
+    shAddBtn.addEventListener("click", function () {
+      addSchoolHoliday(shDateIn.value, shNameIn.value);
+    });
+    shForm.appendChild(shDateIn);
+    shForm.appendChild(shNameIn);
+    shForm.appendChild(shAddBtn);
+    schoolHolCard.appendChild(shForm);
+    app.appendChild(schoolHolCard);
 
     if (state.countryCode) {
       var holidayListCard = el("div", "card");
