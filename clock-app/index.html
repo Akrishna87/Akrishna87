@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>World Clock &amp; Time Converter</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>World Clock</h1>
+    <p class="subtitle">India &amp; London, plus any timezone you add — daylight saving handled automatically.</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Live Clocks</h2>
+        <div class="add-zone">
+          <select id="zoneSelect" aria-label="Choose a timezone to add"></select>
+          <button id="addZoneBtn" type="button">Add clock</button>
+        </div>
+      </div>
+      <div id="clockGrid" class="clock-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Time Converter</h2>
+      <p class="hint">e.g. "If it's 10 pm in London (BST), what time is it in India?"</p>
+      <form id="converterForm" class="converter-form">
+        <div class="field">
+          <label for="fromZone">From timezone</label>
+          <select id="fromZone"></select>
+        </div>
+        <div class="field">
+          <label for="fromDate">Date</label>
+          <input type="date" id="fromDate" required />
+        </div>
+        <div class="field">
+          <label for="fromTime">Time</label>
+          <input type="time" id="fromTime" step="60" required />
+        </div>
+        <button type="submit">Convert</button>
+      </form>
+      <div id="converterResults" class="converter-results"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Times update every second. Timezone conversions automatically account for daylight saving (e.g. BST vs GMT in London, IST has no DST).</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
