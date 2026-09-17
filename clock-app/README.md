@@ -1,6 +1,6 @@
 # World Clock
 
-A small, dependency-free web app for live world clocks and timezone conversion.
+A small, dependency-free, single-file web app for live world clocks and timezone conversion.
 
 ## Features
 
@@ -11,17 +11,11 @@ A small, dependency-free web app for live world clocks and timezone conversion.
 
 ## Running it
 
-No build step or server required — just open `index.html` in a browser. Optionally serve it locally:
-
-```sh
-python3 -m http.server 8000
-```
-
-then visit `http://localhost:8000`.
+Everything (markup, CSS, JS) lives in the single `index.html` file — no build step, no server, and no other files it depends on. Just open it directly in a browser, or serve it (e.g. via GitHub Pages, or `python3 -m http.server 8000` locally) if you'd rather visit it as a URL.
 
 ## How the conversion works
 
-JavaScript's `Date` object has no built-in way to interpret a wall-clock time as "this time in timezone X". `script.js` works around that by:
+JavaScript's `Date` object has no built-in way to interpret a wall-clock time as "this time in timezone X". The inline script works around that by:
 
 1. Treating the entered date/time as if it were UTC (a first guess at the instant).
 2. Formatting that guess in the target timezone and comparing it to what was actually entered.
