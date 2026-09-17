@@ -481,43 +481,99 @@
   };
   var FIREBASE_SDK_VERSION = "10.14.1";
 
+  // Leave empty to keep the app open to anyone with the URL (current
+  // behavior). Fill in with the Google account emails that should be
+  // allowed in (e.g. ["you@gmail.com", "kid@gmail.com"]) to require
+  // Google Sign-In. IMPORTANT: this list alone is only a client-side
+  // gate for the UI — the Firestore security rule must also be updated
+  // to check request.auth.token.email, otherwise the data itself is
+  // still reachable directly regardless of this list.
+  var AUTHORIZED_EMAILS = [];
+
   var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
   var applyingRemoteUpdate = false;
+  var authApi = { signIn: null, signOut: null };
+  var authState = {
+    required: !!(FIREBASE_CONFIG && AUTHORIZED_EMAILS.length),
+    ready: false,
+    user: null,
+    deniedEmail: null
+  };
 
-  function initCloudSync() {
+  function initFirebase() {
     if (!FIREBASE_CONFIG) return;
-    Promise.all([
+    var imports = [
       import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app.js"),
       import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-firestore.js")
-    ]).then(function (mods) {
-      var appMod = mods[0], fsMod = mods[1];
+    ];
+    if (authState.required) {
+      imports.push(import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-auth.js"));
+    }
+    Promise.all(imports).then(function (mods) {
+      var appMod = mods[0], fsMod = mods[1], authMod = mods[2];
       var app = appMod.initializeApp(FIREBASE_CONFIG);
       var db = fsMod.getFirestore(app);
       cloud.docRef = fsMod.doc(db, "notebookTracker", "family");
       cloud.setDoc = fsMod.setDoc;
-      cloud.ready = true;
-      cloud.failed = false;
-      render();
-      fsMod.onSnapshot(cloud.docRef, function (snap) {
-        if (!snap.exists()) {
-          pushCloudUpdate();
-          return;
+
+      if (!authState.required) {
+        startFirestoreSync(fsMod);
+        return;
+      }
+
+      var authInst = authMod.getAuth(app);
+      authApi.signIn = function () {
+        authMod.signInWithRedirect(authInst, new authMod.GoogleAuthProvider());
+      };
+      authApi.signOut = function () { authMod.signOut(authInst); };
+
+      authMod.getRedirectResult(authInst).catch(function (err) {
+        console.warn("Cloud sync: redirect sign-in failed", err);
+      });
+
+      authMod.onAuthStateChanged(authInst, function (user) {
+        authState.ready = true;
+        if (user && AUTHORIZED_EMAILS.indexOf(user.email) >= 0) {
+          authState.user = user;
+          authState.deniedEmail = null;
+          startFirestoreSync(fsMod);
+        } else {
+          if (user) {
+            authState.deniedEmail = user.email;
+            authMod.signOut(authInst);
+          }
+          authState.user = null;
+          cloud.ready = false;
+          render();
         }
-        var remote = snap.data();
-        if (JSON.stringify(remote) === JSON.stringify(state)) return;
-        applyingRemoteUpdate = true;
-        state = remote;
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
-        render();
-        applyingRemoteUpdate = false;
-      }, function (err) {
-        console.warn("Cloud sync: listen failed", err);
-        cloud.ready = false;
-        cloud.failed = true;
-        render();
       });
     }).catch(function (err) {
       console.warn("Cloud sync: unavailable", err);
+      cloud.failed = true;
+      authState.ready = true;
+      render();
+    });
+  }
+
+  function startFirestoreSync(fsMod) {
+    cloud.ready = true;
+    cloud.failed = false;
+    render();
+    fsMod.onSnapshot(cloud.docRef, function (snap) {
+      if (!snap.exists()) {
+        pushCloudUpdate();
+        return;
+      }
+      var remote = snap.data();
+      if (JSON.stringify(remote) === JSON.stringify(state)) return;
+      applyingRemoteUpdate = true;
+      state = remote;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+      render();
+      applyingRemoteUpdate = false;
+    }, function (err) {
+      console.warn("Cloud sync: listen failed", err);
+      cloud.ready = false;
       cloud.failed = true;
       render();
     });
@@ -878,11 +934,36 @@
     btnParent.classList.toggle("active", mode === "parent");
     titleEl.textContent = state.profile.kidName ? "🎒 " + state.profile.kidName + "'s Bag" : "🎒 Tomorrow's Bag";
     app.innerHTML = "";
+    if (authState.required && !authState.user) {
+      renderSignIn();
+      return;
+    }
     if (mode === "kid") {
       renderKid(justSaved);
     } else {
       renderParent();
     }
+  }
+
+  function renderSignIn() {
+    var card = el("div", "card");
+    card.style.textAlign = "center";
+    if (!authState.ready) {
+      card.appendChild(el("div", null, "🔐 Checking sign-in…"));
+    } else {
+      card.appendChild(el("div", "emoji-row", "🔐"));
+      card.appendChild(el("h2", null, "Sign in required"));
+      card.appendChild(el("div", "parent-note", "This app is private to your family. Sign in with an authorized Google account to continue."));
+      if (authState.deniedEmail) {
+        card.appendChild(el("div", "parent-note", "⚠️ " + escapeHtml(authState.deniedEmail) + " isn't authorized for this app."));
+      }
+      var signInBtn = el("button", "big-btn", "Sign in with Google");
+      signInBtn.addEventListener("click", function () {
+        if (authApi.signIn) authApi.signIn();
+      });
+      card.appendChild(signInBtn);
+    }
+    app.appendChild(card);
   }
 
   function el(tag, cls, html) {
@@ -1000,6 +1081,18 @@
 
     app.appendChild(el("div", "today-line", "📅 Today: " + formatLong(todayDate())));
     app.appendChild(el("div", "today-line", cloud.ready ? "☁️ Synced across devices" : (cloud.failed ? "💾 Saved on this device only (sync unavailable)" : (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only"))));
+    if (authState.required && authState.user) {
+      var acctLine = el("div", "today-line", "🔐 Signed in as " + escapeHtml(authState.user.email) + " · ");
+      var signOutLink = document.createElement("a");
+      signOutLink.href = "#";
+      signOutLink.textContent = "Sign out";
+      signOutLink.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (authApi.signOut) authApi.signOut();
+      });
+      acctLine.appendChild(signOutLink);
+      app.appendChild(acctLine);
+    }
 
     var parentSchoolHoliday = getSchoolHolidayForDate(d);
     if (parentSchoolHoliday) {
@@ -1306,7 +1399,7 @@
   }
 
   render();
-  initCloudSync();
+  initFirebase();
 })();
 </script>
 </body>
