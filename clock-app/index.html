@@ -590,10 +590,7 @@ function renderConverterResults(utcInstant) {
   const container = document.getElementById("converterResults");
   container.innerHTML = "";
 
-  const targets = [
-    ...currentZoneList(),
-    { tz: "UTC", city: "UTC" },
-  ];
+  const targets = currentZoneList();
 
   const seen = new Set();
   targets.forEach((zone) => {
