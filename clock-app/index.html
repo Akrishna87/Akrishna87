@@ -23,12 +23,17 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   padding: 24px 16px 48px;
+  overflow-x: hidden;
 }
 
 .app-header {
@@ -80,18 +85,29 @@ main {
 
 .add-zone {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.add-zone select {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
 select,
 input,
 button {
   font: inherit;
+  font-size: 16px;
   background: var(--well);
   color: var(--text);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 button {
@@ -224,6 +240,49 @@ button:hover {
   text-align: center;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+@media (max-width: 600px) {
+  body {
+    padding: 16px 12px 32px;
+  }
+
+  .app-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .add-zone {
+    width: 100%;
+  }
+
+  .add-zone select,
+  .add-zone button {
+    flex: 1 1 auto;
+  }
+
+  .converter-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .converter-form .field,
+  .converter-form button {
+    width: 100%;
+  }
+
+  .result-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .result-row .rr-time {
+    align-self: flex-end;
+  }
 }
 </style>
 </head>
