@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Meal Plan 🍽️</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="theme-color" content="#ff7a45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meal Plan">
+<style>
+  :root {
+    --bg1: #fff8ef;
+    --bg2: #ffe8d6;
+    --card: #ffffff;
+    --ink: #3a2e26;
+    --muted: #948477;
+    --accent: #ff7a45;
+    --accent-dark: #e0592a;
+    --accent2: #4caf7d;
+    --accent2-dark: #3a8f63;
+    --radius: 20px;
+    --shadow: 0 6px 0 rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    color: var(--ink);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 4px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  header h1 {
+    font-size: 1.4rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tab-toggle {
+    display: flex;
+    background: var(--card);
+    border-radius: 999px;
+    padding: 4px;
+    box-shadow: var(--shadow);
+    flex-wrap: wrap;
+  }
+  .tab-toggle button {
+    border: none;
+    background: transparent;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .tab-toggle button.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+
+  .week-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .week-nav .range {
+    font-weight: 800;
+    font-size: 1.05rem;
+    text-align: center;
+    flex: 1;
+  }
+  .week-nav .sub-today {
+    display: block;
+    font-weight: 500;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .week-nav button {
+    border: none;
+    background: var(--card);
+    box-shadow: var(--shadow);
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .week-nav .today-btn {
+    font-size: 0.78rem;
+    padding: 8px 10px;
+  }
+
+  .day-card {
+    margin-bottom: 12px;
+  }
+  .day-card.today {
+    border: 2px solid var(--accent);
+  }
+  .day-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .day-head .dname {
+    font-weight: 800;
+    font-size: 1.02rem;
+  }
+  .day-head .ddate {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .day-head .today-tag {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+
+  .slot-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid #f4ece3;
+  }
+  .slot-row:first-of-type { border-top: none; }
+  .slot-emoji { font-size: 1.2rem; width: 26px; text-align: center; }
+  .slot-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-weight: 700;
+    width: 72px;
+    flex-shrink: 0;
+  }
+  .slot-btn {
+    flex: 1;
+    text-align: left;
+    border: 2px dashed #eadfd2;
+    background: #fffaf3;
+    border-radius: 14px;
+    padding: 9px 12px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .slot-btn.filled {
+    border: 2px solid transparent;
+    background: #fff1e6;
+    color: var(--ink);
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(58, 46, 38, 0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 1000;
+    padding: 0;
+  }
+  @media (min-width: 560px) {
+    .overlay { align-items: center; padding: 16px; }
+  }
+  .sheet {
+    background: var(--card);
+    border-radius: 24px 24px 0 0;
+    padding: 20px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 82vh;
+    overflow-y: auto;
+  }
+  @media (min-width: 560px) {
+    .sheet { border-radius: 24px; }
+  }
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .sheet-head h3 { margin: 0; font-size: 1.05rem; }
+  .sheet-head button.close {
+    border: none;
+    background: #f2ece4;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 1rem;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .sheet input[type="text"], .sheet input[type="search"] {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 14px;
+    border: 2px solid #eee;
+    font-size: 0.95rem;
+    font-family: inherit;
+    margin-bottom: 10px;
+  }
+  .meal-choice-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .meal-choice {
+    border: 2px solid #eee;
+    background: #fafafa;
+    border-radius: 14px;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .meal-choice.current {
+    border-color: var(--accent2);
+    background: #eafbf1;
+  }
+  .sheet .divider {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin: 12px 0 8px;
+  }
+  .sheet .row-inline {
+    display: flex;
+    gap: 8px;
+  }
+  .sheet .row-inline input { flex: 1; }
+  .btn {
+    border: none;
+    border-radius: 14px;
+    padding: 11px 16px;
+    font-size: 0.92rem;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn.primary { background: var(--accent); color: white; }
+  .btn.secondary { background: #f2ece4; color: var(--ink); }
+  .btn.danger { background: #fdeceb; color: #c0392b; }
+  .btn.full { display: block; width: 100%; margin-top: 8px; }
+  .sheet-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .sheet-actions .btn { flex: 1; }
+  .empty-hint {
+    color: var(--muted);
+    text-align: center;
+    padding: 14px 6px;
+    font-size: 0.9rem;
+  }
+
+  .ing-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-top: 1px solid #f4ece3;
+    font-size: 0.94rem;
+  }
+  .ing-item:first-of-type { border-top: none; }
+  .ing-item input[type="checkbox"] { width: 19px; height: 19px; flex-shrink: 0; }
+  .ing-item label { flex: 1; cursor: pointer; }
+  .ing-item.checked label { text-decoration: line-through; color: var(--muted); }
+  .ing-item .rm {
+    color: #c0392b;
+    cursor: pointer;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  .add-extra-form, .add-recipe-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .add-extra-form input, .add-recipe-form input {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 2px solid #eee;
+    font-size: 0.92rem;
+    font-family: inherit;
+  }
+  .add-extra-form input.text-in { flex: 1; min-width: 140px; }
+  .add-recipe-form input.emoji-in { width: 56px; text-align: center; font-size: 1.1rem; }
+  .add-recipe-form input.name-in { flex: 1; min-width: 110px; }
+  .add-recipe-form input.ing-in { flex: 2; min-width: 160px; }
+  .add-extra-form button, .add-recipe-form button {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: none;
+    background: var(--ink);
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .shop-progress {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .shop-note {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .copy-flash {
+    color: var(--accent2-dark);
+    font-weight: 700;
+  }
+
+  .recipe-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-top: 1px solid #f4ece3;
+  }
+  .recipe-card:first-of-type { border-top: none; }
+  .recipe-card .r-emoji { font-size: 1.5rem; }
+  .recipe-card .r-body { flex: 1; }
+  .recipe-card .r-name { font-weight: 800; font-size: 0.96rem; }
+  .recipe-card .r-ings { color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+  .recipe-card .r-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .recipe-card .r-actions span { cursor: pointer; font-size: 0.95rem; }
+  .recipe-card .r-actions .rm { color: #c0392b; }
+  .recipe-card .r-actions .edit { color: #4a90d9; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🍽️ Meal Plan</h1>
+    <div class="tab-toggle">
+      <button id="tabPlanner" class="active">📅 Planner</button>
+      <button id="tabShopping">🛒 Shopping</button>
+      <button id="tabRecipes">📖 Recipes</button>
+    </div>
+  </header>
+
+  <div id="app"></div>
+
+  <footer>Saved on this device only 💾 · Made for planning meals without the "what's for dinner?" scramble</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "mealPlanApp.v1";
+
+  var DAYS = [
+    { key: "mon", label: "Monday" },
+    { key: "tue", label: "Tuesday" },
+    { key: "wed", label: "Wednesday" },
+    { key: "thu", label: "Thursday" },
+    { key: "fri", label: "Friday" },
+    { key: "sat", label: "Saturday" },
+    { key: "sun", label: "Sunday" }
+  ];
+
+  var SLOTS = [
+    { key: "breakfast", label: "Breakfast", emoji: "🌅" },
+    { key: "lunch", label: "Lunch", emoji: "☀️" },
+    { key: "dinner", label: "Dinner", emoji: "🌙" }
+  ];
+
+  var DEFAULT_LIBRARY = [
+    { id: "m_oatmeal", emoji: "🥣", name: "Oatmeal", ingredients: ["Oats", "Milk", "Banana", "Honey"] },
+    { id: "m_eggs_toast", emoji: "🍳", name: "Eggs & Toast", ingredients: ["Eggs", "Bread", "Butter"] },
+    { id: "m_pancakes", emoji: "🥞", name: "Pancakes", ingredients: ["Flour", "Milk", "Eggs", "Maple syrup"] },
+    { id: "m_salad", emoji: "🥗", name: "Salad Bowl", ingredients: ["Lettuce", "Tomato", "Cucumber", "Olive oil"] },
+    { id: "m_dal_rice", emoji: "🍛", name: "Dal Rice", ingredients: ["Lentils", "Rice", "Turmeric", "Onion"] },
+    { id: "m_pasta", emoji: "🍝", name: "Pasta", ingredients: ["Pasta", "Tomato sauce", "Garlic", "Cheese"] },
+    { id: "m_tacos", emoji: "🌮", name: "Tacos", ingredients: ["Tortillas", "Beans", "Cheese", "Salsa"] },
+    { id: "m_pizza", emoji: "🍕", name: "Pizza Night", ingredients: ["Pizza dough", "Cheese", "Tomato sauce"] },
+    { id: "m_soup", emoji: "🍲", name: "Vegetable Soup", ingredients: ["Mixed vegetables", "Vegetable broth", "Onion"] },
+    { id: "m_fried_rice", emoji: "🍚", name: "Fried Rice", ingredients: ["Rice", "Eggs", "Peas", "Soy sauce"] },
+    { id: "m_sandwiches", emoji: "🥪", name: "Sandwiches", ingredients: ["Bread", "Cheese", "Lettuce", "Tomato"] },
+    { id: "m_noodles", emoji: "🍜", name: "Noodles", ingredients: ["Noodles", "Mixed vegetables", "Soy sauce"] }
+  ];
+
+  var EMOJI_PALETTE = ["🥣","🍳","🥞","🥗","🍛","🍝","🌮","🍕","🍲","🍚","🥪","🍜","🍗","🍖","🍤","🥘","🍱","🥙","🌯","🥟","🍣","🍞","🧆","🍇"];
+
+  function emptyDayPlan() {
+    var p = {};
+    DAYS.forEach(function (d) { p[d.key] = { breakfast: null, lunch: null, dinner: null }; });
+    return p;
+  }
+
+  function defaultWeek() {
+    return { plan: emptyDayPlan(), extras: [], checked: {} };
+  }
+
+  function loadState() {
+    var raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    if (raw) {
+      try {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.library && parsed.weeks) return parsed;
+      } catch (e) {}
+    }
+    return { library: DEFAULT_LIBRARY.slice(), weeks: {} };
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = loadState();
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function dateKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function addDays(d, n) {
+    var nd = new Date(d);
+    nd.setDate(nd.getDate() + n);
+    return nd;
+  }
+  function getMonday(d) {
+    var nd = new Date(d);
+    nd.setHours(0, 0, 0, 0);
+    var day = nd.getDay(); // 0 Sun .. 6 Sat
+    var diff = day === 0 ? -6 : 1 - day;
+    nd.setDate(nd.getDate() + diff);
+    return nd;
+  }
+  function formatWeekRange(monday) {
+    var sunday = addDays(monday, 6);
+    return monday.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+      " – " + sunday.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+
+  function ensureWeek(key) {
+    if (!state.weeks[key]) state.weeks[key] = defaultWeek();
+    var w = state.weeks[key];
+    if (!w.plan) w.plan = emptyDayPlan();
+    DAYS.forEach(function (d) { if (!w.plan[d.key]) w.plan[d.key] = { breakfast: null, lunch: null, dinner: null }; });
+    if (!Array.isArray(w.extras)) w.extras = [];
+    if (!w.checked) w.checked = {};
+    return w;
+  }
+
+  function mealById(id) {
+    for (var i = 0; i < state.library.length; i++) {
+      if (state.library[i].id === id) return state.library[i];
+    }
+    return null;
+  }
+
+  function slotDisplay(value) {
+    if (!value) return null;
+    if (value.type === "library") {
+      var m = mealById(value.id);
+      return m ? (m.emoji + " " + m.name) : null;
+    }
+    if (value.type === "custom") return "📝 " + value.name;
+    return null;
+  }
+
+  // ---------- App state (not persisted) ----------
+  var activeTab = "planner";
+  var currentMonday = getMonday(new Date());
+  var pickerState = null; // { dayKey, slotKey }
+  var pickerSearch = "";
+  var pickerCustomText = "";
+  var editingMealId = null;
+  var chosenEmoji = "⭐";
+  var copyFlash = false;
+
+  // ---------- DOM refs ----------
+  var app = document.getElementById("app");
+  var tabPlanner = document.getElementById("tabPlanner");
+  var tabShopping = document.getElementById("tabShopping");
+  var tabRecipes = document.getElementById("tabRecipes");
+
+  tabPlanner.addEventListener("click", function () { activeTab = "planner"; render(); });
+  tabShopping.addEventListener("click", function () { activeTab = "shopping"; render(); });
+  tabRecipes.addEventListener("click", function () { activeTab = "recipes"; render(); });
+
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  }
+
+  function render() {
+    tabPlanner.classList.toggle("active", activeTab === "planner");
+    tabShopping.classList.toggle("active", activeTab === "shopping");
+    tabRecipes.classList.toggle("active", activeTab === "recipes");
+
+    app.innerHTML = "";
+    if (activeTab === "planner") renderPlanner();
+    else if (activeTab === "shopping") renderShopping();
+    else renderRecipes();
+
+    renderPickerOverlay();
+  }
+
+  function renderWeekNav() {
+    var nav = el("div", "week-nav");
+    var isThisWeek = dateKey(currentMonday) === dateKey(getMonday(new Date()));
+
+    var prevBtn = el("button", null, "◀");
+    prevBtn.addEventListener("click", function () { currentMonday = addDays(currentMonday, -7); render(); });
+
+    var rangeWrap = el("div", "range");
+    rangeWrap.appendChild(document.createTextNode(formatWeekRange(currentMonday)));
+    rangeWrap.appendChild(el("span", "sub-today", isThisWeek ? "This week" : ""));
+
+    var todayBtn = el("button", "today-btn", "Today");
+    todayBtn.style.visibility = isThisWeek ? "hidden" : "visible";
+    todayBtn.addEventListener("click", function () { currentMonday = getMonday(new Date()); render(); });
+
+    var nextBtn = el("button", null, "▶");
+    nextBtn.addEventListener("click", function () { currentMonday = addDays(currentMonday, 7); render(); });
+
+    nav.appendChild(prevBtn);
+    nav.appendChild(rangeWrap);
+    nav.appendChild(todayBtn);
+    nav.appendChild(nextBtn);
+    return nav;
+  }
+
+  function renderPlanner() {
+    app.appendChild(renderWeekNav());
+    var weekKey = dateKey(currentMonday);
+    var week = ensureWeek(weekKey);
+    var todayKey = dateKey(new Date());
+
+    DAYS.forEach(function (d, idx) {
+      var dDate = addDays(currentMonday, idx);
+      var isToday = dateKey(dDate) === todayKey;
+      var card = el("div", "card day-card" + (isToday ? " today" : ""));
+      var head = el("div", "day-head");
+      head.appendChild(el("span", "dname", d.label));
+      head.appendChild(el("span", "ddate", dDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })));
+      if (isToday) head.appendChild(el("span", "today-tag", "TODAY"));
+      card.appendChild(head);
+
+      SLOTS.forEach(function (s) {
+        var row = el("div", "slot-row");
+        row.appendChild(el("span", "slot-emoji", s.emoji));
+        row.appendChild(el("span", "slot-label", s.label));
+        var value = week.plan[d.key][s.key];
+        var display = slotDisplay(value);
+        var btn = el("button", "slot-btn" + (display ? " filled" : ""), display ? escapeHtml(display) : "+ Add");
+        btn.addEventListener("click", function () { openPicker(d.key, s.key); });
+        row.appendChild(btn);
+        card.appendChild(row);
+      });
+
+      app.appendChild(card);
+    });
+  }
+
+  function openPicker(dayKey, slotKey) {
+    pickerState = { dayKey: dayKey, slotKey: slotKey };
+    pickerSearch = "";
+    var current = ensureWeek(dateKey(currentMonday)).plan[dayKey][slotKey];
+    pickerCustomText = (current && current.type === "custom") ? current.name : "";
+    render();
+  }
+
+  function closePicker() {
+    pickerState = null;
+    render();
+  }
+
+  function assignSlot(value) {
+    var week = ensureWeek(dateKey(currentMonday));
+    week.plan[pickerState.dayKey][pickerState.slotKey] = value;
+    saveState();
+    closePicker();
+  }
+
+  function renderPickerOverlay() {
+    var existing = document.getElementById("pickerOverlay");
+    if (existing) existing.remove();
+    if (!pickerState) return;
+
+    var slotInfo = SLOTS.filter(function (s) { return s.key === pickerState.slotKey; })[0];
+    var dayInfo = DAYS.filter(function (d) { return d.key === pickerState.dayKey; })[0];
+    var current = ensureWeek(dateKey(currentMonday)).plan[pickerState.dayKey][pickerState.slotKey];
+
+    var overlay = el("div", "overlay");
+    overlay.id = "pickerOverlay";
+    overlay.addEventListener("click", closePicker);
+
+    var sheet = el("div", "sheet");
+    sheet.addEventListener("click", function (ev) { ev.stopPropagation(); });
+
+    var headRow = el("div", "sheet-head");
+    headRow.appendChild(el("h3", null, slotInfo.emoji + " " + slotInfo.label + " — " + dayInfo.label));
+    var closeBtn = el("button", "close", "✕");
+    closeBtn.addEventListener("click", closePicker);
+    headRow.appendChild(closeBtn);
+    sheet.appendChild(headRow);
+
+    var search = document.createElement("input");
+    search.type = "search";
+    search.placeholder = "Search recipes…";
+    search.value = pickerSearch;
+    search.addEventListener("input", function () { pickerSearch = search.value; renderPickerChoices(); });
+    sheet.appendChild(search);
+
+    var choiceList = el("div", "meal-choice-list");
+    choiceList.id = "pickerChoiceList";
+    sheet.appendChild(choiceList);
+
+    function renderPickerChoices() {
+      choiceList.innerHTML = "";
+      var q = pickerSearch.trim().toLowerCase();
+      var matches = state.library.filter(function (m) {
+        return !q || m.name.toLowerCase().indexOf(q) >= 0;
+      });
+      if (!matches.length) {
+        choiceList.appendChild(el("div", "empty-hint", "No recipes match. Add one in the Recipes tab, or type a custom meal below."));
+        return;
+      }
+      matches.forEach(function (m) {
+        var isCurrent = current && current.type === "library" && current.id === m.id;
+        var chip = el("button", "meal-choice" + (isCurrent ? " current" : ""), m.emoji + " " + escapeHtml(m.name));
+        chip.addEventListener("click", function () { assignSlot({ type: "library", id: m.id }); });
+        choiceList.appendChild(chip);
+      });
+    }
+    renderPickerChoices();
+
+    sheet.appendChild(el("div", "divider", "— or type something custom —"));
+    var customRow = el("div", "row-inline");
+    var customInput = document.createElement("input");
+    customInput.type = "text";
+    customInput.placeholder = "e.g. Leftovers, eating out…";
+    customInput.value = pickerCustomText;
+    customInput.addEventListener("input", function () { pickerCustomText = customInput.value; });
+    var setBtn = el("button", "btn primary", "Set");
+    setBtn.addEventListener("click", function () {
+      var text = pickerCustomText.trim();
+      if (!text) return;
+      assignSlot({ type: "custom", name: text });
+    });
+    customRow.appendChild(customInput);
+    customRow.appendChild(setBtn);
+    sheet.appendChild(customRow);
+
+    var actions = el("div", "sheet-actions");
+    if (current) {
+      var clearBtn = el("button", "btn danger", "Clear this meal");
+      clearBtn.addEventListener("click", function () { assignSlot(null); });
+      actions.appendChild(clearBtn);
+    }
+    var cancelBtn = el("button", "btn secondary", "Cancel");
+    cancelBtn.addEventListener("click", closePicker);
+    actions.appendChild(cancelBtn);
+    sheet.appendChild(actions);
+
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+  }
+
+  // ---------- Shopping ----------
+
+  function collectIngredients(week) {
+    var seen = {};
+    var list = [];
+    DAYS.forEach(function (d) {
+      SLOTS.forEach(function (s) {
+        var value = week.plan[d.key][s.key];
+        if (value && value.type === "library") {
+          var m = mealById(value.id);
+          if (m && m.ingredients) {
+            m.ingredients.forEach(function (ing) {
+              var key = ing.trim().toLowerCase();
+              if (!key || seen[key]) return;
+              seen[key] = true;
+              list.push(ing.trim());
+            });
+          }
+        }
+      });
+    });
+    list.sort(function (a, b) { return a.localeCompare(b); });
+    return list;
+  }
+
+  function renderShopping() {
+    app.appendChild(renderWeekNav());
+    var weekKey = dateKey(currentMonday);
+    var week = ensureWeek(weekKey);
+    var ingredients = collectIngredients(week);
+
+    var totalCount = ingredients.length + week.extras.length;
+    var checkedCount = 0;
+    ingredients.forEach(function (ing) { if (week.checked[ing.toLowerCase()]) checkedCount++; });
+    week.extras.forEach(function (e) { if (e.checked) checkedCount++; });
+
+    var card = el("div", "card");
+    card.appendChild(el("h3", null, "🛒 Shopping list for this week"));
+    if (totalCount > 0) {
+      card.appendChild(el("div", "shop-progress", checkedCount + " of " + totalCount + " checked off"));
+    }
+
+    if (!ingredients.length && !week.extras.length) {
+      card.appendChild(el("div", "empty-hint", "Nothing here yet — plan some meals for the week, or add an item below."));
+    }
+
+    ingredients.forEach(function (ing) {
+      var key = ing.toLowerCase();
+      var isChecked = !!week.checked[key];
+      var row = el("div", "ing-item" + (isChecked ? " checked" : ""));
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = isChecked;
+      var id = "ck_" + key.replace(/[^a-z0-9]/g, "_");
+      cb.id = id;
+      cb.addEventListener("change", function () {
+        week.checked[key] = cb.checked;
+        saveState();
+        render();
+      });
+      var label = document.createElement("label");
+      label.htmlFor = id;
+      label.textContent = ing;
+      row.appendChild(cb);
+      row.appendChild(label);
+      card.appendChild(row);
+    });
+
+    week.extras.forEach(function (item) {
+      var row = el("div", "ing-item" + (item.checked ? " checked" : ""));
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = item.checked;
+      cb.addEventListener("change", function () {
+        item.checked = cb.checked;
+        saveState();
+        render();
+      });
+      var label = document.createElement("label");
+      label.textContent = item.text;
+      var rm = el("span", "rm", "✕");
+      rm.addEventListener("click", function () {
+        week.extras = week.extras.filter(function (e) { return e.id !== item.id; });
+        saveState();
+        render();
+      });
+      row.appendChild(cb);
+      row.appendChild(label);
+      row.appendChild(rm);
+      card.appendChild(row);
+    });
+
+    var addForm = el("div", "add-extra-form");
+    var extraIn = document.createElement("input");
+    extraIn.type = "text";
+    extraIn.className = "text-in";
+    extraIn.placeholder = "Add an extra item, e.g. milk, coffee…";
+    var addBtn = document.createElement("button");
+    addBtn.textContent = "Add";
+    function addExtra() {
+      var text = extraIn.value.trim();
+      if (!text) return;
+      week.extras.push({ id: "x_" + Date.now() + "_" + Math.floor(Math.random() * 1000), text: text, checked: false });
+      saveState();
+      render();
+    }
+    addBtn.addEventListener("click", addExtra);
+    extraIn.addEventListener("keydown", function (ev) { if (ev.key === "Enter") addExtra(); });
+    addForm.appendChild(extraIn);
+    addForm.appendChild(addBtn);
+    card.appendChild(addForm);
+
+    if (ingredients.some(function (ing) { return week.checked[ing.toLowerCase()]; }) || week.extras.some(function (e) { return e.checked; })) {
+      var clearBtn = el("button", "btn secondary full", "Clear checked items");
+      clearBtn.addEventListener("click", function () {
+        week.checked = {};
+        week.extras.forEach(function (e) { e.checked = false; });
+        saveState();
+        render();
+      });
+      card.appendChild(clearBtn);
+    }
+
+    var copyBtn = el("button", "btn primary full", copyFlash ? "✅ Copied!" : "📋 Copy list");
+    copyBtn.addEventListener("click", function () {
+      var lines = ingredients.concat(week.extras.map(function (e) { return e.text; }));
+      var text = "Shopping list — " + formatWeekRange(currentMonday) + "\n" + lines.map(function (l) { return "- " + l; }).join("\n");
+      var done = function () {
+        copyFlash = true;
+        render();
+        setTimeout(function () { copyFlash = false; render(); }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { window.prompt("Copy this list:", text); });
+      } else {
+        window.prompt("Copy this list:", text);
+      }
+    });
+    card.appendChild(copyBtn);
+
+    card.appendChild(el("div", "shop-note", "Only meals picked from your Recipes list bring their ingredients along automatically — custom/typed-in meals don't have ingredients, so add anything they need above."));
+
+    app.appendChild(card);
+  }
+
+  // ---------- Recipes ----------
+
+  function addMeal(name, emoji, ingredientsText) {
+    name = (name || "").trim();
+    emoji = (emoji || "").trim() || "⭐";
+    if (!name) return;
+    var ingredients = (ingredientsText || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    var id = "m_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+    state.library.push({ id: id, name: name, emoji: emoji, ingredients: ingredients });
+    saveState();
+    render();
+  }
+
+  function updateMeal(id, name, emoji, ingredientsText) {
+    var m = mealById(id);
+    if (!m) return;
+    name = (name || "").trim();
+    emoji = (emoji || "").trim() || "⭐";
+    if (!name) return;
+    m.name = name;
+    m.emoji = emoji;
+    m.ingredients = (ingredientsText || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    saveState();
+    render();
+  }
+
+  function removeMeal(id) {
+    state.library = state.library.filter(function (m) { return m.id !== id; });
+    Object.keys(state.weeks).forEach(function (weekKey) {
+      var week = state.weeks[weekKey];
+      DAYS.forEach(function (d) {
+        SLOTS.forEach(function (s) {
+          var value = week.plan[d.key] && week.plan[d.key][s.key];
+          if (value && value.type === "library" && value.id === id) {
+            week.plan[d.key][s.key] = null;
+          }
+        });
+      });
+    });
+    saveState();
+    render();
+  }
+
+  function renderRecipes() {
+    var card = el("div", "card");
+    card.appendChild(el("h3", null, "📖 Your recipes"));
+    card.appendChild(el("div", "shop-note", "These show up as quick picks when you're filling in the weekly planner. Ingredients (comma-separated) feed the shopping list automatically."));
+
+    if (!state.library.length) {
+      card.appendChild(el("div", "empty-hint", "No recipes yet — add your first one below."));
+    }
+
+    state.library.forEach(function (m) {
+      if (m.id === editingMealId) {
+        var editForm = el("div", "add-recipe-form");
+        var eEmoji = document.createElement("input");
+        eEmoji.className = "emoji-in";
+        eEmoji.value = m.emoji;
+        eEmoji.maxLength = 4;
+        var eName = document.createElement("input");
+        eName.className = "name-in";
+        eName.value = m.name;
+        var eIng = document.createElement("input");
+        eIng.className = "ing-in";
+        eIng.value = m.ingredients.join(", ");
+        eIng.placeholder = "Ingredients, comma-separated";
+        var eSave = document.createElement("button");
+        eSave.textContent = "Save";
+        eSave.addEventListener("click", function () {
+          updateMeal(m.id, eName.value, eEmoji.value, eIng.value);
+          editingMealId = null;
+        });
+        var eCancel = document.createElement("button");
+        eCancel.textContent = "Cancel";
+        eCancel.addEventListener("click", function () { editingMealId = null; render(); });
+        editForm.appendChild(eEmoji);
+        editForm.appendChild(eName);
+        editForm.appendChild(eIng);
+        editForm.appendChild(eSave);
+        editForm.appendChild(eCancel);
+        card.appendChild(editForm);
+        return;
+      }
+
+      var row = el("div", "recipe-card");
+      row.appendChild(el("div", "r-emoji", m.emoji));
+      var body = el("div", "r-body");
+      body.appendChild(el("div", "r-name", escapeHtml(m.name)));
+      body.appendChild(el("div", "r-ings", m.ingredients.length ? escapeHtml(m.ingredients.join(", ")) : "No ingredients listed"));
+      row.appendChild(body);
+      var actions = el("div", "r-actions");
+      var editIcon = el("span", "edit", "✏️");
+      editIcon.addEventListener("click", function () { editingMealId = m.id; render(); });
+      var rmIcon = el("span", "rm", "✕");
+      rmIcon.addEventListener("click", function () {
+        if (confirm('Remove "' + m.name + '" from your recipes?')) removeMeal(m.id);
+      });
+      actions.appendChild(editIcon);
+      actions.appendChild(rmIcon);
+      row.appendChild(actions);
+      card.appendChild(row);
+    });
+
+    card.appendChild(el("div", "divider", "— add a new recipe —"));
+
+    var palette = el("div", "meal-choice-list");
+    EMOJI_PALETTE.forEach(function (e) {
+      var b = el("button", "meal-choice" + (e === chosenEmoji ? " current" : ""), e);
+      b.addEventListener("click", function () { chosenEmoji = e; render(); });
+      palette.appendChild(b);
+    });
+    card.appendChild(palette);
+
+    var form = el("div", "add-recipe-form");
+    var emojiIn = document.createElement("input");
+    emojiIn.className = "emoji-in";
+    emojiIn.value = chosenEmoji;
+    emojiIn.maxLength = 4;
+    var nameIn = document.createElement("input");
+    nameIn.className = "name-in";
+    nameIn.placeholder = "Recipe name";
+    var ingIn = document.createElement("input");
+    ingIn.className = "ing-in";
+    ingIn.placeholder = "Ingredients, comma-separated";
+    var addBtn = document.createElement("button");
+    addBtn.textContent = "Add";
+    addBtn.addEventListener("click", function () {
+      addMeal(nameIn.value, emojiIn.value, ingIn.value);
+      chosenEmoji = "⭐";
+    });
+    form.appendChild(emojiIn);
+    form.appendChild(nameIn);
+    form.appendChild(ingIn);
+    form.appendChild(addBtn);
+    card.appendChild(form);
+
+    app.appendChild(card);
+  }
+
+  render();
+
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {
+        // offline/installable support is a nice-to-have, not required
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
