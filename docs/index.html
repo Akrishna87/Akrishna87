@@ -463,6 +463,23 @@
 (function () {
   "use strict";
 
+  // Kill switch: set to true to take the app offline for everyone —
+  // no rendering, no Firebase calls, nothing. Flip back to false and
+  // push to reactivate; nothing else in this file needs to change.
+  var MAINTENANCE_MODE = true;
+  if (MAINTENANCE_MODE) {
+    var modeToggle = document.querySelector(".mode-toggle");
+    if (modeToggle) modeToggle.style.display = "none";
+    var appEl = document.getElementById("app");
+    appEl.innerHTML =
+      '<div class="card" style="text-align:center">' +
+      '<div class="emoji-row">🚧</div>' +
+      "<h2>Temporarily unavailable</h2>" +
+      '<div class="parent-note">This app is offline for now. Please check back later.</div>' +
+      "</div>";
+    return;
+  }
+
   var STORAGE_KEY = "notebookTracker.v1";
 
   // ---- Optional cross-device sync (Firebase Firestore) ----
