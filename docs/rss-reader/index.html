@@ -149,6 +149,14 @@ svg.i { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none;
 .nav-item .count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .nav-item.active .count { color: var(--accent); }
 .nav-item .err { color: var(--danger); font-size: 13px; }
+.nav-item.in-folder { padding-left: 22px; }
+.folder-row { display: flex; align-items: center; }
+.folder-row .nav-item { flex: 1; min-width: 0; font-weight: 600; }
+.folder-toggle { width: 30px; height: 38px; border: 0; background: none; color: var(--muted); display: grid; place-items: center; border-radius: 8px; flex: none; }
+.folder-toggle:hover { background: var(--hover); }
+.folder-toggle svg { width: 16px; height: 16px; transition: transform 0.15s; }
+.folder-toggle.collapsed svg { transform: rotate(-90deg); }
+.brand .sync-dot { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--muted); }
 .fav {
   position: relative; width: 18px; height: 18px; flex: none;
   border-radius: 5px; overflow: hidden;
@@ -205,6 +213,8 @@ a.btn { text-decoration: none; color: var(--text); }
   padding: 6px 12px; border-bottom: 1px solid var(--border);
   font-size: 13px; color: var(--muted);
 }
+.searchbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.searchbar .input { padding: 8px 12px; }
 .tools .status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; white-space: nowrap; }
 .toggle input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
@@ -279,6 +289,11 @@ a.btn { text-decoration: none; color: var(--text); }
 .content h1, .content h2, .content h3 { line-height: 1.3; }
 .hero { width: 100%; max-height: 420px; object-fit: cover; border-radius: 10px; margin-bottom: 18px; }
 .open-orig { margin-top: 32px; }
+.fulltext-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); background: var(--side); border-radius: 10px; padding: 8px 12px; margin: 0 0 18px; }
+.fulltext-note .link-btn { padding: 2px 0; }
+.icon-btn.busy svg { animation: spin 0.9s linear infinite; }
+.icon-btn.active { color: var(--accent); }
+mark.hl { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
 .placeholder { min-height: 100%; display: grid; place-items: center; color: var(--faint); text-align: center; padding: 24px; }
 .placeholder svg { width: 56px; height: 56px; stroke-width: 1.4; margin-bottom: 8px; }
 .kbd { font-size: 12px; margin-top: 10px; line-height: 1.9; }
@@ -317,6 +332,13 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .feed-row .info div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-row .info .u { font-size: 12px; color: var(--muted); }
 .feed-row .info .e { font-size: 12px; color: var(--danger); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 4px 0 10px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+.sync-box { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sync-box .who { flex: 1; min-width: 0; font-size: 14px; }
+.sync-box .who small { display: block; color: var(--muted); font-size: 12px; }
+.hint { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.hint.err { color: var(--danger); }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .seg button { border: 0; background: none; padding: 8px 14px; font-size: 14px; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
@@ -370,7 +392,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 <div class="app">
   <!-- Sidebar: views + subscriptions -->
   <aside class="sidebar" id="sidebar" aria-label="Feeds">
-    <div class="brand"><img src="icons/icon.svg" alt="" /> RSS Reader</div>
+    <div class="brand"><img src="icons/icon.svg" alt="" /> RSS Reader <span class="sync-dot" id="syncDot" hidden></span></div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot">
       <button class="btn primary grow" id="btnAdd" type="button">
@@ -390,10 +412,20 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
         <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <h1 id="viewTitle">All articles</h1>
+      <button class="icon-btn" id="btnEditFeed" type="button" aria-label="Edit this feed" title="Edit feed" hidden>
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSearch" type="button" aria-label="Search articles" title="Search (/)">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      </button>
       <button class="icon-btn" id="btnRefresh" type="button" aria-label="Refresh feeds" title="Refresh (r)">
         <svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
       </button>
     </header>
+    <div class="searchbar" id="searchBar" hidden>
+      <input class="input" id="searchInput" type="search" placeholder="Search all articles…" autocomplete="off" enterkeyhint="search" />
+      <button class="link-btn" id="btnSearchClose" type="button">Cancel</button>
+    </div>
     <div class="tools">
       <label class="toggle"><input type="checkbox" id="unreadOnly" /> Unread only</label>
       <span class="status" id="status"></span>
@@ -417,6 +449,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
         <svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <span class="spacer"></span>
+      <button class="icon-btn" id="btnFull" type="button" aria-label="Load full article" title="Full article (f)">
+        <svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>
+      </button>
       <button class="icon-btn" id="btnStar" type="button" aria-label="Star" title="Star (s)">
         <svg class="i" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
       </button>
@@ -435,7 +470,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
         <div>
           <svg class="i" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
           <div>Select an article to read</div>
-          <div class="kbd"><kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>s</kbd> star · <kbd>m</kbd> unread · <kbd>v</kbd> open · <kbd>r</kbd> refresh</div>
+          <div class="kbd"><kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>s</kbd> star · <kbd>m</kbd> unread · <kbd>f</kbd> full text · <kbd>v</kbd> open · <kbd>/</kbd> search · <kbd>r</kbd> refresh</div>
         </div>
       </div>
       <article class="article" id="article" hidden></article>
@@ -456,6 +491,10 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
         <input class="input" id="addUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://example.com/feed.xml" required />
         <small>Paste an RSS/Atom feed link — or just a website address and the feed will be found automatically.</small>
       </label>
+      <label class="field">
+        <span>Folder (optional)</span>
+        <input class="input" id="addFolder" list="folderList" autocomplete="off" placeholder="e.g. Tech, News" />
+      </label>
       <p class="err-msg" id="addErr" hidden></p>
     </div>
     <div class="dlg-foot">
@@ -474,6 +513,10 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
     </div>
     <div class="dlg-body">
       <div class="field">
+        <span>Sync across devices</span>
+        <div id="syncBox"></div>
+      </div>
+      <div class="field">
         <span>Theme</span>
         <div class="seg" id="themeSeg">
           <button type="button" data-theme="auto">Auto</button>
@@ -490,11 +533,15 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
           <option value="60">Every hour</option>
         </select>
       </label>
-      <label class="field">
-        <span>Custom CORS proxy (optional)</span>
-        <input class="input" id="customProxy" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://my-proxy.example.workers.dev/?url={url}" />
-        <small>Most sites block browsers from reading their feeds directly, so the app falls back to free public proxies. For best reliability, run your own and put it here — <code>{url}</code> is replaced with the encoded feed URL.</small>
-      </label>
+      <div class="field">
+        <span>Your feed relay (recommended)</span>
+        <div class="row" style="flex-wrap:nowrap">
+          <input class="input" id="customProxy" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://rss-relay.you.workers.dev/?url={url}" />
+          <button class="btn" type="button" id="btnTestRelay">Test</button>
+        </div>
+        <small>Most sites block browsers from reading their feeds directly. Without a relay the app uses free public ones, which are rate-limited and sometimes down. Set up your own free relay on Cloudflare — see <a href="https://github.com/Akrishna87/Akrishna87/tree/main/rss-relay" target="_blank" rel="noopener">the setup guide</a>. <code>{url}</code> is replaced with the page address.</small>
+        <p class="hint" id="relayResult" hidden style="margin-top:8px"></p>
+      </div>
 
       <div class="section">
         <h4>Subscriptions (<span id="feedCount">0</span>)</h4>
@@ -525,12 +572,15 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   </div>
 </dialog>
 
-<!-- Rename feed -->
+<!-- Edit feed -->
 <dialog id="dlgRename">
   <form class="dlg" id="formRename" method="dialog">
-    <div class="dlg-head"><h3>Rename feed</h3></div>
+    <div class="dlg-head"><h3>Edit feed</h3></div>
     <div class="dlg-body">
       <label class="field"><span>Name</span><input class="input" id="renameInput" required /></label>
+      <label class="field"><span>Folder</span><input class="input" id="editFolder" list="folderList" autocomplete="off" placeholder="No folder" /></label>
+      <label class="check"><input type="checkbox" id="editFullText" /> Always load the full article</label>
+      <p class="hint">Use this for feeds that only include a summary or headline.</p>
     </div>
     <div class="dlg-foot">
       <button class="btn" type="button" data-close>Cancel</button>
@@ -538,6 +588,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
     </div>
   </form>
 </dialog>
+
+<datalist id="folderList"></datalist>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -567,6 +619,17 @@ var SUGGESTED = [
   { title: "Azure Blog", url: "https://azure.microsoft.com/en-us/blog/feed/" },
 ];
 
+// ---- Optional cross-device sync (Firebase: Google sign-in + Firestore) ----
+// Leave null to keep the app fully local. To turn sync on, paste your
+// Firebase web app's config object here — see README → "Sync across
+// devices". Each Google account gets one private document: rssReader/{email}.
+var FIREBASE_CONFIG = null;
+var FIREBASE_SDK_VERSION = "10.14.1";
+var SYNC_COLLECTION = "rssReader";
+var LOG_MAX_AGE_MS = 60 * 86400000;   // read/unstar history older than this isn't synced
+var LOG_MAX_ENTRIES = 5000;
+var TOMBSTONE_MAX_AGE_MS = 120 * 86400000;
+
 var FETCH_TIMEOUT_MS = 15000;
 var MAX_ITEMS_PER_FEED = 200;   // older read, unstarred items beyond this are dropped
 var MAX_CONTENT_CHARS = 150000; // per-article cap to keep storage sane
@@ -587,16 +650,24 @@ var ICON = {
 function defaultState() {
   return {
     version: 1,
-    feeds: [],      // {id, url, title, customTitle, site, via, error, lastFetched, added}
-    items: {},      // id -> {id, feedId, title, link, date, seen, author, content, snippet, thumb, read, starred}
-    settings: { theme: "auto", unreadOnly: false, customProxy: "", refreshMins: 30 },
+    feeds: [],      // {id, url, title, customTitle, folder, fullText, site, via, error, lastFetched, added, ts}
+    items: {},      // id -> {id, feedId, title, link, date, seen, author, content, fullContent, snippet, thumb, read, starred}
+    // Synced settings (ts = last local change, for last-write-wins)
+    settings: { theme: "auto", unreadOnly: false, customProxy: "", refreshMins: 30, ts: 0 },
+    // History used for sync: readLog[id] = +ts (read) / -ts (unread);
+    // starLog[id] = {on, ts, item}; deletedFeeds[feedId] = ts.
+    readLog: {},
+    starLog: {},
+    deletedFeeds: {},
+    collapsed: {},  // folder name -> true (this device only)
+    sync: { enabled: false, email: "", lastSync: 0 },
     view: { type: "all" },
     lastRefresh: 0,
   };
 }
 
 var state = defaultState();
-var ui = { refreshing: false, progress: "", currentId: null, shown: PAGE_SIZE, visibleIds: [] };
+var ui = { refreshing: false, progress: "", currentId: null, shown: PAGE_SIZE, visibleIds: [], query: "", fullBusy: {}, fullError: {}, showFeedVersion: {} };
 
 var DB_NAME = "rss-reader", DB_STORE = "kv", LS_KEY = "rss-reader-state";
 
@@ -643,14 +714,43 @@ function loadState() {
       Object.assign(s.settings, saved.settings || {});
       s.view = saved.view || s.view;
       s.lastRefresh = saved.lastRefresh || 0;
+      ["readLog", "starLog", "deletedFeeds", "collapsed"].forEach(function (k) {
+        if (saved[k] && typeof saved[k] === "object") s[k] = saved[k];
+      });
+      Object.assign(s.sync, saved.sync || {});
     }
+    migrateFeedIds(s);
     if (s.view.type === "feed" && !feedById(s.view.feedId, s)) s.view = { type: "all" };
     return s;
   });
 }
 
+// Feed ids are derived from the feed URL so the same subscription has the
+// same id on every device (needed for sync). Older installs used random
+// ids — rewrite them, and the item ids built from them, once.
+function feedIdFor(url) { return "f" + hash(url); }
+function migrateFeedIds(s) {
+  s.feeds.forEach(function (f) {
+    var nid = feedIdFor(f.url);
+    if (f.id === nid) return;
+    var oldPrefix = f.id + "-";
+    Object.keys(s.items).forEach(function (k) {
+      var it = s.items[k];
+      if (it.feedId !== f.id) return;
+      delete s.items[k];
+      it.id = nid + "-" + k.slice(oldPrefix.length);
+      it.feedId = nid;
+      s.items[it.id] = it;
+    });
+    if (s.view.type === "feed" && s.view.feedId === f.id) s.view.feedId = nid;
+    f.id = nid;
+    f.ts = f.ts || f.added || 1;
+  });
+}
+
 var saveTimer = null;
 function save() {
+  if (typeof Sync !== "undefined") Sync.schedulePush();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(function () {
     var snapshot = JSON.parse(JSON.stringify(state));
@@ -947,14 +1047,15 @@ function proxyList(preferred) {
   var list = PUBLIC_PROXIES.slice();
   var custom = (state.settings.customProxy || "").trim();
   if (custom) {
-    list.splice(1, 0, {
+    // Your own relay is reliable, so it goes first (before even a direct try).
+    list.unshift({
       id: "custom",
       make: function (u) {
         return custom.indexOf("{url}") > -1 ? custom.replace("{url}", encodeURIComponent(u)) : custom + encodeURIComponent(u);
       },
     });
   }
-  if (preferred) {
+  if (preferred && !custom) {
     var i = list.findIndex(function (p) { return p.id === preferred; });
     if (i > 0) list.unshift(list.splice(i, 1)[0]);
   }
@@ -1000,6 +1101,70 @@ function loadFeed(url, preferred, allowDiscovery) {
 }
 
 /* =========================================================================
+   Full article text (Mozilla Readability, loaded on first use)
+   ========================================================================= */
+
+var readabilityPromise = null;
+function loadReadability() {
+  return readabilityPromise || (readabilityPromise = new Promise(function (resolve, reject) {
+    var sc = document.createElement("script");
+    sc.src = "vendor/Readability.js";
+    sc.onload = function () { resolve(window.Readability); };
+    sc.onerror = function () { readabilityPromise = null; reject(new Error("Couldn't load the article extractor")); };
+    document.head.appendChild(sc);
+  }));
+}
+
+function fetchPage(url, preferred) {
+  var proxies = proxyList(preferred), lastErr = null;
+  function attempt(i) {
+    if (i >= proxies.length) return Promise.reject(lastErr || new Error("Couldn't reach that page"));
+    return fetchText(proxies[i].make(url)).then(function (text) {
+      if (!/<(html|body|article|p)\b/i.test(text)) throw new Error("Not a web page");
+      return text;
+    }).catch(function (e) {
+      lastErr = e && e.name === "AbortError" ? new Error("Timed out") : e;
+      return attempt(i + 1);
+    });
+  }
+  return attempt(0);
+}
+
+function loadFullText(it) {
+  if (!it || !it.link || ui.fullBusy[it.id]) return;
+  if (!navigator.onLine) { toast("You're offline"); return; }
+  ui.fullBusy[it.id] = true;
+  delete ui.fullError[it.id];
+  if (ui.currentId === it.id) renderReader();
+  var feed = feedById(it.feedId);
+  Promise.all([loadReadability(), fetchPage(it.link, feed && feed.via)]).then(function (res) {
+    var doc = new DOMParser().parseFromString(res[1], "text/html");
+    var base = doc.createElement("base");
+    base.href = it.link;
+    (doc.head || doc.documentElement).prepend(base);
+    var article = new res[0](doc).parse();
+    if (!article || !article.content || htmlToText(article.content).length < 200) throw new Error("Couldn't find the article text on that page");
+    it.fullContent = article.content.slice(0, MAX_CONTENT_CHARS);
+    delete ui.showFeedVersion[it.id];
+    save();
+  }).catch(function (e) {
+    ui.fullError[it.id] = (e && e.message) || "Couldn't load the full article";
+  }).then(function () {
+    delete ui.fullBusy[it.id];
+    if (ui.currentId === it.id) { renderReader(); }
+  });
+}
+
+function toggleFullText() {
+  var it = state.items[ui.currentId];
+  if (!it || !it.link) return;
+  if (it.fullContent) {
+    if (ui.showFeedVersion[it.id]) delete ui.showFeedVersion[it.id]; else ui.showFeedVersion[it.id] = true;
+    renderReader();
+  } else loadFullText(it);
+}
+
+/* =========================================================================
    Merging fetched items into state
    ========================================================================= */
 
@@ -1025,8 +1190,10 @@ function mergeItems(feed, parsed) {
       if (p.date) existing.date = p.date;
     } else {
       // Undated items keep feed order by nudging "seen" time down by index.
-      state.items[id] = Object.assign({ id: id, feedId: feed.id, date: p.date || now - idx * 1000, seen: now, read: false, starred: false }, fields);
-      added++;
+      var r = state.readLog[id], st = state.starLog[id];
+      state.items[id] = Object.assign({ id: id, feedId: feed.id, date: p.date || now - idx * 1000, seen: now,
+        read: r ? r > 0 : false, starred: !!(st && st.on) }, fields);
+      if (!(r > 0)) added++;
     }
   });
   pruneFeed(feed.id);
@@ -1046,7 +1213,7 @@ function pruneFeed(feedId) {
    Actions
    ========================================================================= */
 
-function addFeed(rawUrl) {
+function addFeed(rawUrl, folder) {
   var url = normalizeUrl(rawUrl);
   if (!url) return Promise.reject(new Error("That doesn't look like a valid URL"));
   if (state.feeds.some(function (f) { return f.url === url; })) return Promise.reject(new Error("You're already subscribed to this feed"));
@@ -1054,16 +1221,20 @@ function addFeed(rawUrl) {
     var existing = state.feeds.find(function (f) { return f.url === r.url; });
     if (existing) throw new Error("You're already subscribed to " + feedName(existing));
     var feed = {
-      id: hash(r.url + Date.now()),
+      id: feedIdFor(r.url),
       url: r.url,
       title: r.feed.title || hostOf(r.feed.site || r.url),
       customTitle: "",
+      folder: (folder || "").trim(),
+      fullText: false,
+      ts: Date.now(),
       site: r.feed.site || "",
       via: r.via,
       error: null,
       lastFetched: Date.now(),
       added: Date.now(),
     };
+    delete state.deletedFeeds[feed.id];
     state.feeds.push(feed);
     mergeItems(feed, r.feed);
     state.view = { type: "feed", feedId: feed.id };
@@ -1121,7 +1292,8 @@ function refreshAll(opts) {
   });
 }
 
-function removeFeed(id) {
+function removeFeed(id, fromSync) {
+  if (!fromSync) state.deletedFeeds[id] = Date.now();
   state.feeds = state.feeds.filter(function (f) { return f.id !== id; });
   Object.keys(state.items).forEach(function (k) { if (state.items[k].feedId === id) delete state.items[k]; });
   if (state.view.type === "feed" && state.view.feedId === id) state.view = { type: "all" };
@@ -1139,21 +1311,67 @@ function setView(v) {
   $("list").scrollTop = 0;
 }
 
-function setRead(item, read) {
+function setRead(item, read, noSave) {
   if (!item || item.read === read) return;
   item.read = read;
+  state.readLog[item.id] = read ? Date.now() : -Date.now();
+  if (!noSave) save();
+}
+
+function setStar(item, on) {
+  if (!item) return;
+  item.starred = on;
+  state.starLog[item.id] = {
+    on: on, ts: Date.now(),
+    // Enough to show the article on a device that hasn't fetched it.
+    item: on ? { feedId: item.feedId, title: item.title, link: item.link || "", date: item.date, author: item.author || "", snippet: item.snippet || "", thumb: item.thumb || "" } : null,
+  };
   save();
+}
+
+function folders() {
+  var set = {};
+  state.feeds.forEach(function (f) { if (f.folder) set[f.folder] = true; });
+  return Object.keys(set).sort(function (a, b) { return a.localeCompare(b); });
 }
 
 /* =========================================================================
    Rendering
    ========================================================================= */
 
+// Plain-text copy of each article for search, built lazily and kept in memory.
+var searchCache = new Map();
+function searchText(it) {
+  var key = it.id + "|" + (it.content || "").length + "|" + (it.fullContent || "").length;
+  var hit = searchCache.get(it.id);
+  if (hit && hit.key === key) return hit.text;
+  var f = feedById(it.feedId);
+  var body = (it.fullContent || it.content || "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ");
+  var text = [it.title, it.author, f ? feedName(f) : "", body.slice(0, 20000)].join(" ")
+    .replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").toLowerCase();
+  searchCache.set(it.id, { key: key, text: text });
+  return text;
+}
+
 function itemsForView(includeRead) {
   var v = state.view;
+  if (ui.query) {
+    // Search covers every saved article, whatever view/filter is active.
+    var terms = ui.query.toLowerCase().split(/\s+/).filter(Boolean);
+    return Object.values(state.items).filter(function (it) {
+      var t = searchText(it);
+      return terms.every(function (w) { return t.indexOf(w) > -1; });
+    }).sort(function (a, b) { return b.date - a.date || b.seen - a.seen; });
+  }
+  var folderFeeds = null;
+  if (v.type === "folder") {
+    folderFeeds = {};
+    state.feeds.forEach(function (f) { if (f.folder === v.name) folderFeeds[f.id] = true; });
+  }
   return Object.values(state.items).filter(function (it) {
     if (v.type === "starred") { if (!it.starred) return false; }
     else if (v.type === "feed") { if (it.feedId !== v.feedId) return false; }
+    else if (folderFeeds) { if (!folderFeeds[it.feedId]) return false; }
     // Keep the open article in the list even after it's been marked read.
     if (!includeRead && state.settings.unreadOnly && v.type !== "starred" && it.read && it.id !== ui.currentId) return false;
     return true;
@@ -1185,23 +1403,38 @@ function renderNav() {
     '<span class="name">All articles</span><span class="count">' + (unreadCount() || "") + "</span></button>" +
     '<button class="nav-item' + (v.type === "starred" ? " active" : "") + '" data-view="starred">' + ICON.star +
     '<span class="name">Starred</span><span class="count">' + (starred || "") + "</span></button>";
+  function feedBtn(f, inFolder) {
+    var n = unreadCount(f.id);
+    return '<button class="nav-item' + (inFolder ? " in-folder" : "") + (v.type === "feed" && v.feedId === f.id ? " active" : "") + '" data-feed="' + esc(f.id) + '" title="' + esc(feedName(f)) + '">' +
+      favHtml(f) + '<span class="name">' + esc(feedName(f)) + "</span>" +
+      (f.error ? '<span class="err" title="' + esc("Last update failed: " + f.error) + '">⚠</span>' : "") +
+      '<span class="count">' + (n || "") + "</span></button>";
+  }
+  var sorted = state.feeds.slice().sort(function (a, b) { return feedName(a).localeCompare(feedName(b)); });
   if (state.feeds.length) {
     html += '<div class="nav-label">Feeds</div>';
-    state.feeds.slice().sort(function (a, b) { return feedName(a).localeCompare(feedName(b)); }).forEach(function (f) {
-      var n = unreadCount(f.id);
-      html += '<button class="nav-item' + (v.type === "feed" && v.feedId === f.id ? " active" : "") + '" data-feed="' + esc(f.id) + '" title="' + esc(feedName(f)) + '">' +
-        favHtml(f) + '<span class="name">' + esc(feedName(f)) + "</span>" +
-        (f.error ? '<span class="err" title="' + esc("Last update failed: " + f.error) + '">⚠</span>' : "") +
-        '<span class="count">' + (n || "") + "</span></button>";
+    folders().forEach(function (name) {
+      var members = sorted.filter(function (f) { return f.folder === name; });
+      var n = members.reduce(function (sum, f) { return sum + unreadCount(f.id); }, 0);
+      var collapsed = !!state.collapsed[name];
+      html += '<div class="folder-row"><button class="folder-toggle' + (collapsed ? " collapsed" : "") + '" data-toggle="' + esc(name) + '" aria-label="' + (collapsed ? "Expand " : "Collapse ") + esc(name) + '" aria-expanded="' + !collapsed + '">' +
+        '<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>' +
+        '<button class="nav-item' + (v.type === "folder" && v.name === name ? " active" : "") + '" data-folder="' + esc(name) + '">' +
+        '<span class="name">' + esc(name) + '</span><span class="count">' + (n || "") + "</span></button></div>";
+      if (!collapsed) members.forEach(function (f) { html += feedBtn(f, true); });
     });
+    sorted.filter(function (f) { return !f.folder; }).forEach(function (f) { html += feedBtn(f, false); });
   }
   $("nav").innerHTML = html;
+  $("folderList").innerHTML = folders().map(function (n) { return '<option value="' + esc(n) + '">'; }).join("");
 }
 
 function viewTitle() {
   var v = state.view;
+  if (ui.query) return "Search";
   if (v.type === "starred") return "Starred";
   if (v.type === "feed") return feedName(feedById(v.feedId));
+  if (v.type === "folder") return v.name;
   return "All articles";
 }
 
@@ -1211,15 +1444,31 @@ function renderChrome() {
   $("btnRefresh").classList.toggle("spin", ui.refreshing);
   $("btnRefresh").disabled = ui.refreshing;
   $("unreadOnly").checked = !!state.settings.unreadOnly;
-  $("unreadOnly").parentElement.hidden = state.view.type === "starred";
+  $("btnEditFeed").hidden = state.view.type !== "feed" || !!ui.query;
+  $("unreadOnly").parentElement.hidden = state.view.type === "starred" || !!ui.query;
   var status = ui.progress;
-  if (!status && state.view.type === "feed") {
+  if (!status && ui.query) {
+    status = ui.visibleIds.length + " result" + (ui.visibleIds.length === 1 ? "" : "s");
+  } else if (!status && state.view.type === "feed") {
     var f = feedById(state.view.feedId);
     if (f && f.error) status = "⚠ " + f.error;
     else if (f && f.lastFetched) status = "Updated " + relTime(f.lastFetched);
   } else if (!status && state.lastRefresh) status = "Updated " + relTime(state.lastRefresh);
   $("status").textContent = status;
   $("offline").hidden = navigator.onLine;
+}
+
+function highlight(text) {
+  var html = esc(text);
+  if (!ui.query) return html;
+  ui.query.split(/\s+/).filter(Boolean).forEach(function (w) {
+    var re = new RegExp("(" + esc(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+    // Only replace outside of tags/entities we've just produced.
+    html = html.replace(/(^|>)([^<]*)/g, function (m, pre, txt) {
+      return pre + txt.replace(re, '<mark class="hl">$1</mark>');
+    });
+  });
+  return html;
 }
 
 function renderList() {
@@ -1238,6 +1487,8 @@ function renderList() {
           return '<button class="btn" data-suggest="' + esc(s.url) + '">+ ' + esc(s.title) + "</button>";
         }).join("") + "</div>" +
         '<div class="suggest"><button class="btn primary" data-action="add">Add a feed</button><button class="btn" data-action="import">Import OPML</button></div>';
+    } else if (ui.query) {
+      empty.innerHTML = "<h2>No matches</h2><p>Nothing in your saved articles matches “" + esc(ui.query) + "”.</p>";
     } else if (state.view.type === "starred") {
       empty.innerHTML = "<h2>No starred articles</h2><p>Tap the ☆ on any article to save it here.</p>";
     } else {
@@ -1248,7 +1499,7 @@ function renderList() {
 
   list.hidden = false;
   empty.hidden = true;
-  var showFeed = state.view.type !== "feed";
+  var showFeed = state.view.type !== "feed" || !!ui.query;
   var html = items.slice(0, ui.shown).map(function (it) {
     var f = feedById(it.feedId);
     return '<li class="item' + (it.read ? " read" : "") + (it.id === ui.currentId ? " selected" : "") + '" data-id="' + esc(it.id) + '">' +
@@ -1256,8 +1507,8 @@ function renderList() {
       (showFeed && f ? '<span class="src">' + esc(feedName(f)) + "</span><span>·</span>" : "") +
       "<span>" + esc(relTime(it.date)) + "</span>" +
       (it.starred ? '<span class="star">' + ICON.starFill + "</span>" : "") +
-      '</div><p class="title">' + esc(it.title) + "</p>" +
-      (it.snippet ? '<p class="snip">' + esc(it.snippet) + "</p>" : "") +
+      '</div><p class="title">' + highlight(it.title) + "</p>" +
+      (it.snippet ? '<p class="snip">' + highlight(it.snippet) + "</p>" : "") +
       "</div>" +
       (it.thumb ? '<img class="thumb" src="' + esc(it.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "") +
       "</li>";
@@ -1277,7 +1528,14 @@ function renderReader() {
 
   var f = feedById(it.feedId);
   var base = it.link || (f && (f.site || f.url));
-  var body = sanitize(it.content, base);
+  var showFull = !!it.fullContent && !ui.showFeedVersion[it.id];
+  var body = sanitize(showFull ? it.fullContent : it.content, base);
+  var note = "";
+  if (ui.fullBusy[it.id]) note = "<span>Loading the full article…</span>";
+  else if (ui.fullError[it.id]) note = "<span>⚠ " + esc(ui.fullError[it.id]) + '</span><button class="link-btn" data-full="load">Try again</button>';
+  else if (showFull) note = "<span>Full article from " + esc(hostOf(it.link)) + '</span><button class="link-btn" data-full="feed">Show feed version</button>';
+  else if (it.fullContent) note = '<span>Feed version</span><button class="link-btn" data-full="full">Show full article</button>';
+  else if (it.link && htmlToText(it.content).length < 500) note = '<span>This feed only has a summary.</span><button class="link-btn" data-full="load">Load full article</button>';
   var hasImg = /<img\b/i.test(body);
   var media = it.media && (/^video/.test(it.media.type)
     ? '<video controls preload="none" src="' + esc(it.media.url) + '"></video>'
@@ -1288,11 +1546,18 @@ function renderReader() {
     (it.author ? "<span>" + esc(it.author) + "</span>" : "") +
     '<time datetime="' + new Date(it.date).toISOString() + '">' + esc(fullDate(it.date)) + "</time></div>" +
     "<h2>" + (it.link ? '<a href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer">' + esc(it.title) + "</a>" : esc(it.title)) + "</h2>" +
+    (note ? '<div class="fulltext-note">' + note + "</div>" : "") +
     (!hasImg && it.thumb ? '<img class="hero" src="' + esc(it.thumb) + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">' : "") +
     (media ? '<div class="content">' + media + "</div>" : "") +
     '<div class="content">' + (body || '<p style="color:var(--muted)">This feed only includes a headline — open the original to read the full article.</p>') + "</div>" +
     (it.link ? '<a class="btn open-orig" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer">Read on ' + esc(hostOf(it.link)) + " ↗</a>" : "");
 
+  var full = $("btnFull");
+  full.hidden = !it.link;
+  full.classList.toggle("busy", !!ui.fullBusy[it.id]);
+  full.classList.toggle("active", showFull);
+  full.setAttribute("aria-pressed", showFull ? "true" : "false");
+  full.title = showFull ? "Show feed version (f)" : "Load full article (f)";
   var star = $("btnStar");
   star.classList.toggle("on", !!it.starred);
   star.setAttribute("aria-label", it.starred ? "Unstar" : "Star");
@@ -1309,8 +1574,8 @@ function renderReader() {
 function render() {
   applyTheme();
   renderNav();
-  renderChrome();
   renderList();
+  renderChrome();
   renderReader();
 }
 
@@ -1332,6 +1597,8 @@ function openItem(id, fromKeyboard) {
   var wasOpen = !!ui.currentId;
   ui.currentId = id;
   setRead(it, true);
+  var feed = feedById(it.feedId);
+  if (feed && feed.fullText && !it.fullContent && it.link && navigator.onLine && !ui.fullError[id]) loadFullText(it);
   // On phones the reader is a full-screen layer: give the back button/gesture something to pop.
   if (narrowMq.matches && !wasOpen) history.pushState({ reader: true }, "");
   renderNav();
@@ -1374,6 +1641,7 @@ function closeSidebar() { $("sidebar").classList.remove("open"); $("scrim").clas
 
 function showAdd(prefill) {
   $("addUrl").value = prefill || "";
+  $("addFolder").value = state.view.type === "folder" ? state.view.name : "";
   $("addErr").hidden = true;
   $("addSubmit").disabled = false;
   $("addSubmit").textContent = "Add feed";
@@ -1389,9 +1657,9 @@ function renderSettings() {
   $("customProxy").value = s.customProxy || "";
   $("feedCount").textContent = state.feeds.length;
   $("feedRows").innerHTML = state.feeds.length ? state.feeds.map(function (f) {
-    return '<div class="feed-row">' + favHtml(f) + '<div class="info"><div>' + esc(feedName(f)) + '</div><div class="u">' + esc(f.url) + "</div>" +
+    return '<div class="feed-row">' + favHtml(f) + '<div class="info"><div>' + esc(feedName(f)) + '</div><div class="u">' + (f.folder ? "📁 " + esc(f.folder) + " · " : "") + esc(f.url) + "</div>" +
       (f.error ? '<div class="e">⚠ ' + esc(f.error) + "</div>" : "") + "</div>" +
-      '<button class="icon-btn" data-rename="' + esc(f.id) + '" aria-label="Rename ' + esc(feedName(f)) + '">' + ICON.edit + "</button>" +
+      '<button class="icon-btn" data-rename="' + esc(f.id) + '" aria-label="Edit ' + esc(feedName(f)) + '">' + ICON.edit + "</button>" +
       '<button class="icon-btn" data-remove="' + esc(f.id) + '" aria-label="Unsubscribe from ' + esc(feedName(f)) + '">' + ICON.trash + "</button></div>";
   }).join("") : '<p style="margin:0;color:var(--muted);font-size:13px">No feeds yet.</p>';
 }
@@ -1399,6 +1667,7 @@ function renderSettings() {
 function showSettings() {
   closeSidebar();
   renderSettings();
+  renderSyncUi();
   $("dlgSettings").showModal();
 }
 
@@ -1408,6 +1677,8 @@ function showRename(id) {
   if (!f) return;
   renameId = id;
   $("renameInput").value = feedName(f);
+  $("editFolder").value = f.folder || "";
+  $("editFullText").checked = !!f.fullText;
   $("dlgRename").showModal();
 }
 
@@ -1416,10 +1687,15 @@ function showRename(id) {
    ========================================================================= */
 
 function exportOpml() {
-  var body = state.feeds.map(function (f) {
-    return '    <outline type="rss" text="' + esc(feedName(f)) + '" title="' + esc(feedName(f)) + '" xmlUrl="' + esc(f.url) + '"' +
+  function line(f, pad) {
+    return pad + '<outline type="rss" text="' + esc(feedName(f)) + '" title="' + esc(feedName(f)) + '" xmlUrl="' + esc(f.url) + '"' +
       (f.site ? ' htmlUrl="' + esc(f.site) + '"' : "") + "/>";
-  }).join("\n");
+  }
+  var body = folders().map(function (name) {
+    return '    <outline text="' + esc(name) + '" title="' + esc(name) + '">\n' +
+      state.feeds.filter(function (f) { return f.folder === name; }).map(function (f) { return line(f, "      "); }).join("\n") +
+      "\n    </outline>";
+  }).concat(state.feeds.filter(function (f) { return !f.folder; }).map(function (f) { return line(f, "    "); })).join("\n");
   var xml = '<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n  <head><title>RSS Reader subscriptions</title><dateCreated>' +
     new Date().toUTCString() + "</dateCreated></head>\n  <body>\n" + body + "\n  </body>\n</opml>\n";
   var a = document.createElement("a");
@@ -1438,8 +1714,12 @@ function importOpml(text) {
     var url = normalizeUrl(o.getAttribute("xmlUrl") || o.getAttribute("xmlurl"));
     if (!url || state.feeds.some(function (f) { return f.url === url; })) return;
     var title = o.getAttribute("title") || o.getAttribute("text") || "";
+    var parent = o.parentElement;
+    var folder = parent && parent.localName === "outline" ? (parent.getAttribute("title") || parent.getAttribute("text") || "").trim() : "";
+    var id = feedIdFor(url);
+    delete state.deletedFeeds[id];
     state.feeds.push({
-      id: hash(url + Date.now() + added), url: url, title: title || hostOf(url), customTitle: "",
+      id: id, url: url, title: title || hostOf(url), customTitle: "", folder: folder, fullText: false, ts: Date.now(),
       site: absUrl(o.getAttribute("htmlUrl"), url) || "", via: null, error: null, lastFetched: 0, added: Date.now(),
     });
     added++;
@@ -1452,6 +1732,324 @@ function importOpml(text) {
 }
 
 /* =========================================================================
+   Cross-device sync (optional; Firebase Auth + one Firestore doc per user)
+   -------------------------------------------------------------------------
+   Articles themselves aren't synced — every device fetches its own feeds.
+   What syncs is small: subscriptions (+ folders, names), read/unread and
+   starred state, and settings. Each piece carries a timestamp and the
+   newest change wins, so edits made offline on two devices merge cleanly.
+   ========================================================================= */
+
+var Sync = (function () {
+  var st = { status: "off", error: "", api: null, docRef: null, unsub: null, lastJson: "", signingIn: false };
+  var pushTimer = null;
+
+  function configured() { return !!FIREBASE_CONFIG; }
+
+  function friendly(err) {
+    var code = (err && err.code) || "";
+    if (code === "permission-denied") return "Sync isn't switched on in Firebase yet — add the Firestore rule from the README.";
+    if (code === "auth/unauthorized-domain") return "This site isn't an authorized domain in Firebase (Authentication → Settings).";
+    if (code === "auth/popup-blocked") return "The sign-in popup was blocked — allow popups for this site and try again.";
+    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return "";
+    if (code === "auth/network-request-failed" || code === "unavailable") return "Can't reach the sync service — are you offline?";
+    return (err && err.message) || "Sync failed";
+  }
+
+  // JSON with sorted keys, so two docs with the same content compare equal.
+  function stable(v) {
+    if (Array.isArray(v)) return "[" + v.map(stable).join(",") + "]";
+    if (v && typeof v === "object") {
+      return "{" + Object.keys(v).sort().filter(function (k) { return v[k] !== undefined; })
+        .map(function (k) { return JSON.stringify(k) + ":" + stable(v[k]); }).join(",") + "}";
+    }
+    return JSON.stringify(v);
+  }
+
+  function prune() {
+    var now = Date.now();
+    var ids = Object.keys(state.readLog).filter(function (id) {
+      if (now - Math.abs(state.readLog[id]) > LOG_MAX_AGE_MS) { delete state.readLog[id]; return false; }
+      return true;
+    });
+    if (ids.length > LOG_MAX_ENTRIES) {
+      ids.sort(function (a, b) { return Math.abs(state.readLog[b]) - Math.abs(state.readLog[a]); });
+      ids.slice(LOG_MAX_ENTRIES).forEach(function (id) { delete state.readLog[id]; });
+    }
+    Object.keys(state.starLog).forEach(function (id) {
+      var e = state.starLog[id];
+      if (!e || (!e.on && now - e.ts > LOG_MAX_AGE_MS)) delete state.starLog[id];
+    });
+    Object.keys(state.deletedFeeds).forEach(function (id) {
+      if (now - state.deletedFeeds[id] > TOMBSTONE_MAX_AGE_MS) delete state.deletedFeeds[id];
+    });
+  }
+
+  function buildDoc() {
+    prune();
+    var feeds = {};
+    state.feeds.forEach(function (f) {
+      feeds[f.id] = { url: f.url, title: f.title || "", customTitle: f.customTitle || "", folder: f.folder || "",
+        fullText: !!f.fullText, site: f.site || "", ts: f.ts || 1 };
+    });
+    Object.keys(state.deletedFeeds).forEach(function (id) {
+      if (!feeds[id]) feeds[id] = { deleted: true, ts: state.deletedFeeds[id] };
+    });
+    var s = state.settings;
+    return JSON.parse(JSON.stringify({
+      v: 1,
+      feeds: feeds,
+      read: state.readLog,
+      star: state.starLog,
+      settings: { theme: s.theme, refreshMins: s.refreshMins, customProxy: s.customProxy || "", ts: s.ts || 0 },
+    }));
+  }
+
+  function withoutMeta(doc) {
+    var d = Object.assign({}, doc);
+    delete d.updatedAt;
+    return d;
+  }
+
+  // Fold a remote doc into local state. Returns the feeds that are new here.
+  function merge(remote) {
+    var changed = false, added = [];
+    var rf = remote.feeds || {};
+    Object.keys(rf).forEach(function (id) {
+      var r = rf[id];
+      if (!r || typeof r !== "object" || typeof r.ts !== "number") return;
+      var local = feedById(id);
+      if (r.deleted) {
+        if (local && (local.ts || 0) <= r.ts) {
+          state.feeds = state.feeds.filter(function (f) { return f.id !== id; });
+          Object.keys(state.items).forEach(function (k) { if (state.items[k].feedId === id) delete state.items[k]; });
+          if (state.view.type === "feed" && state.view.feedId === id) state.view = { type: "all" };
+          if (ui.currentId && !state.items[ui.currentId]) ui.currentId = null;
+          changed = true;
+        }
+        if (!(state.deletedFeeds[id] >= r.ts)) state.deletedFeeds[id] = r.ts;
+        return;
+      }
+      if (!r.url) return;
+      if (!local) {
+        if (state.deletedFeeds[id] >= r.ts) return; // removed here more recently
+        delete state.deletedFeeds[id];
+        var f = { id: id, url: r.url, title: r.title || hostOf(r.url), customTitle: r.customTitle || "", folder: r.folder || "",
+          fullText: !!r.fullText, site: r.site || "", ts: r.ts, via: null, error: null, lastFetched: 0, added: Date.now() };
+        state.feeds.push(f);
+        added.push(f);
+        changed = true;
+      } else if (r.ts > (local.ts || 0)) {
+        local.customTitle = r.customTitle || "";
+        local.folder = r.folder || "";
+        local.fullText = !!r.fullText;
+        local.ts = r.ts;
+        if (r.title) local.title = r.title;
+        if (r.site) local.site = r.site;
+        changed = true;
+      } else if (r.ts === local.ts && ((r.title && r.title !== local.title) || (r.site && r.site !== local.site))) {
+        // Same edit, different fetched metadata: settle on one copy so devices don't ping-pong.
+        if (r.title) local.title = r.title;
+        if (r.site) local.site = r.site;
+        changed = true;
+      }
+    });
+
+    var rr = remote.read || {};
+    Object.keys(rr).forEach(function (id) {
+      var v = rr[id], l = state.readLog[id];
+      if (typeof v !== "number" || (l && Math.abs(l) >= Math.abs(v))) return;
+      state.readLog[id] = v;
+      var it = state.items[id];
+      if (it && it.read !== v > 0) { it.read = v > 0; changed = true; }
+    });
+
+    var rs = remote.star || {};
+    Object.keys(rs).forEach(function (id) {
+      var e = rs[id], l = state.starLog[id];
+      if (!e || typeof e.ts !== "number" || (l && l.ts >= e.ts)) return;
+      state.starLog[id] = e;
+      var it = state.items[id];
+      if (it) {
+        if (it.starred !== !!e.on) { it.starred = !!e.on; changed = true; }
+      } else if (e.on && e.item) {
+        // Starred on another device but not fetched here (yet): keep a stub so it shows under Starred.
+        var m = e.item, r2 = state.readLog[id];
+        state.items[id] = { id: id, feedId: m.feedId, title: m.title || "(untitled)", link: m.link || "", date: m.date || e.ts, seen: e.ts,
+          author: m.author || "", content: m.snippet ? "<p>" + esc(m.snippet) + "</p>" : "", snippet: m.snippet || "", thumb: m.thumb || null,
+          media: null, read: r2 ? r2 > 0 : true, starred: true };
+        changed = true;
+      }
+    });
+
+    var rset = remote.settings;
+    if (rset && typeof rset.ts === "number" && rset.ts > (state.settings.ts || 0)) {
+      if (state.settings.customProxy !== (rset.customProxy || "")) state.feeds.forEach(function (f) { f.via = null; });
+      state.settings.theme = rset.theme || "auto";
+      state.settings.refreshMins = typeof rset.refreshMins === "number" ? rset.refreshMins : 30;
+      state.settings.customProxy = rset.customProxy || "";
+      state.settings.ts = rset.ts;
+      scheduleAutoRefresh();
+      changed = true;
+    }
+    return { changed: changed, added: added };
+  }
+
+  function onRemote(snap) {
+    if (snap.metadata.hasPendingWrites) return; // our own write echoing back
+    var remote = snap.exists() ? snap.data() : null;
+    if (remote) {
+      st.lastJson = stable(withoutMeta(remote));
+      var res = merge(remote);
+      if (res.changed) {
+        render();
+        if ($("dlgSettings").open) renderSettings();
+      }
+      if (res.added.length) {
+        Promise.all(res.added.map(function (f) { return refreshFeed(f).catch(function () {}); })).then(function () { save(); render(); });
+      }
+    }
+    st.status = "synced";
+    st.error = "";
+    state.sync.lastSync = Date.now();
+    save(); // persists merged state locally; pushes only if we have something the server lacks
+    renderSyncUi();
+  }
+
+  function push() {
+    if (!st.docRef || st.status === "error") return;
+    var doc = buildDoc(), json = stable(doc);
+    if (json === st.lastJson) return;
+    st.lastJson = json;
+    doc.updatedAt = Date.now();
+    st.api.fs.setDoc(st.docRef, doc).then(function () {
+      state.sync.lastSync = Date.now();
+      renderSyncUi();
+    }).catch(function (err) {
+      st.lastJson = "";
+      st.status = "error";
+      st.error = friendly(err);
+      renderSyncUi();
+    });
+  }
+
+  function schedulePush() {
+    if (!st.docRef) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(push, 1500);
+  }
+
+  function onUser(user) {
+    if (st.unsub) { st.unsub(); st.unsub = null; }
+    st.docRef = null;
+    st.lastJson = "";
+    if (!user) {
+      if (!st.signingIn) st.status = "signed-out";
+      renderSyncUi();
+      return;
+    }
+    var email = (user.email || "").toLowerCase();
+    state.sync.enabled = true;
+    state.sync.email = email;
+    st.status = "connecting";
+    renderSyncUi();
+    st.docRef = st.api.fs.doc(st.api.db, SYNC_COLLECTION, email);
+    st.unsub = st.api.fs.onSnapshot(st.docRef, onRemote, function (err) {
+      st.status = "error";
+      st.error = friendly(err);
+      renderSyncUi();
+    });
+  }
+
+  function loadSdk() {
+    if (st.api) return Promise.resolve(st.api);
+    var base = "https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/";
+    return Promise.all([import(base + "firebase-app.js"), import(base + "firebase-auth.js"), import(base + "firebase-firestore.js")])
+      .then(function (m) {
+        var app = m[0].initializeApp(FIREBASE_CONFIG);
+        st.api = { authMod: m[1], fs: m[2], auth: m[1].getAuth(app), db: m[2].getFirestore(app) };
+        m[1].onAuthStateChanged(st.api.auth, onUser);
+        return st.api;
+      });
+  }
+
+  function start() {
+    if (!configured()) { st.status = "unconfigured"; return; }
+    if (!state.sync.enabled) { st.status = "off"; return; }
+    st.status = "connecting";
+    loadSdk().catch(function (err) { st.status = "error"; st.error = friendly(err); renderSyncUi(); });
+  }
+
+  function signIn() {
+    st.status = "connecting";
+    st.error = "";
+    st.signingIn = true;
+    renderSyncUi();
+    loadSdk().then(function (api) {
+      if (api.auth.currentUser) return;
+      return api.authMod.signInWithPopup(api.auth, new api.authMod.GoogleAuthProvider());
+    }).catch(function (err) {
+      var msg = friendly(err);
+      st.status = msg ? "error" : (state.sync.enabled ? "signed-out" : "off");
+      st.error = msg;
+    }).then(function () {
+      st.signingIn = false;
+      renderSyncUi();
+    });
+  }
+
+  function signOut() {
+    clearTimeout(pushTimer);
+    push(); // flush anything pending first
+    if (st.unsub) { st.unsub(); st.unsub = null; }
+    st.docRef = null;
+    state.sync.enabled = false;
+    state.sync.email = "";
+    st.status = "off";
+    save();
+    if (st.api) st.api.authMod.signOut(st.api.auth);
+    renderSyncUi();
+    toast("Signed out — articles stay on this device");
+  }
+
+  function retry() {
+    if (st.api && st.api.auth.currentUser) { st.status = "connecting"; st.error = ""; onUser(st.api.auth.currentUser); }
+    else signIn();
+  }
+
+  return { start: start, signIn: signIn, signOut: signOut, retry: retry, schedulePush: schedulePush, info: function () { return st; } };
+})();
+
+function renderSyncUi() {
+  var info = Sync.info(), box = $("syncBox"), dot = $("syncDot");
+  dot.hidden = !(info.status === "synced" || info.status === "error");
+  dot.textContent = info.status === "synced" ? "☁︎ Synced" : "⚠ Sync";
+  dot.title = info.status === "synced" ? "Synced as " + state.sync.email : info.error;
+  if (!box) return;
+  var html;
+  switch (info.status) {
+    case "unconfigured":
+      html = '<p class="hint" style="margin:0">Not set up yet — sync needs a free Firebase project. See <a href="https://github.com/Akrishna87/Akrishna87/tree/main/docs/rss-reader#sync-across-devices" target="_blank" rel="noopener">the setup guide</a>.</p>';
+      break;
+    case "connecting":
+      html = '<div class="sync-box"><div class="who">Connecting…</div></div>';
+      break;
+    case "synced":
+      html = '<div class="sync-box"><div class="who">' + esc(state.sync.email) + "<small>Synced" +
+        (state.sync.lastSync ? " · " + esc(relTime(state.sync.lastSync)) : "") + '</small></div><button class="btn" type="button" data-sync="out">Sign out</button></div>';
+      break;
+    case "error":
+      html = '<p class="hint err">⚠ ' + esc(info.error) + '</p><div class="row"><button class="btn" type="button" data-sync="retry">Try again</button>' +
+        (state.sync.enabled ? '<button class="btn" type="button" data-sync="out">Sign out</button>' : "") + "</div>";
+      break;
+    default: // off / signed-out
+      html = '<p class="hint">Keep your feeds, folders, read and starred articles in step on every device you sign in on.</p>' +
+        '<button class="btn primary" type="button" data-sync="in">Sign in with Google</button>';
+  }
+  box.innerHTML = html;
+}
+
+/* =========================================================================
    Events
    ========================================================================= */
 
@@ -1461,6 +2059,51 @@ $("btnAdd").onclick = function () { showAdd(""); };
 $("btnSettings").onclick = showSettings;
 $("btnRefresh").onclick = function () { refreshAll(); };
 $("btnBack").onclick = function () { closeReader(); };
+$("btnFull").onclick = toggleFullText;
+$("btnEditFeed").onclick = function () { if (state.view.type === "feed") showRename(state.view.feedId); };
+$("article").onclick = function (e) {
+  var b = e.target.closest("[data-full]");
+  if (!b) return;
+  var it = state.items[ui.currentId];
+  if (!it) return;
+  if (b.dataset.full === "load") loadFullText(it);
+  else if (b.dataset.full === "feed") { ui.showFeedVersion[it.id] = true; renderReader(); }
+  else if (b.dataset.full === "full") { delete ui.showFeedVersion[it.id]; renderReader(); }
+};
+
+// ---- Search ----
+var searchTimer = null;
+function openSearch() {
+  $("searchBar").hidden = false;
+  $("searchInput").focus();
+  $("searchInput").select();
+}
+function closeSearch(silent) {
+  clearTimeout(searchTimer);
+  $("searchBar").hidden = true;
+  $("searchInput").value = "";
+  if (!ui.query) return;
+  ui.query = "";
+  ui.shown = PAGE_SIZE;
+  if (!silent) { renderList(); renderChrome(); renderReader(); }
+}
+$("btnSearch").onclick = function () { if ($("searchBar").hidden) openSearch(); else closeSearch(); };
+$("btnSearchClose").onclick = function () { closeSearch(); };
+$("searchInput").oninput = function (e) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function () {
+    ui.query = e.target.value.trim();
+    ui.shown = PAGE_SIZE;
+    renderList();
+    renderChrome();
+    renderReader();
+    $("list").scrollTop = 0;
+  }, 150);
+};
+$("searchInput").onkeydown = function (e) {
+  if (e.key === "Escape") { e.preventDefault(); closeSearch(); }
+  if (e.key === "Enter") { e.preventDefault(); e.target.blur(); }
+};
 $("btnPrev").onclick = function () { step(-1); };
 $("btnNext").onclick = function () { step(1); };
 
@@ -1475,16 +2118,26 @@ $("unreadOnly").onchange = function (e) {
 $("btnMarkAll").onclick = function () {
   var items = itemsForView(true).filter(function (i) { return !i.read; });
   if (!items.length) return;
-  items.forEach(function (i) { i.read = true; });
+  items.forEach(function (i) { setRead(i, true, true); });
   save();
   render();
   toast("Marked " + items.length + " as read");
 };
 
 $("nav").onclick = function (e) {
+  var t = e.target.closest("[data-toggle]");
+  if (t) {
+    var name = t.dataset.toggle;
+    if (state.collapsed[name]) delete state.collapsed[name]; else state.collapsed[name] = true;
+    save();
+    renderNav();
+    return;
+  }
   var b = e.target.closest(".nav-item");
   if (!b) return;
+  if (ui.query) closeSearch(true);
   if (b.dataset.feed) setView({ type: "feed", feedId: b.dataset.feed });
+  else if (b.dataset.folder) setView({ type: "folder", name: b.dataset.folder });
   else setView({ type: b.dataset.view });
 };
 
@@ -1515,8 +2168,7 @@ $("empty").onclick = function (e) {
 $("btnStar").onclick = function () {
   var it = state.items[ui.currentId];
   if (!it) return;
-  it.starred = !it.starred;
-  save();
+  setStar(it, !it.starred);
   renderNav();
   renderList();
   renderReader();
@@ -1548,7 +2200,7 @@ $("formAdd").onsubmit = function (e) {
   btn.disabled = true;
   btn.textContent = "Finding feed…";
   err.hidden = true;
-  addFeed($("addUrl").value).then(function (f) {
+  addFeed($("addUrl").value, $("addFolder").value).then(function (f) {
     $("dlgAdd").close();
     toast("Subscribed to " + feedName(f));
   }, function (e2) {
@@ -1565,7 +2217,12 @@ $("formRename").onsubmit = function (e) {
   var f = feedById(renameId);
   if (f) {
     var name = $("renameInput").value.trim();
+    var oldFolder = f.folder || "";
     f.customTitle = name && name !== f.title ? name : "";
+    f.folder = $("editFolder").value.trim();
+    f.fullText = $("editFullText").checked;
+    f.ts = Date.now();
+    if (state.view.type === "folder" && state.view.name === oldFolder && folders().indexOf(oldFolder) < 0) state.view = { type: "all" };
     save();
     render();
     renderSettings();
@@ -1577,12 +2234,14 @@ $("themeSeg").onclick = function (e) {
   var b = e.target.closest("button[data-theme]");
   if (!b) return;
   state.settings.theme = b.dataset.theme;
+  state.settings.ts = Date.now();
   save();
   applyTheme();
   renderSettings();
 };
 $("refreshMins").onchange = function (e) {
   state.settings.refreshMins = +e.target.value;
+  state.settings.ts = Date.now();
   save();
   scheduleAutoRefresh();
 };
@@ -1590,8 +2249,32 @@ $("customProxy").onchange = function (e) {
   var v = e.target.value.trim();
   if (v && !/^https:\/\//i.test(v)) { toast("Proxy must be an https:// URL"); e.target.value = state.settings.customProxy; return; }
   state.settings.customProxy = v;
+  state.settings.ts = Date.now();
+  state.feeds.forEach(function (f) { f.via = null; });
   save();
   toast(v ? "Custom proxy saved" : "Custom proxy removed");
+};
+$("btnTestRelay").onclick = function () {
+  var v = $("customProxy").value.trim(), out = $("relayResult"), btn = $("btnTestRelay");
+  if (!v) { out.hidden = false; out.className = "hint err"; out.textContent = "Enter your relay address first."; return; }
+  var testUrl = "https://hnrss.org/frontpage";
+  var target = v.indexOf("{url}") > -1 ? v.replace("{url}", encodeURIComponent(testUrl)) : v + encodeURIComponent(testUrl);
+  btn.disabled = true;
+  out.hidden = false; out.className = "hint"; out.textContent = "Testing…";
+  fetchText(target).then(function (text) {
+    parseFeed(text, testUrl);
+    out.className = "hint"; out.textContent = "✅ Relay works.";
+  }).catch(function (e) {
+    out.className = "hint err";
+    out.textContent = "❌ " + (e && e.message === "Failed to fetch" ? "Couldn't reach the relay (check the address, and that it allows this site)" : ((e && e.message) || "Relay failed"));
+  }).then(function () { btn.disabled = false; });
+};
+$("syncBox").onclick = function (e) {
+  var b = e.target.closest("[data-sync]");
+  if (!b) return;
+  if (b.dataset.sync === "in") Sync.signIn();
+  if (b.dataset.sync === "out") Sync.signOut();
+  if (b.dataset.sync === "retry") Sync.retry();
 };
 $("feedRows").onclick = function (e) {
   var r = e.target.closest("[data-rename]"), d = e.target.closest("[data-remove]");
@@ -1626,7 +2309,8 @@ $("btnPurge").onclick = function () {
   toast("Deleted " + n + " read article" + (n === 1 ? "" : "s"));
 };
 $("btnReset").onclick = function () {
-  if (!confirm("Remove all feeds, articles and settings from this device?")) return;
+  if (!confirm("Remove all feeds, articles and settings from this device?" + (state.sync.enabled ? " You'll be signed out of sync first, so your synced copy is kept." : ""))) return;
+  if (state.sync.enabled) Sync.signOut();
   state = defaultState();
   ui.currentId = null;
   save();
@@ -1658,8 +2342,10 @@ document.addEventListener("keydown", function (e) {
     case "m": if (it) $("btnUnread").click(); break;
     case "v": case "o": if (it && it.link) window.open(it.link, "_blank", "noopener"); break;
     case "r": refreshAll(); break;
+    case "f": if (it) toggleFullText(); break;
+    case "/": e.preventDefault(); openSearch(); break;
     case "a": showAdd(""); e.preventDefault(); break;
-    case "Escape": if (it) closeReader(); else closeSidebar(); break;
+    case "Escape": if (it) closeReader(); else if (ui.query || !$("searchBar").hidden) closeSearch(); else closeSidebar(); break;
   }
 });
 
@@ -1687,6 +2373,8 @@ loadState().then(function (s) {
   state = s;
   render();
   scheduleAutoRefresh();
+  Sync.start();
+  renderSyncUi();
 
   // Share target (Android "Share → Reader") and ?add=<url> links open the add dialog pre-filled.
   var params = new URLSearchParams(location.search);
