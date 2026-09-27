@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>RSS Reader</title>
+<meta name="description" content="A fast, private RSS & Atom feed reader that works offline." />
+
+<!-- Android / Chrome: installable PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#e2582b" />
+
+<!-- iOS Safari: "Add to Home Screen" support (iOS ignores the manifest above) -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Reader" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png" />
+
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f5f3ee;
+  --panel: #fffdf9;
+  --side: #eeebe4;
+  --border: #e2ded4;
+  --text: #1f1d1a;
+  --muted: #6d6a62;
+  --faint: #9d998f;
+  --accent: #d4521f;
+  --accent-ink: #ffffff;
+  --accent-soft: #fbe6da;
+  --hover: rgba(0, 0, 0, 0.045);
+  --danger: #c0392b;
+  --star: #e0a100;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  --radius: 12px;
+  --side-w: 264px;
+  --list-w: 400px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #151515;
+    --panel: #1c1c1b;
+    --side: #111111;
+    --border: #2c2b29;
+    --text: #ecebe7;
+    --muted: #a19e96;
+    --faint: #6f6c66;
+    --accent: #ff7a45;
+    --accent-ink: #1a1a1a;
+    --accent-soft: #3a2419;
+    --hover: rgba(255, 255, 255, 0.05);
+    --danger: #ff6b5b;
+    --star: #ffc53d;
+    --shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #151515;
+  --panel: #1c1c1b;
+  --side: #111111;
+  --border: #2c2b29;
+  --text: #ecebe7;
+  --muted: #a19e96;
+  --faint: #6f6c66;
+  --accent: #ff7a45;
+  --accent-ink: #1a1a1a;
+  --accent-soft: #3a2419;
+  --hover: rgba(255, 255, 255, 0.05);
+  --danger: #ff6b5b;
+  --star: #ffc53d;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+svg.i { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+[hidden] { display: none !important; }
+
+/* ---------- layout ---------- */
+.app {
+  display: grid;
+  grid-template-columns: var(--side-w) var(--list-w) 1fr;
+  height: 100vh;
+  height: 100dvh;
+}
+.sidebar {
+  background: var(--side);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+}
+.list-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  padding-top: env(safe-area-inset-top);
+}
+.reader {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ---------- sidebar ---------- */
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 16px 10px;
+  font-weight: 700; font-size: 17px;
+}
+.brand img { width: 28px; height: 28px; border-radius: 7px; }
+.nav { flex: 1; overflow-y: auto; padding: 4px 8px 12px; overscroll-behavior: contain; }
+.nav-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--faint); padding: 14px 10px 6px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; border: 0; background: none; text-align: left;
+  padding: 8px 10px; border-radius: 8px; color: var(--text);
+  min-height: 38px;
+}
+.nav-item:hover { background: var(--hover); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav-item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item .count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nav-item.active .count { color: var(--accent); }
+.nav-item .err { color: var(--danger); font-size: 13px; }
+.fav {
+  position: relative; width: 18px; height: 18px; flex: none;
+  border-radius: 5px; overflow: hidden;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+}
+.fav img { position: absolute; inset: 0; width: 100%; height: 100%; background: var(--panel); }
+.side-foot {
+  display: flex; gap: 8px; padding: 12px;
+  border-top: 1px solid var(--border);
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--border); background: var(--panel);
+  padding: 9px 14px; border-radius: 10px; font-weight: 600; font-size: 14px;
+  min-height: 40px;
+}
+.btn:hover { border-color: var(--muted); }
+a.btn { text-decoration: none; color: var(--text); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.danger { color: var(--danger); }
+.btn.grow { flex: 1; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.icon-btn {
+  display: inline-grid; place-items: center;
+  width: 40px; height: 40px; border: 0; border-radius: 10px;
+  background: none; color: var(--muted);
+}
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.icon-btn.on { color: var(--star); }
+.icon-btn.on svg { fill: currentColor; }
+.link-btn { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 13px; padding: 6px 4px; }
+.link-btn:disabled { color: var(--faint); cursor: default; }
+
+/* ---------- list pane ---------- */
+.bar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 8px 8px 12px; min-height: 56px;
+  border-bottom: 1px solid var(--border);
+}
+.bar h1 {
+  flex: 1; min-width: 0; margin: 0 4px;
+  font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.only-narrow { display: none; }
+.spin svg { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.tools {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px; border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--muted);
+}
+.tools .status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; white-space: nowrap; }
+.toggle input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.banner {
+  padding: 8px 12px; font-size: 13px;
+  background: var(--accent-soft); color: var(--accent); font-weight: 600;
+}
+.list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; overscroll-behavior: contain; }
+.item {
+  display: flex; gap: 12px;
+  padding: 12px 14px 12px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; position: relative;
+}
+.item:hover { background: var(--hover); }
+.item.selected { background: var(--accent-soft); }
+.item .dot { width: 8px; flex: none; padding-top: 7px; }
+.item .dot::before { content: ""; display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.item.read .dot::before { background: transparent; }
+.item .body { flex: 1; min-width: 0; }
+.item .meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+.item .meta .src { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .meta .star { color: var(--star); }
+.item .title { font-weight: 650; font-size: 15px; line-height: 1.3; margin: 0 0 3px; overflow-wrap: anywhere; }
+.item.read .title { font-weight: 450; color: var(--muted); }
+.item .snip {
+  font-size: 13px; color: var(--muted); margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.item .thumb {
+  width: 72px; height: 72px; flex: none; border-radius: 8px;
+  object-fit: cover; background: var(--hover);
+}
+.item.read .thumb { opacity: 0.7; }
+.more { display: block; margin: 14px auto 24px; }
+.empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 32px 24px; color: var(--muted); gap: 8px; overflow-y: auto;
+}
+.empty h2 { color: var(--text); margin: 0; font-size: 19px; }
+.empty p { margin: 0; max-width: 34ch; }
+.suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; max-width: 360px; }
+
+/* ---------- reader ---------- */
+.reader-bar {
+  display: flex; align-items: center; gap: 2px;
+  padding: 8px; min-height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.reader-bar .spacer { flex: 1; }
+.reader-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.article {
+  max-width: 720px; margin: 0 auto;
+  padding: 28px 24px calc(64px + env(safe-area-inset-bottom));
+}
+.article .a-meta { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.article .a-meta .src { color: var(--accent); font-weight: 600; }
+.article h2 { font-size: 27px; line-height: 1.22; margin: 10px 0 20px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.article h2 a { color: inherit; text-decoration: none; }
+.article h2 a:hover { text-decoration: underline; }
+.content { font-size: 17px; line-height: 1.7; overflow-wrap: anywhere; }
+.content img, .content video, .content picture { max-width: 100%; height: auto; border-radius: 8px; }
+.content figure { margin: 1.4em 0; }
+.content figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.content a { color: var(--accent); }
+.content blockquote { margin: 1.2em 0; padding: 2px 0 2px 16px; border-left: 3px solid var(--border); color: var(--muted); }
+.content pre { background: var(--side); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+.content code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+.content table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; }
+.content td, .content th { border: 1px solid var(--border); padding: 6px 8px; }
+.content h1, .content h2, .content h3 { line-height: 1.3; }
+.hero { width: 100%; max-height: 420px; object-fit: cover; border-radius: 10px; margin-bottom: 18px; }
+.open-orig { margin-top: 32px; }
+.placeholder { min-height: 100%; display: grid; place-items: center; color: var(--faint); text-align: center; padding: 24px; }
+.placeholder svg { width: 56px; height: 56px; stroke-width: 1.4; margin-bottom: 8px; }
+.kbd { font-size: 12px; margin-top: 10px; line-height: 1.9; }
+kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-family: inherit; font-size: 11px; }
+
+/* ---------- dialogs ---------- */
+dialog {
+  border: 1px solid var(--border); border-radius: 16px;
+  background: var(--panel); color: var(--text);
+  padding: 0; width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.dlg { display: flex; flex-direction: column; max-height: calc(100dvh - 34px); }
+.dlg-head { display: flex; align-items: center; padding: 14px 10px 6px 20px; }
+.dlg-head h3 { flex: 1; margin: 0; font-size: 18px; }
+.dlg-body { padding: 6px 20px 8px; overflow-y: auto; }
+.dlg-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px 18px; }
+.field { display: block; margin: 10px 0 14px; }
+.field > span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.field small { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
+.input {
+  width: 100%; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg);
+  font-size: 16px; /* >=16px stops iOS zooming on focus */
+}
+.input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.err-msg { color: var(--danger); font-size: 13px; margin: 0 0 8px; }
+.section { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
+.section h4 { margin: 0 0 8px; font-size: 14px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.feed-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.feed-row:last-child { border-bottom: 0; }
+.feed-row .info { flex: 1; min-width: 0; }
+.feed-row .info div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-row .info .u { font-size: 12px; color: var(--muted); }
+.feed-row .info .e { font-size: 12px; color: var(--danger); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; background: none; padding: 8px 14px; font-size: 14px; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  background: var(--text); color: var(--bg);
+  padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  transition: opacity 0.2s, transform 0.2s; z-index: 100; max-width: calc(100vw - 32px);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.scrim { display: none; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1120px) {
+  .app { grid-template-columns: var(--side-w) 1fr; }
+  .list-pane { border-right: 0; }
+  .reader {
+    position: fixed; inset: 0; z-index: 30;
+    transform: translateX(100%); transition: transform 0.22s ease;
+    visibility: hidden;
+  }
+  .reader.open { transform: none; visibility: visible; }
+  .only-narrow { display: inline-grid; }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 40;
+    width: min(300px, 86vw);
+    transform: translateX(calc(-100% - 60px)); transition: transform 0.22s ease;
+    box-shadow: var(--shadow);
+  }
+  .sidebar.open { transform: none; }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,0.4); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .only-mobile { display: inline-grid !important; }
+  .article { padding: 20px 18px calc(64px + env(safe-area-inset-bottom)); }
+  .article h2 { font-size: 23px; }
+  .item .thumb { width: 64px; height: 64px; }
+}
+.only-mobile { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reader, .sidebar, .scrim, .toast { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar: views + subscriptions -->
+  <aside class="sidebar" id="sidebar" aria-label="Feeds">
+    <div class="brand"><img src="icons/icon.svg" alt="" /> RSS Reader</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <button class="btn primary grow" id="btnAdd" type="button">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Add feed
+      </button>
+      <button class="btn" id="btnSettings" type="button" aria-label="Settings" title="Settings & feeds">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- Article list -->
+  <main class="list-pane">
+    <header class="bar">
+      <button class="icon-btn only-mobile" id="btnMenu" type="button" aria-label="Show feeds">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1 id="viewTitle">All articles</h1>
+      <button class="icon-btn" id="btnRefresh" type="button" aria-label="Refresh feeds" title="Refresh (r)">
+        <svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      </button>
+    </header>
+    <div class="tools">
+      <label class="toggle"><input type="checkbox" id="unreadOnly" /> Unread only</label>
+      <span class="status" id="status"></span>
+      <button class="link-btn" id="btnMarkAll" type="button">Mark all read</button>
+    </div>
+    <div class="banner" id="offline" hidden>You're offline — showing saved articles.</div>
+    <ul class="list" id="list" aria-label="Articles"></ul>
+    <div class="empty" id="empty" hidden></div>
+  </main>
+
+  <!-- Reader -->
+  <section class="reader" id="reader" aria-label="Article">
+    <div class="reader-bar" id="readerBar" hidden>
+      <button class="icon-btn only-narrow" id="btnBack" type="button" aria-label="Back to list">
+        <svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="icon-btn" id="btnPrev" type="button" aria-label="Previous article" title="Previous (k)">
+        <svg class="i" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+      </button>
+      <button class="icon-btn" id="btnNext" type="button" aria-label="Next article" title="Next (j)">
+        <svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="btnStar" type="button" aria-label="Star" title="Star (s)">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnUnread" type="button" aria-label="Mark unread" title="Mark unread (m)">
+        <svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      </button>
+      <button class="icon-btn" id="btnShare" type="button" aria-label="Share" title="Share">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>
+      </button>
+      <a class="icon-btn" id="btnOpen" target="_blank" rel="noopener noreferrer" aria-label="Open original" title="Open original (v)">
+        <svg class="i" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+      </a>
+    </div>
+    <div class="reader-scroll" id="readerScroll">
+      <div class="placeholder" id="placeholder">
+        <div>
+          <svg class="i" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+          <div>Select an article to read</div>
+          <div class="kbd"><kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>s</kbd> star · <kbd>m</kbd> unread · <kbd>v</kbd> open · <kbd>r</kbd> refresh</div>
+        </div>
+      </div>
+      <article class="article" id="article" hidden></article>
+    </div>
+  </section>
+</div>
+
+<!-- Add feed -->
+<dialog id="dlgAdd">
+  <form class="dlg" id="formAdd" method="dialog">
+    <div class="dlg-head">
+      <h3>Add a feed</h3>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dlg-body">
+      <label class="field">
+        <span>Feed or website URL</span>
+        <input class="input" id="addUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://example.com/feed.xml" required />
+        <small>Paste an RSS/Atom feed link — or just a website address and the feed will be found automatically.</small>
+      </label>
+      <p class="err-msg" id="addErr" hidden></p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit" id="addSubmit">Add feed</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Settings & feed management -->
+<dialog id="dlgSettings">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h3>Settings</h3>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dlg-body">
+      <div class="field">
+        <span>Theme</span>
+        <div class="seg" id="themeSeg">
+          <button type="button" data-theme="auto">Auto</button>
+          <button type="button" data-theme="light">Light</button>
+          <button type="button" data-theme="dark">Dark</button>
+        </div>
+      </div>
+      <label class="field">
+        <span>Auto-refresh while open</span>
+        <select class="input" id="refreshMins">
+          <option value="0">Off</option>
+          <option value="15">Every 15 minutes</option>
+          <option value="30">Every 30 minutes</option>
+          <option value="60">Every hour</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Custom CORS proxy (optional)</span>
+        <input class="input" id="customProxy" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://my-proxy.example.workers.dev/?url={url}" />
+        <small>Most sites block browsers from reading their feeds directly, so the app falls back to free public proxies. For best reliability, run your own and put it here — <code>{url}</code> is replaced with the encoded feed URL.</small>
+      </label>
+
+      <div class="section">
+        <h4>Subscriptions (<span id="feedCount">0</span>)</h4>
+        <div id="feedRows"></div>
+      </div>
+
+      <div class="section">
+        <h4>Import / export</h4>
+        <div class="row">
+          <button class="btn" type="button" id="btnImport">Import OPML</button>
+          <button class="btn" type="button" id="btnExport">Export OPML</button>
+          <input type="file" id="fileOpml" accept=".opml,.xml,text/xml,text/x-opml,application/xml" hidden />
+        </div>
+      </div>
+
+      <div class="section">
+        <h4>Storage</h4>
+        <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">Everything is saved on this device only. Nothing is sent anywhere except the feed requests themselves.</p>
+        <div class="row">
+          <button class="btn" type="button" id="btnPurge">Delete read articles</button>
+          <button class="btn danger" type="button" id="btnReset">Reset app</button>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn primary" type="button" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Rename feed -->
+<dialog id="dlgRename">
+  <form class="dlg" id="formRename" method="dialog">
+    <div class="dlg-head"><h3>Rename feed</h3></div>
+    <div class="dlg-body">
+      <label class="field"><span>Name</span><input class="input" id="renameInput" required /></label>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* =========================================================================
+   Constants
+   ========================================================================= */
+
+// Feeds are fetched straight from the browser. Most sites don't send CORS
+// headers, so after a direct attempt we fall back through public CORS
+// proxies. Whichever one works for a feed is remembered and tried first
+// next time.
+var PUBLIC_PROXIES = [
+  { id: "direct",     make: function (u) { return u; } },
+  { id: "allorigins", make: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); } },
+  { id: "corsproxy",  make: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); } },
+  { id: "codetabs",   make: function (u) { return "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u); } },
+];
+
+var SUGGESTED = [
+  { title: "Hacker News", url: "https://hnrss.org/frontpage" },
+  { title: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml" },
+  { title: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
+  { title: "GitHub Blog", url: "https://github.blog/feed/" },
+  { title: "Azure Blog", url: "https://azure.microsoft.com/en-us/blog/feed/" },
+];
+
+var FETCH_TIMEOUT_MS = 15000;
+var MAX_ITEMS_PER_FEED = 200;   // older read, unstarred items beyond this are dropped
+var MAX_CONTENT_CHARS = 150000; // per-article cap to keep storage sane
+var PAGE_SIZE = 150;
+
+var ICON = {
+  starFill: '<svg class="i" viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+  all: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  star: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+  edit: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  trash: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>',
+};
+
+/* =========================================================================
+   State & persistence (IndexedDB, with localStorage fallback)
+   ========================================================================= */
+
+function defaultState() {
+  return {
+    version: 1,
+    feeds: [],      // {id, url, title, customTitle, site, via, error, lastFetched, added}
+    items: {},      // id -> {id, feedId, title, link, date, seen, author, content, snippet, thumb, read, starred}
+    settings: { theme: "auto", unreadOnly: false, customProxy: "", refreshMins: 30 },
+    view: { type: "all" },
+    lastRefresh: 0,
+  };
+}
+
+var state = defaultState();
+var ui = { refreshing: false, progress: "", currentId: null, shown: PAGE_SIZE, visibleIds: [] };
+
+var DB_NAME = "rss-reader", DB_STORE = "kv", LS_KEY = "rss-reader-state";
+
+function openDb() {
+  return new Promise(function (resolve, reject) {
+    if (!("indexedDB" in window)) return reject(new Error("no idb"));
+    var req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = function () { req.result.createObjectStore(DB_STORE); };
+    req.onsuccess = function () { resolve(req.result); };
+    req.onerror = function () { reject(req.error); };
+  });
+}
+var dbPromise = null;
+function db() { return dbPromise || (dbPromise = openDb()); }
+
+function idbGet(key) {
+  return db().then(function (d) {
+    return new Promise(function (resolve, reject) {
+      var r = d.transaction(DB_STORE).objectStore(DB_STORE).get(key);
+      r.onsuccess = function () { resolve(r.result); };
+      r.onerror = function () { reject(r.error); };
+    });
+  });
+}
+function idbSet(key, value) {
+  return db().then(function (d) {
+    return new Promise(function (resolve, reject) {
+      var tx = d.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).put(value, key);
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = function () { reject(tx.error); };
+    });
+  });
+}
+
+function loadState() {
+  return idbGet("state").catch(function () {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) { return null; }
+  }).then(function (saved) {
+    var s = defaultState();
+    if (saved && typeof saved === "object") {
+      s.feeds = Array.isArray(saved.feeds) ? saved.feeds : [];
+      s.items = saved.items && typeof saved.items === "object" ? saved.items : {};
+      Object.assign(s.settings, saved.settings || {});
+      s.view = saved.view || s.view;
+      s.lastRefresh = saved.lastRefresh || 0;
+    }
+    if (s.view.type === "feed" && !feedById(s.view.feedId, s)) s.view = { type: "all" };
+    return s;
+  });
+}
+
+var saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function () {
+    var snapshot = JSON.parse(JSON.stringify(state));
+    idbSet("state", snapshot).catch(function () {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot)); }
+      catch (e) { toast("Storage is full — try deleting read articles"); }
+    });
+  }, 250);
+}
+
+/* =========================================================================
+   Helpers
+   ========================================================================= */
+
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function hash(str) {
+  var h = 5381;
+  for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+function feedById(id, s) { return (s || state).feeds.find(function (f) { return f.id === id; }); }
+function feedName(f) { return (f && (f.customTitle || f.title)) || hostOf(f && f.url) || "Untitled feed"; }
+function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
+function absUrl(v, base) {
+  if (!v) return null;
+  try {
+    var u = new URL(String(v).trim(), base || undefined);
+    return /^(https?|mailto):$/.test(u.protocol) ? u.href : null;
+  } catch (e) { return null; }
+}
+function normalizeUrl(raw) {
+  var s = String(raw || "").trim();
+  if (!s) return "";
+  if (/^feed:\/\//i.test(s)) s = "https://" + s.slice(7);
+  else if (/^feed:/i.test(s)) s = s.slice(5);
+  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+  try { return new URL(s).href; } catch (e) { return ""; }
+}
+function colorFor(s) {
+  var hues = [14, 32, 150, 190, 210, 260, 290, 340];
+  return "hsl(" + hues[parseInt(hash(s), 36) % hues.length] + " 55% 48%)";
+}
+function relTime(ts) {
+  var diff = (Date.now() - ts) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + "d ago";
+  var d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+}
+function fullDate(ts) {
+  return new Date(ts).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
+function htmlToText(html) {
+  if (!html) return "";
+  var doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script, style, noscript, template").forEach(function (n) { n.remove(); });
+  return (doc.body ? doc.body.textContent : "").replace(/\s+/g, " ").trim();
+}
+var toastTimer = null;
+function toast(msg) {
+  var t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2800);
+}
+
+/* =========================================================================
+   Feed parsing (RSS 2.0, RSS 1.0/RDF, Atom)
+   ========================================================================= */
+
+// Find a direct child by qualified name ("content:encoded") or, for plain
+// names, by un-prefixed local name — so "content" never matches media:content.
+function kid(el, names) {
+  if (!el) return null;
+  var children = Array.prototype.slice.call(el.children);
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i], hit;
+    if (n.indexOf(":") > -1) {
+      var local = n.split(":")[1];
+      hit = children.find(function (c) { return c.nodeName === n; }) ||
+            children.find(function (c) { return c.localName === local && c.prefix; });
+    } else {
+      hit = children.find(function (c) { return c.localName === n && !c.prefix; });
+    }
+    if (hit) return hit;
+  }
+  return null;
+}
+function txt(el) { return el ? el.textContent.trim() : ""; }
+function cleanTitle(s) { return s ? htmlToText(s) : ""; }
+function parseDate(s) {
+  if (!s) return 0;
+  var t = Date.parse(s.trim());
+  if (!isNaN(t)) return t;
+  // Some feeds use non-standard zone names ("... 10:00:00 EDT" is fine, "IST" is not)
+  t = Date.parse(s.trim().replace(/\s+[A-Z]{2,5}$/, " GMT"));
+  return isNaN(t) ? 0 : t;
+}
+function atomText(el) {
+  if (!el) return "";
+  if ((el.getAttribute("type") || "").toLowerCase() === "xhtml") {
+    var ser = new XMLSerializer(), out = "";
+    Array.prototype.forEach.call(el.childNodes, function (n) { out += ser.serializeToString(n); });
+    return out;
+  }
+  return el.textContent;
+}
+var MRSS = "http://search.yahoo.com/mrss/";
+function findThumb(item, html, base) {
+  var el = item.getElementsByTagNameNS(MRSS, "thumbnail")[0];
+  if (el && el.getAttribute("url")) return absUrl(el.getAttribute("url"), base);
+  var media = item.getElementsByTagNameNS(MRSS, "content");
+  for (var i = 0; i < media.length; i++) {
+    var m = media[i], type = m.getAttribute("type") || "", medium = m.getAttribute("medium") || "";
+    if ((medium === "image" || /^image\//.test(type) || (!type && !medium && /\.(jpe?g|png|webp|gif)(\?|$)/i.test(m.getAttribute("url") || ""))) && m.getAttribute("url"))
+      return absUrl(m.getAttribute("url"), base);
+  }
+  var enc = Array.prototype.find.call(item.children, function (c) {
+    return c.localName === "enclosure" && /^image\//.test(c.getAttribute("type") || "");
+  });
+  if (enc) return absUrl(enc.getAttribute("url"), base);
+  var it = kid(item, ["itunes:image"]);
+  if (it && it.getAttribute("href")) return absUrl(it.getAttribute("href"), base);
+  var m2 = html && html.match(/<img[^>]+?src\s*=\s*["']([^"']+)["']/i);
+  if (m2) return absUrl(m2[1].replace(/&amp;/g, "&"), base);
+  return null;
+}
+function findAudioVideo(item, base) {
+  var enc = Array.prototype.find.call(item.children, function (c) {
+    return c.localName === "enclosure" && /^(audio|video)\//.test(c.getAttribute("type") || "");
+  });
+  if (!enc) return null;
+  var url = absUrl(enc.getAttribute("url"), base);
+  return url ? { url: url, type: enc.getAttribute("type") } : null;
+}
+
+function parseFeed(text, feedUrl) {
+  var doc = new DOMParser().parseFromString(text.replace(/^﻿/, "").trim(), "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) throw new Error("Not a valid RSS/Atom feed");
+  var root = doc.documentElement, kind = root.localName.toLowerCase();
+  var out = { title: "", site: "", items: [] };
+
+  if (kind === "feed") {
+    out.title = cleanTitle(txt(kid(root, ["title"])));
+    var altLink = Array.prototype.find.call(root.children, function (c) {
+      return c.localName === "link" && !c.prefix && (!c.getAttribute("rel") || c.getAttribute("rel") === "alternate");
+    });
+    out.site = altLink ? absUrl(altLink.getAttribute("href"), feedUrl) : "";
+    Array.prototype.forEach.call(root.children, function (e) {
+      if (e.localName !== "entry") return;
+      var link = Array.prototype.find.call(e.children, function (c) {
+        return c.localName === "link" && !c.prefix && (!c.getAttribute("rel") || c.getAttribute("rel") === "alternate");
+      });
+      var content = atomText(kid(e, ["content"])) || atomText(kid(e, ["summary"]));
+      var mediaGroup = e.getElementsByTagNameNS(MRSS, "description")[0]; // YouTube feeds
+      if (!content && mediaGroup) content = esc(mediaGroup.textContent).replace(/\n/g, "<br>");
+      var author = kid(e, ["author"]) || kid(root, ["author"]);
+      out.items.push({
+        guid: txt(kid(e, ["id"])),
+        title: cleanTitle(atomText(kid(e, ["title"]))),
+        link: link ? absUrl(link.getAttribute("href"), feedUrl) : "",
+        date: parseDate(txt(kid(e, ["published"])) || txt(kid(e, ["updated"]))),
+        author: author ? txt(kid(author, ["name"])) : "",
+        content: content,
+        thumb: findThumb(e, content, feedUrl),
+        media: null,
+      });
+    });
+    return out;
+  }
+
+  if (kind === "rss" || kind === "rdf") {
+    var channel = kid(root, ["channel"]) || root;
+    out.title = cleanTitle(txt(kid(channel, ["title"])));
+    out.site = absUrl(txt(kid(channel, ["link"])), feedUrl) || "";
+    var items = doc.getElementsByTagNameNS("*", "item");
+    Array.prototype.forEach.call(items, function (it) {
+      var guidEl = kid(it, ["guid"]);
+      var guid = txt(guidEl);
+      var link = txt(kid(it, ["link"]));
+      if (!link && guid && guidEl.getAttribute("isPermaLink") !== "false" && /^https?:/i.test(guid)) link = guid;
+      var desc = txt(kid(it, ["description"]));
+      var content = txt(kid(it, ["content:encoded"])) || desc;
+      out.items.push({
+        guid: guid || txt(kid(it, ["rdf:about"])) || it.getAttribute("rdf:about") || "",
+        title: cleanTitle(txt(kid(it, ["title"]))),
+        link: absUrl(link, feedUrl) || "",
+        date: parseDate(txt(kid(it, ["pubDate"])) || txt(kid(it, ["dc:date"])) || txt(kid(it, ["updated"])) || txt(kid(it, ["published"]))),
+        author: txt(kid(it, ["dc:creator"])) || txt(kid(it, ["author"])),
+        content: content,
+        thumb: findThumb(it, content, feedUrl),
+        media: findAudioVideo(it, feedUrl),
+      });
+    });
+    return out;
+  }
+
+  throw new Error("Not a valid RSS/Atom feed");
+}
+
+// Given an HTML page, find its advertised feed (<link rel="alternate" type="application/rss+xml">).
+function discoverFeed(text, pageUrl) {
+  if (!/<html|<head|<link/i.test(text.slice(0, 5000))) return null;
+  var doc = new DOMParser().parseFromString(text, "text/html");
+  var links = doc.querySelectorAll('link[rel~="alternate"][href]');
+  var best = null;
+  links.forEach(function (l) {
+    var t = (l.getAttribute("type") || "").toLowerCase();
+    if (!best && /(rss|atom|feed)\+xml|application\/xml|text\/xml/.test(t)) best = l.getAttribute("href");
+  });
+  if (!best) {
+    // Last resort: an obvious anchor to a feed.
+    var a = doc.querySelector('a[href*="/feed"], a[href*="rss"], a[href$=".xml"], a[href*="atom"]');
+    if (a) best = a.getAttribute("href");
+  }
+  return best ? absUrl(best, pageUrl) : null;
+}
+
+/* =========================================================================
+   Sanitizing article HTML
+   ========================================================================= */
+
+var ALLOWED_TAGS = new Set(("a abbr b blockquote br caption cite code dd del details div dl dt em figcaption figure " +
+  "h1 h2 h3 h4 h5 h6 hr i img ins kbd li mark ol p picture pre q s small span strong sub summary sup table " +
+  "tbody td tfoot th thead tr u ul video audio source").split(" "));
+var DROP_TAGS = new Set(("script style link meta noscript object embed applet form input button textarea select " +
+  "option svg math frame frameset template base head title canvas dialog").split(" "));
+var ALLOWED_ATTRS = new Set(["href", "src", "alt", "title", "width", "height", "colspan", "rowspan", "datetime", "poster", "type", "open"]);
+
+function sanitize(html, base) {
+  var doc = new DOMParser().parseFromString(html || "", "text/html");
+  (function walk(node) {
+    Array.prototype.slice.call(node.childNodes).forEach(function (child) {
+      if (child.nodeType === 8) { child.remove(); return; }
+      if (child.nodeType !== 1) return;
+      var tag = child.localName;
+      if (tag === "iframe") {
+        var src = absUrl(child.getAttribute("src") || child.getAttribute("data-src"), base);
+        if (src) {
+          var p = doc.createElement("p"), a = doc.createElement("a");
+          a.href = src;
+          a.textContent = "▶ Embedded content from " + hostOf(src);
+          p.appendChild(a);
+          child.replaceWith(p);
+          walk(p);
+        } else child.remove();
+        return;
+      }
+      if (DROP_TAGS.has(tag)) { child.remove(); return; }
+      walk(child);
+      if (!ALLOWED_TAGS.has(tag)) {
+        child.replaceWith.apply(child, Array.prototype.slice.call(child.childNodes));
+        return;
+      }
+      if (tag === "img" && !child.getAttribute("src")) {
+        var lazy = child.getAttribute("data-src") || child.getAttribute("data-lazy-src") || child.getAttribute("data-original");
+        if (lazy) child.setAttribute("src", lazy);
+      }
+      Array.prototype.slice.call(child.attributes).forEach(function (attr) {
+        var n = attr.name.toLowerCase();
+        if (!ALLOWED_ATTRS.has(n)) { child.removeAttribute(attr.name); return; }
+        if (n === "href" || n === "src" || n === "poster") {
+          var u = absUrl(attr.value, base);
+          if (u) child.setAttribute(n, u); else child.removeAttribute(attr.name);
+        }
+      });
+      if (tag === "a") { child.setAttribute("target", "_blank"); child.setAttribute("rel", "noopener noreferrer"); }
+      if (tag === "img") {
+        child.setAttribute("loading", "lazy");
+        child.setAttribute("decoding", "async");
+        child.setAttribute("referrerpolicy", "no-referrer");
+        var w = +child.getAttribute("width"), h = +child.getAttribute("height");
+        if ((w && w <= 2) || (h && h <= 2)) child.remove(); // tracking pixels
+      }
+      if (tag === "video" || tag === "audio") child.setAttribute("controls", "");
+    });
+  })(doc.body);
+  return doc.body.innerHTML;
+}
+
+/* =========================================================================
+   Fetching
+   ========================================================================= */
+
+function proxyList(preferred) {
+  var list = PUBLIC_PROXIES.slice();
+  var custom = (state.settings.customProxy || "").trim();
+  if (custom) {
+    list.splice(1, 0, {
+      id: "custom",
+      make: function (u) {
+        return custom.indexOf("{url}") > -1 ? custom.replace("{url}", encodeURIComponent(u)) : custom + encodeURIComponent(u);
+      },
+    });
+  }
+  if (preferred) {
+    var i = list.findIndex(function (p) { return p.id === preferred; });
+    if (i > 0) list.unshift(list.splice(i, 1)[0]);
+  }
+  return list;
+}
+
+function fetchText(url) {
+  var ctrl = "AbortController" in window ? new AbortController() : null;
+  var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, FETCH_TIMEOUT_MS);
+  return fetch(url, { signal: ctrl && ctrl.signal, cache: "no-store", credentials: "omit", redirect: "follow" })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.text();
+    })
+    .finally(function () { clearTimeout(timer); });
+}
+
+// Returns {feed, via, url} — `url` may differ from the input if the input
+// was a web page and we discovered its feed.
+function loadFeed(url, preferred, allowDiscovery) {
+  var proxies = proxyList(preferred), lastErr = null, discovered = null;
+  function attempt(i) {
+    if (i >= proxies.length) {
+      if (discovered && allowDiscovery) return loadFeed(discovered.url, discovered.via, false);
+      return Promise.reject(lastErr || new Error("Couldn't load this feed"));
+    }
+    var p = proxies[i];
+    return fetchText(p.make(url)).then(function (text) {
+      try {
+        return { feed: parseFeed(text, url), via: p.id, url: url };
+      } catch (e) {
+        lastErr = e;
+        var alt = allowDiscovery && discoverFeed(text, url);
+        if (alt && alt !== url) return loadFeed(alt, p.id, false);
+        return attempt(i + 1);
+      }
+    }, function (e) {
+      lastErr = e && e.name === "AbortError" ? new Error("Timed out") : (e && e.message === "Failed to fetch" ? new Error("Network or CORS error") : e);
+      return attempt(i + 1);
+    });
+  }
+  return attempt(0);
+}
+
+/* =========================================================================
+   Merging fetched items into state
+   ========================================================================= */
+
+function mergeItems(feed, parsed) {
+  var now = Date.now(), added = 0;
+  parsed.items.forEach(function (p, idx) {
+    var key = p.guid || p.link || (p.title + "|" + p.date);
+    if (!key) return;
+    var id = feed.id + "-" + hash(key);
+    var content = (p.content || "").slice(0, MAX_CONTENT_CHARS);
+    var existing = state.items[id];
+    var fields = {
+      title: p.title || htmlToText(content).slice(0, 90) || "(untitled)",
+      link: p.link,
+      author: p.author,
+      content: content,
+      snippet: htmlToText(content).slice(0, 240),
+      thumb: p.thumb,
+      media: p.media,
+    };
+    if (existing) {
+      Object.assign(existing, fields);
+      if (p.date) existing.date = p.date;
+    } else {
+      // Undated items keep feed order by nudging "seen" time down by index.
+      state.items[id] = Object.assign({ id: id, feedId: feed.id, date: p.date || now - idx * 1000, seen: now, read: false, starred: false }, fields);
+      added++;
+    }
+  });
+  pruneFeed(feed.id);
+  return added;
+}
+
+function pruneFeed(feedId) {
+  var list = Object.values(state.items).filter(function (it) { return it.feedId === feedId; });
+  if (list.length <= MAX_ITEMS_PER_FEED) return;
+  list.sort(function (a, b) { return b.date - a.date; });
+  list.slice(MAX_ITEMS_PER_FEED).forEach(function (it) {
+    if (!it.starred && it.read) delete state.items[it.id];
+  });
+}
+
+/* =========================================================================
+   Actions
+   ========================================================================= */
+
+function addFeed(rawUrl) {
+  var url = normalizeUrl(rawUrl);
+  if (!url) return Promise.reject(new Error("That doesn't look like a valid URL"));
+  if (state.feeds.some(function (f) { return f.url === url; })) return Promise.reject(new Error("You're already subscribed to this feed"));
+  return loadFeed(url, null, true).then(function (r) {
+    var existing = state.feeds.find(function (f) { return f.url === r.url; });
+    if (existing) throw new Error("You're already subscribed to " + feedName(existing));
+    var feed = {
+      id: hash(r.url + Date.now()),
+      url: r.url,
+      title: r.feed.title || hostOf(r.feed.site || r.url),
+      customTitle: "",
+      site: r.feed.site || "",
+      via: r.via,
+      error: null,
+      lastFetched: Date.now(),
+      added: Date.now(),
+    };
+    state.feeds.push(feed);
+    mergeItems(feed, r.feed);
+    state.view = { type: "feed", feedId: feed.id };
+    ui.shown = PAGE_SIZE;
+    save();
+    render();
+    return feed;
+  });
+}
+
+function refreshFeed(f) {
+  return loadFeed(f.url, f.via, false).then(function (r) {
+    f.via = r.via;
+    f.error = null;
+    f.title = r.feed.title || f.title;
+    f.site = r.feed.site || f.site;
+    f.lastFetched = Date.now();
+    return mergeItems(f, r.feed);
+  }, function (e) {
+    f.error = (e && e.message) || "Failed";
+    throw e;
+  });
+}
+
+function refreshAll(opts) {
+  if (ui.refreshing || !state.feeds.length) return Promise.resolve();
+  if (!navigator.onLine) { if (!(opts && opts.quiet)) toast("You're offline"); return Promise.resolve(); }
+  ui.refreshing = true;
+  var queue = state.feeds.slice(), done = 0, failed = 0, added = 0, total = queue.length;
+  ui.progress = "Updating 0/" + total + "…";
+  renderChrome();
+  function worker() {
+    var f = queue.shift();
+    if (!f) return Promise.resolve();
+    return refreshFeed(f).then(function (n) { added += n; }, function () { failed++; }).then(function () {
+      done++;
+      ui.progress = "Updating " + done + "/" + total + "…";
+      renderChrome();
+      return worker();
+    });
+  }
+  var workers = [];
+  for (var i = 0; i < Math.min(4, total); i++) workers.push(worker());
+  return Promise.all(workers).then(function () {
+    ui.refreshing = false;
+    ui.progress = "";
+    state.lastRefresh = Date.now();
+    save();
+    render();
+    if (!(opts && opts.quiet) || added) {
+      var msg = added ? added + " new article" + (added === 1 ? "" : "s") : "No new articles";
+      if (failed) msg += " · " + failed + " feed" + (failed === 1 ? "" : "s") + " failed";
+      toast(msg);
+    }
+  });
+}
+
+function removeFeed(id) {
+  state.feeds = state.feeds.filter(function (f) { return f.id !== id; });
+  Object.keys(state.items).forEach(function (k) { if (state.items[k].feedId === id) delete state.items[k]; });
+  if (state.view.type === "feed" && state.view.feedId === id) state.view = { type: "all" };
+  if (ui.currentId && !state.items[ui.currentId]) closeReader();
+  save();
+  render();
+}
+
+function setView(v) {
+  state.view = v;
+  ui.shown = PAGE_SIZE;
+  closeSidebar();
+  save();
+  render();
+  $("list").scrollTop = 0;
+}
+
+function setRead(item, read) {
+  if (!item || item.read === read) return;
+  item.read = read;
+  save();
+}
+
+/* =========================================================================
+   Rendering
+   ========================================================================= */
+
+function itemsForView(includeRead) {
+  var v = state.view;
+  return Object.values(state.items).filter(function (it) {
+    if (v.type === "starred") { if (!it.starred) return false; }
+    else if (v.type === "feed") { if (it.feedId !== v.feedId) return false; }
+    // Keep the open article in the list even after it's been marked read.
+    if (!includeRead && state.settings.unreadOnly && v.type !== "starred" && it.read && it.id !== ui.currentId) return false;
+    return true;
+  }).sort(function (a, b) { return b.date - a.date || b.seen - a.seen; });
+}
+
+function unreadCount(feedId) {
+  var n = 0;
+  for (var k in state.items) {
+    var it = state.items[k];
+    if (!it.read && (!feedId || it.feedId === feedId)) n++;
+  }
+  return n;
+}
+
+function favHtml(f) {
+  var host = hostOf(f.site || f.url);
+  var letter = (feedName(f).trim()[0] || "?").toUpperCase();
+  return '<span class="fav" style="background:' + colorFor(host || f.url) + '">' + esc(letter) +
+    (host ? '<img src="https://icons.duckduckgo.com/ip3/' + esc(host) + '.ico" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "") +
+    "</span>";
+}
+
+function renderNav() {
+  var v = state.view;
+  var starred = Object.values(state.items).filter(function (i) { return i.starred; }).length;
+  var html =
+    '<button class="nav-item' + (v.type === "all" ? " active" : "") + '" data-view="all">' + ICON.all +
+    '<span class="name">All articles</span><span class="count">' + (unreadCount() || "") + "</span></button>" +
+    '<button class="nav-item' + (v.type === "starred" ? " active" : "") + '" data-view="starred">' + ICON.star +
+    '<span class="name">Starred</span><span class="count">' + (starred || "") + "</span></button>";
+  if (state.feeds.length) {
+    html += '<div class="nav-label">Feeds</div>';
+    state.feeds.slice().sort(function (a, b) { return feedName(a).localeCompare(feedName(b)); }).forEach(function (f) {
+      var n = unreadCount(f.id);
+      html += '<button class="nav-item' + (v.type === "feed" && v.feedId === f.id ? " active" : "") + '" data-feed="' + esc(f.id) + '" title="' + esc(feedName(f)) + '">' +
+        favHtml(f) + '<span class="name">' + esc(feedName(f)) + "</span>" +
+        (f.error ? '<span class="err" title="' + esc("Last update failed: " + f.error) + '">⚠</span>' : "") +
+        '<span class="count">' + (n || "") + "</span></button>";
+    });
+  }
+  $("nav").innerHTML = html;
+}
+
+function viewTitle() {
+  var v = state.view;
+  if (v.type === "starred") return "Starred";
+  if (v.type === "feed") return feedName(feedById(v.feedId));
+  return "All articles";
+}
+
+function renderChrome() {
+  $("viewTitle").textContent = viewTitle();
+  document.title = (unreadCount() ? "(" + unreadCount() + ") " : "") + "RSS Reader";
+  $("btnRefresh").classList.toggle("spin", ui.refreshing);
+  $("btnRefresh").disabled = ui.refreshing;
+  $("unreadOnly").checked = !!state.settings.unreadOnly;
+  $("unreadOnly").parentElement.hidden = state.view.type === "starred";
+  var status = ui.progress;
+  if (!status && state.view.type === "feed") {
+    var f = feedById(state.view.feedId);
+    if (f && f.error) status = "⚠ " + f.error;
+    else if (f && f.lastFetched) status = "Updated " + relTime(f.lastFetched);
+  } else if (!status && state.lastRefresh) status = "Updated " + relTime(state.lastRefresh);
+  $("status").textContent = status;
+  $("offline").hidden = navigator.onLine;
+}
+
+function renderList() {
+  var items = itemsForView(false);
+  ui.visibleIds = items.map(function (i) { return i.id; });
+  var list = $("list"), empty = $("empty");
+  $("btnMarkAll").disabled = !items.some(function (i) { return !i.read; });
+
+  if (!items.length) {
+    list.innerHTML = "";
+    list.hidden = true;
+    empty.hidden = false;
+    if (!state.feeds.length) {
+      empty.innerHTML = '<h2>Welcome 👋</h2><p>Add a feed to get started — paste any RSS/Atom link or website address, or try one of these:</p>' +
+        '<div class="suggest">' + SUGGESTED.map(function (s) {
+          return '<button class="btn" data-suggest="' + esc(s.url) + '">+ ' + esc(s.title) + "</button>";
+        }).join("") + "</div>" +
+        '<div class="suggest"><button class="btn primary" data-action="add">Add a feed</button><button class="btn" data-action="import">Import OPML</button></div>';
+    } else if (state.view.type === "starred") {
+      empty.innerHTML = "<h2>No starred articles</h2><p>Tap the ☆ on any article to save it here.</p>";
+    } else {
+      empty.innerHTML = "<h2>All caught up ✨</h2><p>" + (state.settings.unreadOnly ? "No unread articles here." : "No articles yet — try refreshing.") + "</p>";
+    }
+    return;
+  }
+
+  list.hidden = false;
+  empty.hidden = true;
+  var showFeed = state.view.type !== "feed";
+  var html = items.slice(0, ui.shown).map(function (it) {
+    var f = feedById(it.feedId);
+    return '<li class="item' + (it.read ? " read" : "") + (it.id === ui.currentId ? " selected" : "") + '" data-id="' + esc(it.id) + '">' +
+      '<span class="dot"></span><div class="body"><div class="meta">' +
+      (showFeed && f ? '<span class="src">' + esc(feedName(f)) + "</span><span>·</span>" : "") +
+      "<span>" + esc(relTime(it.date)) + "</span>" +
+      (it.starred ? '<span class="star">' + ICON.starFill + "</span>" : "") +
+      '</div><p class="title">' + esc(it.title) + "</p>" +
+      (it.snippet ? '<p class="snip">' + esc(it.snippet) + "</p>" : "") +
+      "</div>" +
+      (it.thumb ? '<img class="thumb" src="' + esc(it.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "") +
+      "</li>";
+  }).join("");
+  if (items.length > ui.shown) html += '<li><button class="btn more" data-action="more">Show more (' + (items.length - ui.shown) + ")</button></li>";
+  list.innerHTML = html;
+}
+
+function renderReader() {
+  var it = ui.currentId && state.items[ui.currentId];
+  var reader = $("reader");
+  $("readerBar").hidden = !it;
+  $("placeholder").hidden = !!it;
+  $("article").hidden = !it;
+  reader.classList.toggle("open", !!it);
+  if (!it) return;
+
+  var f = feedById(it.feedId);
+  var base = it.link || (f && (f.site || f.url));
+  var body = sanitize(it.content, base);
+  var hasImg = /<img\b/i.test(body);
+  var media = it.media && (/^video/.test(it.media.type)
+    ? '<video controls preload="none" src="' + esc(it.media.url) + '"></video>'
+    : '<audio controls preload="none" src="' + esc(it.media.url) + '" style="width:100%"></audio>');
+
+  $("article").innerHTML =
+    '<div class="a-meta"><span class="src">' + esc(feedName(f)) + "</span>" +
+    (it.author ? "<span>" + esc(it.author) + "</span>" : "") +
+    '<time datetime="' + new Date(it.date).toISOString() + '">' + esc(fullDate(it.date)) + "</time></div>" +
+    "<h2>" + (it.link ? '<a href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer">' + esc(it.title) + "</a>" : esc(it.title)) + "</h2>" +
+    (!hasImg && it.thumb ? '<img class="hero" src="' + esc(it.thumb) + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">' : "") +
+    (media ? '<div class="content">' + media + "</div>" : "") +
+    '<div class="content">' + (body || '<p style="color:var(--muted)">This feed only includes a headline — open the original to read the full article.</p>') + "</div>" +
+    (it.link ? '<a class="btn open-orig" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer">Read on ' + esc(hostOf(it.link)) + " ↗</a>" : "");
+
+  var star = $("btnStar");
+  star.classList.toggle("on", !!it.starred);
+  star.setAttribute("aria-label", it.starred ? "Unstar" : "Star");
+  star.setAttribute("aria-pressed", it.starred ? "true" : "false");
+  var open = $("btnOpen");
+  if (it.link) open.href = it.link; else open.removeAttribute("href");
+  open.hidden = !it.link;
+  $("btnShare").hidden = !(navigator.share && it.link);
+  var idx = ui.visibleIds.indexOf(it.id);
+  $("btnPrev").disabled = idx <= 0;
+  $("btnNext").disabled = idx < 0 || idx >= ui.visibleIds.length - 1;
+}
+
+function render() {
+  applyTheme();
+  renderNav();
+  renderChrome();
+  renderList();
+  renderReader();
+}
+
+function applyTheme() {
+  var t = state.settings.theme;
+  if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  else document.documentElement.removeAttribute("data-theme");
+}
+
+/* =========================================================================
+   Reader navigation
+   ========================================================================= */
+
+var narrowMq = window.matchMedia("(max-width: 1120px)");
+
+function openItem(id, fromKeyboard) {
+  var it = state.items[id];
+  if (!it) return;
+  var wasOpen = !!ui.currentId;
+  ui.currentId = id;
+  setRead(it, true);
+  // On phones the reader is a full-screen layer: give the back button/gesture something to pop.
+  if (narrowMq.matches && !wasOpen) history.pushState({ reader: true }, "");
+  renderNav();
+  renderChrome();
+  renderList();
+  renderReader();
+  $("readerScroll").scrollTop = 0;
+  var row = document.querySelector('.item[data-id="' + CSS.escape(id) + '"]');
+  if (row && fromKeyboard) row.scrollIntoView({ block: "nearest" });
+}
+
+function closeReader(fromPop) {
+  if (!ui.currentId) return;
+  ui.currentId = null;
+  if (!fromPop && history.state && history.state.reader) history.back();
+  renderList();
+  renderReader();
+}
+
+function step(dir) {
+  var ids = ui.visibleIds;
+  if (!ids.length) return;
+  var idx = ids.indexOf(ui.currentId);
+  var next = idx < 0 ? 0 : idx + dir;
+  if (next < 0 || next >= ids.length) return;
+  if (next >= ui.shown) ui.shown += PAGE_SIZE;
+  openItem(ids[next], true);
+}
+
+/* =========================================================================
+   Sidebar (mobile drawer)
+   ========================================================================= */
+
+function openSidebar() { $("sidebar").classList.add("open"); $("scrim").classList.add("open"); }
+function closeSidebar() { $("sidebar").classList.remove("open"); $("scrim").classList.remove("open"); }
+
+/* =========================================================================
+   Dialogs
+   ========================================================================= */
+
+function showAdd(prefill) {
+  $("addUrl").value = prefill || "";
+  $("addErr").hidden = true;
+  $("addSubmit").disabled = false;
+  $("addSubmit").textContent = "Add feed";
+  closeSidebar();
+  $("dlgAdd").showModal();
+  setTimeout(function () { $("addUrl").focus(); }, 50);
+}
+
+function renderSettings() {
+  var s = state.settings;
+  Array.prototype.forEach.call($("themeSeg").children, function (b) { b.classList.toggle("on", b.dataset.theme === s.theme); });
+  $("refreshMins").value = String(s.refreshMins);
+  $("customProxy").value = s.customProxy || "";
+  $("feedCount").textContent = state.feeds.length;
+  $("feedRows").innerHTML = state.feeds.length ? state.feeds.map(function (f) {
+    return '<div class="feed-row">' + favHtml(f) + '<div class="info"><div>' + esc(feedName(f)) + '</div><div class="u">' + esc(f.url) + "</div>" +
+      (f.error ? '<div class="e">⚠ ' + esc(f.error) + "</div>" : "") + "</div>" +
+      '<button class="icon-btn" data-rename="' + esc(f.id) + '" aria-label="Rename ' + esc(feedName(f)) + '">' + ICON.edit + "</button>" +
+      '<button class="icon-btn" data-remove="' + esc(f.id) + '" aria-label="Unsubscribe from ' + esc(feedName(f)) + '">' + ICON.trash + "</button></div>";
+  }).join("") : '<p style="margin:0;color:var(--muted);font-size:13px">No feeds yet.</p>';
+}
+
+function showSettings() {
+  closeSidebar();
+  renderSettings();
+  $("dlgSettings").showModal();
+}
+
+var renameId = null;
+function showRename(id) {
+  var f = feedById(id);
+  if (!f) return;
+  renameId = id;
+  $("renameInput").value = feedName(f);
+  $("dlgRename").showModal();
+}
+
+/* =========================================================================
+   OPML
+   ========================================================================= */
+
+function exportOpml() {
+  var body = state.feeds.map(function (f) {
+    return '    <outline type="rss" text="' + esc(feedName(f)) + '" title="' + esc(feedName(f)) + '" xmlUrl="' + esc(f.url) + '"' +
+      (f.site ? ' htmlUrl="' + esc(f.site) + '"' : "") + "/>";
+  }).join("\n");
+  var xml = '<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n  <head><title>RSS Reader subscriptions</title><dateCreated>' +
+    new Date().toUTCString() + "</dateCreated></head>\n  <body>\n" + body + "\n  </body>\n</opml>\n";
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([xml], { type: "text/x-opml" }));
+  a.download = "subscriptions.opml";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+function importOpml(text) {
+  var doc = new DOMParser().parseFromString(text, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) { toast("That file isn't valid OPML"); return; }
+  var added = 0;
+  Array.prototype.forEach.call(doc.querySelectorAll("outline[xmlUrl], outline[xmlurl]"), function (o) {
+    var url = normalizeUrl(o.getAttribute("xmlUrl") || o.getAttribute("xmlurl"));
+    if (!url || state.feeds.some(function (f) { return f.url === url; })) return;
+    var title = o.getAttribute("title") || o.getAttribute("text") || "";
+    state.feeds.push({
+      id: hash(url + Date.now() + added), url: url, title: title || hostOf(url), customTitle: "",
+      site: absUrl(o.getAttribute("htmlUrl"), url) || "", via: null, error: null, lastFetched: 0, added: Date.now(),
+    });
+    added++;
+  });
+  save();
+  render();
+  renderSettings();
+  toast(added ? "Imported " + added + " feed" + (added === 1 ? "" : "s") + " — fetching…" : "No new feeds found in that file");
+  if (added) refreshAll({ quiet: true });
+}
+
+/* =========================================================================
+   Events
+   ========================================================================= */
+
+$("btnMenu").onclick = openSidebar;
+$("scrim").onclick = closeSidebar;
+$("btnAdd").onclick = function () { showAdd(""); };
+$("btnSettings").onclick = showSettings;
+$("btnRefresh").onclick = function () { refreshAll(); };
+$("btnBack").onclick = function () { closeReader(); };
+$("btnPrev").onclick = function () { step(-1); };
+$("btnNext").onclick = function () { step(1); };
+
+$("unreadOnly").onchange = function (e) {
+  state.settings.unreadOnly = e.target.checked;
+  ui.shown = PAGE_SIZE;
+  save();
+  renderList();
+  renderReader();
+};
+
+$("btnMarkAll").onclick = function () {
+  var items = itemsForView(true).filter(function (i) { return !i.read; });
+  if (!items.length) return;
+  items.forEach(function (i) { i.read = true; });
+  save();
+  render();
+  toast("Marked " + items.length + " as read");
+};
+
+$("nav").onclick = function (e) {
+  var b = e.target.closest(".nav-item");
+  if (!b) return;
+  if (b.dataset.feed) setView({ type: "feed", feedId: b.dataset.feed });
+  else setView({ type: b.dataset.view });
+};
+
+$("list").onclick = function (e) {
+  if (e.target.closest('[data-action="more"]')) {
+    ui.shown += PAGE_SIZE;
+    renderList();
+    return;
+  }
+  var li = e.target.closest(".item");
+  if (li) openItem(li.dataset.id);
+};
+
+$("empty").onclick = function (e) {
+  var s = e.target.closest("[data-suggest]");
+  if (s) {
+    s.disabled = true;
+    s.textContent = "Adding…";
+    addFeed(s.dataset.suggest).catch(function (err) { toast(err.message); s.disabled = false; s.textContent = "Retry"; });
+    return;
+  }
+  var a = e.target.closest("[data-action]");
+  if (!a) return;
+  if (a.dataset.action === "add") showAdd("");
+  if (a.dataset.action === "import") $("fileOpml").click();
+};
+
+$("btnStar").onclick = function () {
+  var it = state.items[ui.currentId];
+  if (!it) return;
+  it.starred = !it.starred;
+  save();
+  renderNav();
+  renderList();
+  renderReader();
+};
+$("btnUnread").onclick = function () {
+  var it = state.items[ui.currentId];
+  if (!it) return;
+  setRead(it, false);
+  toast("Marked as unread");
+  renderNav();
+  renderChrome();
+  if (narrowMq.matches) closeReader(); else renderList();
+};
+$("btnShare").onclick = function () {
+  var it = state.items[ui.currentId];
+  if (it && navigator.share) navigator.share({ title: it.title, url: it.link }).catch(function () {});
+};
+
+// Dialog close buttons + click-outside-to-close
+document.querySelectorAll("dialog").forEach(function (d) {
+  d.addEventListener("click", function (e) {
+    if (e.target === d || e.target.closest("[data-close]")) d.close();
+  });
+});
+
+$("formAdd").onsubmit = function (e) {
+  e.preventDefault();
+  var btn = $("addSubmit"), err = $("addErr");
+  btn.disabled = true;
+  btn.textContent = "Finding feed…";
+  err.hidden = true;
+  addFeed($("addUrl").value).then(function (f) {
+    $("dlgAdd").close();
+    toast("Subscribed to " + feedName(f));
+  }, function (e2) {
+    err.textContent = (e2 && e2.message) || "Couldn't add that feed";
+    if (/CORS|HTTP|Timed out|valid/.test(err.textContent)) err.textContent += " — check the address, or set a custom proxy in Settings.";
+    err.hidden = false;
+    btn.disabled = false;
+    btn.textContent = "Add feed";
+  });
+};
+
+$("formRename").onsubmit = function (e) {
+  e.preventDefault();
+  var f = feedById(renameId);
+  if (f) {
+    var name = $("renameInput").value.trim();
+    f.customTitle = name && name !== f.title ? name : "";
+    save();
+    render();
+    renderSettings();
+  }
+  $("dlgRename").close();
+};
+
+$("themeSeg").onclick = function (e) {
+  var b = e.target.closest("button[data-theme]");
+  if (!b) return;
+  state.settings.theme = b.dataset.theme;
+  save();
+  applyTheme();
+  renderSettings();
+};
+$("refreshMins").onchange = function (e) {
+  state.settings.refreshMins = +e.target.value;
+  save();
+  scheduleAutoRefresh();
+};
+$("customProxy").onchange = function (e) {
+  var v = e.target.value.trim();
+  if (v && !/^https:\/\//i.test(v)) { toast("Proxy must be an https:// URL"); e.target.value = state.settings.customProxy; return; }
+  state.settings.customProxy = v;
+  save();
+  toast(v ? "Custom proxy saved" : "Custom proxy removed");
+};
+$("feedRows").onclick = function (e) {
+  var r = e.target.closest("[data-rename]"), d = e.target.closest("[data-remove]");
+  if (r) showRename(r.dataset.rename);
+  if (d) {
+    var f = feedById(d.dataset.remove);
+    if (f && confirm("Unsubscribe from “" + feedName(f) + "”? Its saved articles (including starred ones) will be removed.")) {
+      removeFeed(f.id);
+      renderSettings();
+    }
+  }
+};
+$("btnExport").onclick = function () {
+  if (!state.feeds.length) { toast("No feeds to export"); return; }
+  exportOpml();
+};
+$("btnImport").onclick = function () { $("fileOpml").click(); };
+$("fileOpml").onchange = function (e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  file.text().then(importOpml);
+  e.target.value = "";
+};
+$("btnPurge").onclick = function () {
+  var n = 0;
+  Object.keys(state.items).forEach(function (k) {
+    var it = state.items[k];
+    if (it.read && !it.starred && k !== ui.currentId) { delete state.items[k]; n++; }
+  });
+  save();
+  render();
+  toast("Deleted " + n + " read article" + (n === 1 ? "" : "s"));
+};
+$("btnReset").onclick = function () {
+  if (!confirm("Remove all feeds, articles and settings from this device?")) return;
+  state = defaultState();
+  ui.currentId = null;
+  save();
+  render();
+  renderSettings();
+  $("dlgSettings").close();
+  toast("App reset");
+};
+
+window.addEventListener("popstate", function () {
+  if (ui.currentId && narrowMq.matches) closeReader(true);
+});
+window.addEventListener("online", function () { renderChrome(); refreshAll({ quiet: true }); });
+window.addEventListener("offline", renderChrome);
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "visible") maybeAutoRefresh();
+});
+
+// Keyboard shortcuts (desktop)
+document.addEventListener("keydown", function (e) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (document.querySelector("dialog[open]")) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName || ""))) return;
+  var it = state.items[ui.currentId];
+  switch (e.key) {
+    case "j": case "ArrowDown": if (e.key === "j" || it) { e.preventDefault(); step(1); } break;
+    case "k": case "ArrowUp": if (e.key === "k" || it) { e.preventDefault(); step(-1); } break;
+    case "s": if (it) $("btnStar").click(); break;
+    case "m": if (it) $("btnUnread").click(); break;
+    case "v": case "o": if (it && it.link) window.open(it.link, "_blank", "noopener"); break;
+    case "r": refreshAll(); break;
+    case "a": showAdd(""); e.preventDefault(); break;
+    case "Escape": if (it) closeReader(); else closeSidebar(); break;
+  }
+});
+
+/* =========================================================================
+   Auto refresh
+   ========================================================================= */
+
+var autoTimer = null;
+function scheduleAutoRefresh() {
+  clearInterval(autoTimer);
+  var mins = state.settings.refreshMins;
+  if (mins > 0) autoTimer = setInterval(function () { refreshAll({ quiet: true }); }, mins * 60000);
+}
+function maybeAutoRefresh() {
+  var mins = state.settings.refreshMins || 30;
+  if (Date.now() - state.lastRefresh > Math.min(mins, 15) * 60000) refreshAll({ quiet: true });
+  else renderChrome();
+}
+
+/* =========================================================================
+   Boot
+   ========================================================================= */
+
+loadState().then(function (s) {
+  state = s;
+  render();
+  scheduleAutoRefresh();
+
+  // Share target (Android "Share → Reader") and ?add=<url> links open the add dialog pre-filled.
+  var params = new URLSearchParams(location.search);
+  var shared = params.get("add") || params.get("url") || ((params.get("text") || "").match(/https?:\/\/\S+/) || [])[0];
+  if (shared) {
+    history.replaceState(null, "", location.pathname);
+    showAdd(shared);
+  }
+  maybeAutoRefresh();
+});
+
+setInterval(renderChrome, 60000); // keep "Updated 5m ago" fresh
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
