@@ -147,6 +147,11 @@ button.link-toggle {
   display: block;
 }
 
+.repeat-card { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.repeat-card .repeat-label { font-weight: 700; flex: 1 1 140px; }
+.repeat-card .repeat-summary { color: var(--muted); font-size: 0.9rem; flex: 1 1 160px; }
+.repeat-card .repeat-confirm { font-weight: 600; color: var(--income); flex: 1 1 auto; }
+
 .fab {
   position: fixed;
   bottom: 22px;
@@ -464,6 +469,7 @@ var selectedMonth = currentMonthKey();
 var entryDraft = null;      // being edited/created on the Add tab
 var recurringDraft = null;  // being edited/created on the Recurring tab
 var dueOverrides = {};      // periodKey -> { amount, date }
+var lastRepeatConfirmation = null; // { entryId } - set right after "Repeat last expense" logs one
 var historyFilter = { type: "all", categoryId: "all", month: "all", search: "" };
 var editingCategoryId = null;
 var newCategoryDraft = { name: "", emoji: "⭐", budget: "" };
@@ -620,6 +626,26 @@ function skipDueItem(item, periodIndex) {
   if (item.skippedPeriods.indexOf(periodIndex) < 0) item.skippedPeriods.push(periodIndex);
   delete dueOverrides[item.id + "_" + periodIndex];
   saveState();
+  render();
+}
+
+function repeatLastExpense() {
+  var last = mostRecentExpenseEntry();
+  if (!last) return;
+  var entry = {
+    id: genId("e"),
+    type: "expense",
+    amount: Number(last.amount),
+    date: todayKey(),
+    note: last.note || "",
+    categoryId: last.categoryId,
+    paymentMethod: last.paymentMethod,
+    sourceName: null,
+    recurringId: null,
+    periodIndex: null
+  };
+  upsertEntry(entry);
+  lastRepeatConfirmation = { entryId: entry.id };
   render();
 }
 
@@ -784,8 +810,39 @@ function renderAccountLine() {
 
 // ----- Dashboard -----
 
+function renderRepeatCard() {
+  var lastExpense = mostRecentExpenseEntry();
+  if (!lastExpense) return null;
+  var cat = categoryById(lastExpense.categoryId);
+  var summary = (cat ? cat.emoji + " " + cat.name : "Expense") + " · " + formatMoney(lastExpense.amount) +
+    (lastExpense.paymentMethod ? " · " + escapeHtml(lastExpense.paymentMethod) : "");
+
+  var card = el("div", "panel repeat-card");
+  if (lastRepeatConfirmation && lastRepeatConfirmation.entryId === lastExpense.id) {
+    card.appendChild(el("div", "repeat-confirm", "✅ Added " + summary));
+    var undoBtn = el("button", "small secondary", "Undo");
+    undoBtn.addEventListener("click", function () {
+      lastRepeatConfirmation = null;
+      deleteEntry(lastExpense.id);
+    });
+    card.appendChild(undoBtn);
+  } else {
+    card.appendChild(el("div", "repeat-label", "🔁 Repeat last expense"));
+    card.appendChild(el("div", "repeat-summary", summary));
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Log it again";
+    btn.addEventListener("click", repeatLastExpense);
+    card.appendChild(btn);
+  }
+  return card;
+}
+
 function renderDashboard() {
   app.appendChild(renderAccountLine());
+
+  var repeatCard = renderRepeatCard();
+  if (repeatCard) app.appendChild(repeatCard);
 
   var pending = allPendingItems();
   if (pending.length) {
