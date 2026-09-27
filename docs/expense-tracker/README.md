@@ -7,6 +7,11 @@ to the home screen on both iOS and Android.
 
 ## Features
 
+- **Repeat last expense (1-tap)** — the Dashboard always shows a card for
+  your most recent expense with a **Log it again** button. For anything
+  that repeats as-is (daily chai, the same auto fare), that's the entire
+  flow: one tap, no typing, dated today. After tapping, the card shows
+  an "Undo" link in case it was a mis-tap.
 - **Quick add, built for one-thumb phone use** — a floating ➕ button
   (bottom-right, on every screen but Add) drops you straight into a
   minimal entry: type the amount, tap a category chip, tap a payment
