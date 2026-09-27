@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Expense Tracker</title>
+
+<!-- Android / Chrome: installable PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0d1426" />
+
+<!-- iOS Safari: "Add to Home Screen" support (iOS ignores the manifest above) -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Expenses" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png" />
+
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #0d1426;
+  --panel: #141b34;
+  --panel-border: #232d52;
+  --text: #eef1fb;
+  --muted: #93a0c9;
+  --accent: #4ddcb0;
+  --accent-text: #062018;
+  --income: #4ddcb0;
+  --expense: #ff9d76;
+  --danger: #ff7d7d;
+  --well: #10182e;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { overflow-x: hidden; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 20px 16px 56px;
+  overflow-x: hidden;
+}
+
+.app-header {
+  max-width: 860px;
+  margin: 0 auto 16px;
+  text-align: center;
+}
+.app-header h1 { margin: 0 0 4px; font-size: 1.7rem; }
+.subtitle { margin: 0; color: var(--muted); font-size: 0.9rem; }
+
+.tab-bar {
+  max-width: 860px;
+  margin: 16px auto;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.tab-bar button {
+  flex: 0 0 auto;
+  border: 1px solid var(--panel-border);
+  background: var(--well);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab-bar button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 18px;
+}
+.panel h2 { margin: 0 0 4px; font-size: 1.1rem; }
+.panel h3 { margin: 0 0 10px; font-size: 1rem; }
+.panel-hint { color: var(--muted); font-size: 0.82rem; margin: 0 0 12px; }
+
+select, input, textarea, button {
+  font: inherit;
+  font-size: 16px;
+  background: var(--well);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+button { background: var(--accent); color: var(--accent-text); border: none; font-weight: 600; cursor: pointer; }
+button:hover { filter: brightness(1.08); }
+button.secondary { background: var(--well); color: var(--text); border: 1px solid var(--panel-border); }
+button.danger { background: var(--danger); color: #310a0a; }
+button.small { padding: 6px 10px; font-size: 0.82rem; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 0.8rem; color: var(--muted); }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.form-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+.type-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+.type-toggle button { flex: 1; }
+.type-toggle button.income.active { background: var(--income); color: #06301f; }
+.type-toggle button.expense.active { background: var(--expense); color: #3a1400; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.summary-card {
+  background: var(--well);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.summary-card .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.summary-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.summary-card.income .value { color: var(--income); }
+.summary-card.expense .value { color: var(--expense); }
+
+.month-picker { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.month-picker input[type="month"] { flex: 0 0 auto; }
+
+.due-card {
+  border: 1px solid var(--accent);
+  background: linear-gradient(180deg, rgba(77, 220, 176, 0.12), transparent);
+}
+.due-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: var(--well);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 10px;
+}
+.due-item .due-info { flex: 1 1 200px; min-width: 0; }
+.due-item .due-name { font-weight: 700; }
+.due-item .due-meta { color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+.due-item .due-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.due-item .due-controls input { width: 110px; }
+.due-item .due-controls input[type="date"] { width: 140px; }
+
+.cat-row, .rec-row, .pm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--well);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.cat-row .cat-emoji, .rec-row .rec-emoji { font-size: 1.2rem; }
+.cat-row .cat-name, .rec-row .rec-name { font-weight: 600; flex: 1 1 auto; min-width: 90px; }
+.cat-row .cat-budget, .rec-row .rec-meta { color: var(--muted); font-size: 0.8rem; }
+.row-actions { display: flex; gap: 6px; margin-left: auto; }
+
+.budget-bar-wrap { margin-top: 10px; }
+.budget-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+.budget-row .cat-label { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.budget-track { background: var(--well); border-radius: 999px; height: 10px; overflow: hidden; border: 1px solid var(--panel-border); }
+.budget-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+.budget-fill.warn { background: #f4c860; }
+.budget-fill.over { background: var(--danger); }
+.cat-block { margin-bottom: 14px; }
+.cat-block:last-child { margin-bottom: 0; }
+
+.filter-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.filter-bar > * { flex: 1 1 140px; min-width: 0; }
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--well);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 8px;
+}
+.entry-row .entry-icon { font-size: 1.3rem; flex: 0 0 auto; }
+.entry-row .entry-main { flex: 1 1 auto; min-width: 0; }
+.entry-row .entry-title { font-weight: 600; }
+.entry-row .entry-sub { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+.entry-row .entry-amount { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.entry-row .entry-amount.income { color: var(--income); }
+.entry-row .entry-amount.expense { color: var(--expense); }
+.entry-row .entry-actions { display: flex; gap: 6px; }
+
+.empty-hint { color: var(--muted); text-align: center; padding: 14px; font-size: 0.9rem; }
+
+.account-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.88rem; color: var(--muted); }
+.account-line a { color: var(--accent); text-decoration: none; cursor: pointer; }
+
+.app-footer { max-width: 860px; margin: 24px auto 0; text-align: center; color: var(--muted); font-size: 0.78rem; }
+
+@media (max-width: 600px) {
+  body { padding: 14px 10px 40px; }
+  .app-header h1 { font-size: 1.4rem; }
+  .panel { padding: 14px; }
+  .entry-row { flex-wrap: wrap; }
+  .entry-row .entry-amount { order: 3; margin-left: auto; }
+}
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>💰 Expense Tracker</h1>
+    <p class="subtitle">Two incomes, recurring bills, category budgets — all in one place.</p>
+  </header>
+
+  <nav class="tab-bar" id="tabBar"></nav>
+
+  <main id="app"></main>
+
+  <footer class="app-footer">
+    <p>Data is stored on this device. Cloud sync (optional) needs your own Google sign-in project — see the README.</p>
+  </footer>
+
+<script>
+(function () {
+"use strict";
+
+var STORAGE_KEY = "expenseTracker.v1";
+
+// ---- Optional cross-device sync (Firebase Firestore + Google Sign-In) ----
+// Leave this null to keep the app exactly as it is: fully local, no internet
+// dependency, data stays on this one device/browser. Fill it in with your
+// own Firebase project's config (Firebase console -> Project settings ->
+// your web app) to sync your ledger across every device where you sign in
+// with the same Google account. See README.md for the full setup steps.
+var FIREBASE_CONFIG = null;
+var FIREBASE_SDK_VERSION = "10.14.1";
+var REQUIRE_SIGN_IN = true;
+
+var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
+var applyingRemoteUpdate = false;
+var authApi = { signIn: null, signOut: null };
+var authState = {
+  required: !!(FIREBASE_CONFIG && REQUIRE_SIGN_IN),
+  ready: false,
+  user: null
+};
+
+function initFirebase() {
+  if (!FIREBASE_CONFIG) return;
+  var imports = [
+    import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-firestore.js")
+  ];
+  if (authState.required) {
+    imports.push(import("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-auth.js"));
+  }
+  Promise.all(imports).then(function (mods) {
+    var appMod = mods[0], fsMod = mods[1], authMod = mods[2];
+    var app = appMod.initializeApp(FIREBASE_CONFIG);
+    var db = fsMod.getFirestore(app);
+
+    if (!authState.required) {
+      cloud.docRef = fsMod.doc(db, "expenseTracker", "default");
+      cloud.setDoc = fsMod.setDoc;
+      startFirestoreSync(fsMod);
+      return;
+    }
+
+    var authInst = authMod.getAuth(app);
+    authApi.signIn = function () {
+      authMod.signInWithPopup(authInst, new authMod.GoogleAuthProvider()).catch(function (err) {
+        console.warn("Cloud sync: sign-in failed", err);
+      });
+    };
+    authApi.signOut = function () { authMod.signOut(authInst); };
+
+    authMod.onAuthStateChanged(authInst, function (user) {
+      authState.ready = true;
+      authState.user = user || null;
+      if (user) {
+        var myEmail = (user.email || "").toLowerCase();
+        cloud.docRef = fsMod.doc(db, "expenseTracker", myEmail);
+        cloud.setDoc = fsMod.setDoc;
+        startFirestoreSync(fsMod);
+      } else {
+        cloud.ready = false;
+        render();
+      }
+    });
+  }).catch(function (err) {
+    console.warn("Cloud sync: unavailable", err);
+    cloud.failed = true;
+    authState.ready = true;
+    render();
+  });
+}
+
+function startFirestoreSync(fsMod) {
+  cloud.ready = true;
+  cloud.failed = false;
+  render();
+  fsMod.onSnapshot(cloud.docRef, function (snap) {
+    if (!snap.exists()) {
+      pushCloudUpdate();
+      return;
+    }
+    var remote = snap.data();
+    if (JSON.stringify(remote) === JSON.stringify(state)) return;
+    applyingRemoteUpdate = true;
+    state = remote;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    render();
+    applyingRemoteUpdate = false;
+  }, function (err) {
+    console.warn("Cloud sync: listen failed", err);
+    cloud.ready = false;
+    cloud.failed = true;
+    render();
+  });
+}
+
+function pushCloudUpdate() {
+  if (!cloud.ready || applyingRemoteUpdate) return;
+  cloud.setDoc(cloud.docRef, state).catch(function (err) {
+    console.warn("Cloud sync: push failed", err);
+  });
+}
+
+// ---------- Defaults ----------
+
+var DEFAULT_CATEGORIES = [
+  { id: "housing", name: "Housing / Rent", emoji: "🏠", budget: 0 },
+  { id: "loan", name: "Loan EMI", emoji: "🏦", budget: 0 },
+  { id: "investment", name: "Mutual Fund", emoji: "📈", budget: 0 },
+  { id: "rd", name: "RD", emoji: "💵", budget: 0 },
+  { id: "electricity", name: "EB Bill", emoji: "💡", budget: 0 },
+  { id: "groceries", name: "Groceries", emoji: "🛒", budget: 0 },
+  { id: "transport", name: "Transport", emoji: "🚗", budget: 0 },
+  { id: "dining", name: "Dining Out", emoji: "🍔", budget: 0 },
+  { id: "utilities", name: "Utilities", emoji: "🔧", budget: 0 },
+  { id: "healthcare", name: "Healthcare", emoji: "🩺", budget: 0 },
+  { id: "shopping", name: "Shopping", emoji: "🛍️", budget: 0 },
+  { id: "entertainment", name: "Entertainment", emoji: "🎬", budget: 0 },
+  { id: "other", name: "Other", emoji: "❔", budget: 0 }
+];
+
+var DEFAULT_PAYMENT_METHODS = ["Cash", "Card", "UPI", "Bank Transfer", "Other"];
+
+var EMOJI_PALETTE = ["🏠","🏦","📈","💵","💡","🛒","🚗","🍔","🔧","🩺","🛍️","🎬","📱","🎓","🐾","✈️","🎁","❔","💼","💳"];
+
+var INTERVAL_OPTIONS = [
+  { value: 1, label: "Every month" },
+  { value: 2, label: "Every 2 months" },
+  { value: 3, label: "Every 3 months" },
+  { value: 6, label: "Every 6 months" },
+  { value: 12, label: "Every year" }
+];
+
+var TABS = [
+  { id: "dashboard", label: "📊 Dashboard" },
+  { id: "add", label: "➕ Add" },
+  { id: "recurring", label: "🔁 Recurring" },
+  { id: "history", label: "📜 History" },
+  { id: "settings", label: "⚙️ Settings" }
+];
+
+// ---------- State ----------
+
+function loadState() {
+  var raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+  if (raw) {
+    try {
+      var parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.categories)) return parsed;
+    } catch (e) {}
+  }
+  return {
+    currencySymbol: "₹",
+    categories: DEFAULT_CATEGORIES.map(function (c) { return Object.assign({}, c); }),
+    paymentMethods: DEFAULT_PAYMENT_METHODS.slice(),
+    recurringItems: [],
+    entries: []
+  };
+}
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  pushCloudUpdate();
+}
+
+var state = loadState();
+if (!state.currencySymbol) state.currencySymbol = "₹";
+if (!Array.isArray(state.paymentMethods) || !state.paymentMethods.length) state.paymentMethods = DEFAULT_PAYMENT_METHODS.slice();
+if (!Array.isArray(state.recurringItems)) state.recurringItems = [];
+if (!Array.isArray(state.entries)) state.entries = [];
+
+var currentTab = "dashboard";
+var selectedMonth = currentMonthKey();
+var entryDraft = null;      // being edited/created on the Add tab
+var recurringDraft = null;  // being edited/created on the Recurring tab
+var dueOverrides = {};      // periodKey -> { amount, date }
+var historyFilter = { type: "all", categoryId: "all", month: "all", search: "" };
+var editingCategoryId = null;
+var newCategoryDraft = { name: "", emoji: "⭐", budget: "" };
+
+// ---------- Date helpers ----------
+
+function pad(n) { return n < 10 ? "0" + n : "" + n; }
+
+function todayKey() {
+  var d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+
+function currentMonthKey() {
+  var d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1);
+}
+
+function monthKeyOfDate(dateStr) { return dateStr.slice(0, 7); }
+
+function monthsBetween(startStr, todayStr) {
+  var s = startStr.split("-").map(Number);
+  var t = todayStr.split("-").map(Number);
+  var months = (t[0] - s[0]) * 12 + (t[1] - s[1]);
+  if (t[2] < s[2]) months -= 1;
+  return months;
+}
+
+function addMonthsClamped(dateStr, n) {
+  var parts = dateStr.split("-").map(Number);
+  var y = parts[0], m = parts[1], d = parts[2];
+  var targetIndex = (m - 1) + n;
+  var targetYear = y + Math.floor(targetIndex / 12);
+  var targetMonth = ((targetIndex % 12) + 12) % 12;
+  var daysInTarget = new Date(targetYear, targetMonth + 1, 0).getDate();
+  var clampedDay = Math.min(d, daysInTarget);
+  return targetYear + "-" + pad(targetMonth + 1) + "-" + pad(clampedDay);
+}
+
+function formatDateLong(dateStr) {
+  var parts = dateStr.split("-").map(Number);
+  var d = new Date(parts[0], parts[1] - 1, parts[2]);
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function formatMoney(amount) {
+  var n = Number(amount) || 0;
+  return state.currencySymbol + n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+function intervalLabel(n) {
+  for (var i = 0; i < INTERVAL_OPTIONS.length; i++) {
+    if (INTERVAL_OPTIONS[i].value === n) return INTERVAL_OPTIONS[i].label;
+  }
+  return "Every " + n + " months";
+}
+
+// ---------- Lookups ----------
+
+function categoryById(id) {
+  for (var i = 0; i < state.categories.length; i++) {
+    if (state.categories[i].id === id) return state.categories[i];
+  }
+  return null;
+}
+
+function recurringById(id) {
+  for (var i = 0; i < state.recurringItems.length; i++) {
+    if (state.recurringItems[i].id === id) return state.recurringItems[i];
+  }
+  return null;
+}
+
+function genId(prefix) {
+  return prefix + "_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+}
+
+// ---------- Recurring due-period logic ----------
+
+// Caps how many overdue periods of one recurring item we surface at once,
+// so a bill left unopened for years doesn't flood the dashboard.
+var MAX_PENDING_PER_RECURRING = 6;
+
+function isPeriodLogged(recurringId, periodIndex) {
+  return state.entries.some(function (e) { return e.recurringId === recurringId && e.periodIndex === periodIndex; });
+}
+
+function isPeriodSkipped(item, periodIndex) {
+  return Array.isArray(item.skippedPeriods) && item.skippedPeriods.indexOf(periodIndex) >= 0;
+}
+
+function pendingPeriodsFor(item, todayStr) {
+  var elapsed = monthsBetween(item.startDate, todayStr);
+  if (elapsed < 0) return [];
+  var maxIdx = Math.floor(elapsed / item.intervalMonths);
+  var pending = [];
+  for (var idx = maxIdx; idx >= 0 && pending.length < MAX_PENDING_PER_RECURRING; idx--) {
+    var due = addMonthsClamped(item.startDate, idx * item.intervalMonths);
+    if (due > todayStr) continue;
+    if (isPeriodLogged(item.id, idx) || isPeriodSkipped(item, idx)) continue;
+    pending.push({ periodIndex: idx, dueDate: due });
+  }
+  return pending.reverse();
+}
+
+function nextDueDateFor(item, todayStr) {
+  var elapsed = monthsBetween(item.startDate, todayStr);
+  var idx = elapsed < 0 ? 0 : Math.floor(elapsed / item.intervalMonths);
+  while (idx >= 0 && (isPeriodLogged(item.id, idx) || isPeriodSkipped(item, idx))) {
+    idx += 1;
+  }
+  return addMonthsClamped(item.startDate, idx * item.intervalMonths);
+}
+
+function allPendingItems() {
+  var today = todayKey();
+  var out = [];
+  state.recurringItems.forEach(function (item) {
+    pendingPeriodsFor(item, today).forEach(function (p) {
+      out.push({ item: item, periodIndex: p.periodIndex, dueDate: p.dueDate });
+    });
+  });
+  out.sort(function (a, b) { return a.dueDate < b.dueDate ? -1 : (a.dueDate > b.dueDate ? 1 : 0); });
+  return out;
+}
+
+function confirmDueItem(item, periodIndex, amount, date) {
+  state.entries.push({
+    id: genId("e"),
+    type: item.type,
+    amount: Number(amount) || 0,
+    date: date,
+    note: item.note || "",
+    categoryId: item.type === "expense" ? item.categoryId : null,
+    paymentMethod: item.type === "expense" ? item.paymentMethod : null,
+    sourceName: item.type === "income" ? item.name : null,
+    recurringId: item.id,
+    periodIndex: periodIndex
+  });
+  delete dueOverrides[item.id + "_" + periodIndex];
+  saveState();
+  render();
+}
+
+function skipDueItem(item, periodIndex) {
+  if (!Array.isArray(item.skippedPeriods)) item.skippedPeriods = [];
+  if (item.skippedPeriods.indexOf(periodIndex) < 0) item.skippedPeriods.push(periodIndex);
+  delete dueOverrides[item.id + "_" + periodIndex];
+  saveState();
+  render();
+}
+
+// ---------- Entry / recurring / category mutations ----------
+
+function upsertEntry(entry) {
+  var idx = state.entries.findIndex(function (e) { return e.id === entry.id; });
+  if (idx >= 0) state.entries[idx] = entry;
+  else state.entries.push(entry);
+  saveState();
+}
+
+function deleteEntry(id) {
+  state.entries = state.entries.filter(function (e) { return e.id !== id; });
+  saveState();
+  render();
+}
+
+function upsertRecurring(item) {
+  var idx = state.recurringItems.findIndex(function (r) { return r.id === item.id; });
+  if (idx >= 0) state.recurringItems[idx] = item;
+  else state.recurringItems.push(item);
+  saveState();
+}
+
+function deleteRecurring(id) {
+  state.recurringItems = state.recurringItems.filter(function (r) { return r.id !== id; });
+  saveState();
+  render();
+}
+
+function upsertCategory(cat) {
+  var idx = state.categories.findIndex(function (c) { return c.id === cat.id; });
+  if (idx >= 0) state.categories[idx] = cat;
+  else state.categories.push(cat);
+  saveState();
+}
+
+function deleteCategory(id) {
+  state.categories = state.categories.filter(function (c) { return c.id !== id; });
+  saveState();
+  render();
+}
+
+// ---------- DOM helpers ----------
+
+function el(tag, cls, html) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, function (c) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+  });
+}
+
+function field(labelText, inputEl) {
+  var wrap = el("div", "field");
+  var label = el("label", null, escapeHtml(labelText));
+  wrap.appendChild(label);
+  wrap.appendChild(inputEl);
+  return wrap;
+}
+
+function paymentMethodOptions() {
+  var set = state.paymentMethods.slice();
+  state.entries.forEach(function (e) {
+    if (e.paymentMethod && set.indexOf(e.paymentMethod) < 0) set.push(e.paymentMethod);
+  });
+  return set;
+}
+
+// ---------- Rendering ----------
+
+var app = document.getElementById("app");
+var tabBar = document.getElementById("tabBar");
+
+function renderTabBar() {
+  tabBar.innerHTML = "";
+  TABS.forEach(function (t) {
+    var b = document.createElement("button");
+    b.textContent = t.label;
+    if (t.id === currentTab) b.classList.add("active");
+    b.addEventListener("click", function () {
+      currentTab = t.id;
+      if (t.id !== "add") entryDraft = null;
+      if (t.id !== "recurring") recurringDraft = null;
+      render();
+    });
+    tabBar.appendChild(b);
+  });
+}
+
+function render() {
+  renderTabBar();
+  tabBar.style.display = (authState.required && !authState.user) ? "none" : "flex";
+  app.innerHTML = "";
+
+  if (authState.required && !authState.user) {
+    renderSignIn();
+    return;
+  }
+
+  switch (currentTab) {
+    case "dashboard": renderDashboard(); break;
+    case "add": renderAdd(); break;
+    case "recurring": renderRecurring(); break;
+    case "history": renderHistory(); break;
+    case "settings": renderSettings(); break;
+    default: renderDashboard();
+  }
+}
+
+function renderSignIn() {
+  var panel = el("div", "panel");
+  panel.style.textAlign = "center";
+  if (!authState.ready) {
+    panel.appendChild(el("div", null, "🔐 Checking sign-in…"));
+  } else {
+    panel.appendChild(el("h2", null, "🔐 Sign in with Google"));
+    panel.appendChild(el("p", "panel-hint", "Your expense data syncs to your own private record, tied to your Google account."));
+    var btn = el("button", null, "Sign in with Google");
+    btn.addEventListener("click", function () { if (authApi.signIn) authApi.signIn(); });
+    panel.appendChild(btn);
+  }
+  app.appendChild(panel);
+}
+
+function renderAccountLine() {
+  var line = el("div", "account-line");
+  var syncText = cloud.ready ? "☁️ Synced across devices" :
+    (cloud.failed ? "💾 Saved on this device only (sync unavailable)" :
+    (FIREBASE_CONFIG ? "🔌 Connecting…" : "💾 Saved on this device only"));
+  line.appendChild(el("span", null, syncText));
+  if (authState.required && authState.user) {
+    line.appendChild(el("span", null, "· " + escapeHtml(authState.user.email)));
+    var signOutLink = document.createElement("a");
+    signOutLink.textContent = "Sign out";
+    signOutLink.addEventListener("click", function () { if (authApi.signOut) authApi.signOut(); });
+    line.appendChild(document.createTextNode("· "));
+    line.appendChild(signOutLink);
+  }
+  return line;
+}
+
+// ----- Dashboard -----
+
+function renderDashboard() {
+  app.appendChild(renderAccountLine());
+
+  var pending = allPendingItems();
+  if (pending.length) {
+    var dueCard = el("div", "panel due-card");
+    dueCard.appendChild(el("h2", null, "🔔 Due now (" + pending.length + ")"));
+    dueCard.appendChild(el("p", "panel-hint", "Recurring items that are due. Confirm to log them, or skip this one period."));
+    pending.forEach(function (p) {
+      dueCard.appendChild(renderDueItem(p.item, p.periodIndex, p.dueDate));
+    });
+    app.appendChild(dueCard);
+  }
+
+  var summaryPanel = el("div", "panel");
+  var monthPicker = el("div", "month-picker");
+  var monthLabel = el("label", null, "Month:");
+  var monthInput = document.createElement("input");
+  monthInput.type = "month";
+  monthInput.value = selectedMonth;
+  monthInput.addEventListener("change", function () {
+    if (monthInput.value) selectedMonth = monthInput.value;
+    render();
+  });
+  monthPicker.appendChild(monthLabel);
+  monthPicker.appendChild(monthInput);
+  summaryPanel.appendChild(monthPicker);
+
+  var monthEntries = state.entries.filter(function (e) { return monthKeyOfDate(e.date) === selectedMonth; });
+  var totalIncome = monthEntries.filter(function (e) { return e.type === "income"; }).reduce(function (s, e) { return s + Number(e.amount); }, 0);
+  var totalExpense = monthEntries.filter(function (e) { return e.type === "expense"; }).reduce(function (s, e) { return s + Number(e.amount); }, 0);
+
+  var grid = el("div", "summary-grid");
+  var incomeCard = el("div", "summary-card income");
+  incomeCard.appendChild(el("div", "label", "Income"));
+  incomeCard.appendChild(el("div", "value", formatMoney(totalIncome)));
+  var expenseCard = el("div", "summary-card expense");
+  expenseCard.appendChild(el("div", "label", "Expenses"));
+  expenseCard.appendChild(el("div", "value", formatMoney(totalExpense)));
+  var netCard = el("div", "summary-card");
+  netCard.appendChild(el("div", "label", "Net"));
+  var netValue = el("div", "value", formatMoney(totalIncome - totalExpense));
+  netValue.style.color = (totalIncome - totalExpense) >= 0 ? "var(--income)" : "var(--expense)";
+  netCard.appendChild(netValue);
+  grid.appendChild(incomeCard);
+  grid.appendChild(expenseCard);
+  grid.appendChild(netCard);
+  summaryPanel.appendChild(grid);
+  app.appendChild(summaryPanel);
+
+  var catPanel = el("div", "panel");
+  catPanel.appendChild(el("h2", null, "📊 Category breakdown"));
+  var expenseEntries = monthEntries.filter(function (e) { return e.type === "expense"; });
+  if (!expenseEntries.length) {
+    catPanel.appendChild(el("div", "empty-hint", "No expenses logged for this month yet."));
+  } else {
+    var byCategory = {};
+    expenseEntries.forEach(function (e) {
+      byCategory[e.categoryId] = (byCategory[e.categoryId] || 0) + Number(e.amount);
+    });
+    Object.keys(byCategory)
+      .sort(function (a, b) { return byCategory[b] - byCategory[a]; })
+      .forEach(function (catId) {
+        var cat = categoryById(catId) || { name: "(deleted category)", emoji: "❓", budget: 0 };
+        var spent = byCategory[catId];
+        var block = el("div", "cat-block");
+        var row = el("div", "budget-row");
+        row.appendChild(el("div", "cat-label", cat.emoji + " " + escapeHtml(cat.name)));
+        var amountText = cat.budget > 0 ? formatMoney(spent) + " / " + formatMoney(cat.budget) : formatMoney(spent);
+        row.appendChild(el("div", null, amountText));
+        block.appendChild(row);
+        var track = el("div", "budget-track");
+        var fill = el("div", "budget-fill");
+        var pct = cat.budget > 0 ? Math.min((spent / cat.budget) * 100, 100) : Math.min((spent / (spent || 1)) * 100, 100);
+        fill.style.width = pct + "%";
+        if (cat.budget > 0) {
+          if (spent > cat.budget) fill.classList.add("over");
+          else if (spent >= cat.budget * 0.8) fill.classList.add("warn");
+        }
+        track.appendChild(fill);
+        block.appendChild(track);
+        catPanel.appendChild(block);
+      });
+  }
+  app.appendChild(catPanel);
+}
+
+function renderDueItem(item, periodIndex, dueDate) {
+  var key = item.id + "_" + periodIndex;
+  if (!dueOverrides[key]) dueOverrides[key] = { amount: item.amount, date: dueDate };
+  var draft = dueOverrides[key];
+
+  var row = el("div", "due-item");
+  var info = el("div", "due-info");
+  info.appendChild(el("div", "due-name", (item.type === "income" ? "💰 " : "💸 ") + escapeHtml(item.name)));
+  var catLabel = item.type === "expense" ? (categoryById(item.categoryId) || { name: "Other" }).name + " · " : "";
+  info.appendChild(el("div", "due-meta", catLabel + "Due " + formatDateLong(dueDate) + " · " + intervalLabel(item.intervalMonths)));
+  row.appendChild(info);
+
+  var controls = el("div", "due-controls");
+  var amountIn = document.createElement("input");
+  amountIn.type = "number";
+  amountIn.step = "0.01";
+  amountIn.value = draft.amount;
+  amountIn.addEventListener("input", function () { draft.amount = amountIn.value; });
+  controls.appendChild(amountIn);
+
+  var dateIn = document.createElement("input");
+  dateIn.type = "date";
+  dateIn.value = draft.date;
+  dateIn.addEventListener("input", function () { draft.date = dateIn.value; });
+  controls.appendChild(dateIn);
+
+  var confirmBtn = el("button", "small", "✅ Log it");
+  confirmBtn.addEventListener("click", function () {
+    confirmDueItem(item, periodIndex, amountIn.value, dateIn.value);
+  });
+  controls.appendChild(confirmBtn);
+
+  var skipBtn = el("button", "small secondary", "Skip");
+  skipBtn.addEventListener("click", function () { skipDueItem(item, periodIndex); });
+  controls.appendChild(skipBtn);
+
+  row.appendChild(controls);
+  return row;
+}
+
+// ----- Add -----
+
+function blankEntryDraft() {
+  return {
+    id: null,
+    type: "expense",
+    amount: "",
+    date: todayKey(),
+    categoryId: state.categories[0] ? state.categories[0].id : "",
+    paymentMethod: state.paymentMethods[0] || "",
+    sourceName: "",
+    note: ""
+  };
+}
+
+function renderAdd() {
+  if (!entryDraft) entryDraft = blankEntryDraft();
+  var panel = el("div", "panel");
+  panel.appendChild(el("h2", null, entryDraft.id ? "✏️ Edit entry" : "➕ Add entry"));
+
+  var toggle = el("div", "type-toggle");
+  var incBtn = el("button", "income" + (entryDraft.type === "income" ? " active" : ""), "💰 Income");
+  incBtn.type = "button";
+  incBtn.addEventListener("click", function () { entryDraft.type = "income"; render(); });
+  var expBtn = el("button", "expense" + (entryDraft.type === "expense" ? " active" : ""), "💸 Expense");
+  expBtn.type = "button";
+  expBtn.addEventListener("click", function () { entryDraft.type = "expense"; render(); });
+  toggle.appendChild(incBtn);
+  toggle.appendChild(expBtn);
+  panel.appendChild(toggle);
+
+  var form = el("form", "form-grid");
+
+  var amountIn = document.createElement("input");
+  amountIn.type = "number";
+  amountIn.step = "0.01";
+  amountIn.min = "0";
+  amountIn.required = true;
+  amountIn.value = entryDraft.amount;
+  amountIn.addEventListener("input", function () { entryDraft.amount = amountIn.value; });
+  form.appendChild(field("Amount", amountIn));
+
+  var dateIn = document.createElement("input");
+  dateIn.type = "date";
+  dateIn.required = true;
+  dateIn.value = entryDraft.date;
+  dateIn.addEventListener("input", function () { entryDraft.date = dateIn.value; });
+  form.appendChild(field("Date", dateIn));
+
+  if (entryDraft.type === "expense") {
+    var catSelect = document.createElement("select");
+    state.categories.forEach(function (c) {
+      var o = document.createElement("option");
+      o.value = c.id;
+      o.textContent = c.emoji + " " + c.name;
+      if (c.id === entryDraft.categoryId) o.selected = true;
+      catSelect.appendChild(o);
+    });
+    catSelect.addEventListener("change", function () { entryDraft.categoryId = catSelect.value; });
+    form.appendChild(field("Category", catSelect));
+
+    var pmInput = document.createElement("input");
+    pmInput.setAttribute("list", "paymentMethodList");
+    pmInput.value = entryDraft.paymentMethod || "";
+    pmInput.addEventListener("input", function () { entryDraft.paymentMethod = pmInput.value; });
+    form.appendChild(field("Payment method", pmInput));
+
+    var datalist = document.createElement("datalist");
+    datalist.id = "paymentMethodList";
+    paymentMethodOptions().forEach(function (pm) {
+      var o = document.createElement("option");
+      o.value = pm;
+      datalist.appendChild(o);
+    });
+    form.appendChild(datalist);
+  } else {
+    var sourceIn = document.createElement("input");
+    sourceIn.type = "text";
+    sourceIn.placeholder = "e.g. Salary – Primary";
+    sourceIn.required = true;
+    sourceIn.value = entryDraft.sourceName || "";
+    sourceIn.addEventListener("input", function () { entryDraft.sourceName = sourceIn.value; });
+    form.appendChild(field("Income source", sourceIn));
+  }
+
+  var noteIn = document.createElement("input");
+  noteIn.type = "text";
+  noteIn.placeholder = "optional note";
+  noteIn.value = entryDraft.note || "";
+  noteIn.addEventListener("input", function () { entryDraft.note = noteIn.value; });
+  form.appendChild(field("Note", noteIn));
+
+  panel.appendChild(form);
+
+  var actions = el("div", "form-actions");
+  var saveBtn = el("button", null, entryDraft.id ? "Save changes" : "Add " + (entryDraft.type === "income" ? "income" : "expense"));
+  saveBtn.type = "button";
+  saveBtn.addEventListener("click", function () {
+    if (!entryDraft.amount || Number(entryDraft.amount) <= 0 || !entryDraft.date) return;
+    if (entryDraft.type === "income" && !entryDraft.sourceName.trim()) return;
+    var entry = {
+      id: entryDraft.id || genId("e"),
+      type: entryDraft.type,
+      amount: Number(entryDraft.amount),
+      date: entryDraft.date,
+      note: entryDraft.note || "",
+      categoryId: entryDraft.type === "expense" ? entryDraft.categoryId : null,
+      paymentMethod: entryDraft.type === "expense" ? (entryDraft.paymentMethod || "") : null,
+      sourceName: entryDraft.type === "income" ? entryDraft.sourceName.trim() : null,
+      recurringId: null,
+      periodIndex: null
+    };
+    upsertEntry(entry);
+    entryDraft = null;
+    currentTab = "history";
+    render();
+  });
+  actions.appendChild(saveBtn);
+
+  if (entryDraft.id) {
+    var cancelBtn = el("button", "secondary", "Cancel");
+    cancelBtn.type = "button";
+    cancelBtn.addEventListener("click", function () { entryDraft = null; render(); });
+    actions.appendChild(cancelBtn);
+  }
+  panel.appendChild(actions);
+  app.appendChild(panel);
+}
+
+// ----- Recurring -----
+
+function blankRecurringDraft() {
+  return {
+    id: null,
+    type: "expense",
+    name: "",
+    amount: "",
+    categoryId: state.categories[0] ? state.categories[0].id : "",
+    paymentMethod: state.paymentMethods[0] || "",
+    intervalMonths: 1,
+    startDate: todayKey(),
+    note: "",
+    skippedPeriods: []
+  };
+}
+
+function renderRecurring() {
+  app.appendChild(renderAccountLine());
+
+  var listPanel = el("div", "panel");
+  listPanel.appendChild(el("h2", null, "🔁 Recurring incomes & expenses"));
+  listPanel.appendChild(el("p", "panel-hint", "Monthly EMIs, SIPs, RD, bi-monthly EB bills, or your regular salaries — add them once and confirm each due period from the Dashboard."));
+
+  if (!state.recurringItems.length) {
+    listPanel.appendChild(el("div", "empty-hint", "No recurring items yet."));
+  } else {
+    var today = todayKey();
+    state.recurringItems
+      .slice()
+      .sort(function (a, b) { return a.name.localeCompare(b.name); })
+      .forEach(function (item) {
+        var row = el("div", "rec-row");
+        row.appendChild(el("div", "rec-emoji", item.type === "income" ? "💰" : "💸"));
+        var nameWrap = el("div", "rec-name", escapeHtml(item.name));
+        row.appendChild(nameWrap);
+        var catText = item.type === "expense" ? ((categoryById(item.categoryId) || { name: "Other" }).name + " · ") : "";
+        var meta = el("div", "rec-meta", catText + formatMoney(item.amount) + " · " + intervalLabel(item.intervalMonths) + " · next " + formatDateLong(nextDueDateFor(item, today)));
+        row.appendChild(meta);
+
+        var actions = el("div", "row-actions");
+        var editBtn = el("button", "small secondary", "Edit");
+        editBtn.addEventListener("click", function () { recurringDraft = Object.assign({}, item); render(); });
+        var delBtn = el("button", "small danger", "Delete");
+        delBtn.addEventListener("click", function () {
+          if (confirm('Delete recurring item "' + item.name + '"? Past logged entries stay in your history.')) deleteRecurring(item.id);
+        });
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        row.appendChild(actions);
+        listPanel.appendChild(row);
+      });
+  }
+  app.appendChild(listPanel);
+
+  if (!recurringDraft) recurringDraft = blankRecurringDraft();
+  var formPanel = el("div", "panel");
+  formPanel.appendChild(el("h3", null, recurringDraft.id ? "Edit recurring item" : "Add recurring item"));
+
+  var toggle = el("div", "type-toggle");
+  var incBtn = el("button", "income" + (recurringDraft.type === "income" ? " active" : ""), "💰 Income");
+  incBtn.type = "button";
+  incBtn.addEventListener("click", function () { recurringDraft.type = "income"; render(); });
+  var expBtn = el("button", "expense" + (recurringDraft.type === "expense" ? " active" : ""), "💸 Expense");
+  expBtn.type = "button";
+  expBtn.addEventListener("click", function () { recurringDraft.type = "expense"; render(); });
+  toggle.appendChild(incBtn);
+  toggle.appendChild(expBtn);
+  formPanel.appendChild(toggle);
+
+  var form = el("form", "form-grid");
+
+  var nameIn = document.createElement("input");
+  nameIn.type = "text";
+  nameIn.placeholder = recurringDraft.type === "income" ? "e.g. Salary – Primary" : "e.g. Home Loan EMI";
+  nameIn.value = recurringDraft.name;
+  nameIn.addEventListener("input", function () { recurringDraft.name = nameIn.value; });
+  form.appendChild(field("Name", nameIn));
+
+  var amountIn = document.createElement("input");
+  amountIn.type = "number";
+  amountIn.step = "0.01";
+  amountIn.min = "0";
+  amountIn.value = recurringDraft.amount;
+  amountIn.addEventListener("input", function () { recurringDraft.amount = amountIn.value; });
+  form.appendChild(field("Amount", amountIn));
+
+  if (recurringDraft.type === "expense") {
+    var catSelect = document.createElement("select");
+    state.categories.forEach(function (c) {
+      var o = document.createElement("option");
+      o.value = c.id;
+      o.textContent = c.emoji + " " + c.name;
+      if (c.id === recurringDraft.categoryId) o.selected = true;
+      catSelect.appendChild(o);
+    });
+    catSelect.addEventListener("change", function () { recurringDraft.categoryId = catSelect.value; });
+    form.appendChild(field("Category", catSelect));
+
+    var pmInput = document.createElement("input");
+    pmInput.setAttribute("list", "recPaymentMethodList");
+    pmInput.value = recurringDraft.paymentMethod || "";
+    pmInput.addEventListener("input", function () { recurringDraft.paymentMethod = pmInput.value; });
+    form.appendChild(field("Payment method", pmInput));
+
+    var datalist = document.createElement("datalist");
+    datalist.id = "recPaymentMethodList";
+    paymentMethodOptions().forEach(function (pm) {
+      var o = document.createElement("option");
+      o.value = pm;
+      datalist.appendChild(o);
+    });
+    form.appendChild(datalist);
+  }
+
+  var intervalSelect = document.createElement("select");
+  INTERVAL_OPTIONS.forEach(function (opt) {
+    var o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === recurringDraft.intervalMonths) o.selected = true;
+    intervalSelect.appendChild(o);
+  });
+  intervalSelect.addEventListener("change", function () { recurringDraft.intervalMonths = Number(intervalSelect.value); });
+  form.appendChild(field("Frequency", intervalSelect));
+
+  var startIn = document.createElement("input");
+  startIn.type = "date";
+  startIn.value = recurringDraft.startDate;
+  startIn.addEventListener("input", function () { recurringDraft.startDate = startIn.value; });
+  form.appendChild(field("First due date", startIn));
+
+  var noteIn = document.createElement("input");
+  noteIn.type = "text";
+  noteIn.placeholder = "optional note";
+  noteIn.value = recurringDraft.note || "";
+  noteIn.addEventListener("input", function () { recurringDraft.note = noteIn.value; });
+  form.appendChild(field("Note", noteIn));
+
+  formPanel.appendChild(form);
+
+  var actions = el("div", "form-actions");
+  var saveBtn = el("button", null, recurringDraft.id ? "Save changes" : "Add recurring item");
+  saveBtn.type = "button";
+  saveBtn.addEventListener("click", function () {
+    if (!recurringDraft.name.trim() || !recurringDraft.amount || Number(recurringDraft.amount) <= 0 || !recurringDraft.startDate) return;
+    var item = {
+      id: recurringDraft.id || genId("r"),
+      type: recurringDraft.type,
+      name: recurringDraft.name.trim(),
+      amount: Number(recurringDraft.amount),
+      categoryId: recurringDraft.type === "expense" ? recurringDraft.categoryId : null,
+      paymentMethod: recurringDraft.type === "expense" ? (recurringDraft.paymentMethod || "") : null,
+      intervalMonths: Number(recurringDraft.intervalMonths),
+      startDate: recurringDraft.startDate,
+      note: recurringDraft.note || "",
+      skippedPeriods: recurringDraft.skippedPeriods || []
+    };
+    upsertRecurring(item);
+    recurringDraft = null;
+    render();
+  });
+  actions.appendChild(saveBtn);
+
+  var cancelBtn = el("button", "secondary", "Cancel");
+  cancelBtn.type = "button";
+  cancelBtn.addEventListener("click", function () { recurringDraft = null; render(); });
+  actions.appendChild(cancelBtn);
+
+  formPanel.appendChild(actions);
+  app.appendChild(formPanel);
+}
+
+// ----- History -----
+
+function renderHistory() {
+  var panel = el("div", "panel");
+  panel.appendChild(el("h2", null, "📜 History"));
+
+  var filterBar = el("div", "filter-bar");
+
+  var typeSelect = document.createElement("select");
+  [["all", "All types"], ["income", "💰 Income"], ["expense", "💸 Expense"]].forEach(function (pair) {
+    var o = document.createElement("option");
+    o.value = pair[0];
+    o.textContent = pair[1];
+    if (pair[0] === historyFilter.type) o.selected = true;
+    typeSelect.appendChild(o);
+  });
+  typeSelect.addEventListener("change", function () { historyFilter.type = typeSelect.value; render(); });
+  filterBar.appendChild(typeSelect);
+
+  var catSelect = document.createElement("select");
+  var allCatOpt = document.createElement("option");
+  allCatOpt.value = "all";
+  allCatOpt.textContent = "All categories";
+  catSelect.appendChild(allCatOpt);
+  state.categories.forEach(function (c) {
+    var o = document.createElement("option");
+    o.value = c.id;
+    o.textContent = c.emoji + " " + c.name;
+    if (c.id === historyFilter.categoryId) o.selected = true;
+    catSelect.appendChild(o);
+  });
+  catSelect.addEventListener("change", function () { historyFilter.categoryId = catSelect.value; render(); });
+  filterBar.appendChild(catSelect);
+
+  var monthSelect = document.createElement("select");
+  var allMonthOpt = document.createElement("option");
+  allMonthOpt.value = "all";
+  allMonthOpt.textContent = "All months";
+  monthSelect.appendChild(allMonthOpt);
+  var months = Array.from(new Set(state.entries.map(function (e) { return monthKeyOfDate(e.date); }))).sort().reverse();
+  months.forEach(function (m) {
+    var o = document.createElement("option");
+    o.value = m;
+    o.textContent = m;
+    if (m === historyFilter.month) o.selected = true;
+    monthSelect.appendChild(o);
+  });
+  monthSelect.addEventListener("change", function () { historyFilter.month = monthSelect.value; render(); });
+  filterBar.appendChild(monthSelect);
+
+  var searchIn = document.createElement("input");
+  searchIn.type = "text";
+  searchIn.placeholder = "Search notes…";
+  searchIn.value = historyFilter.search;
+  searchIn.addEventListener("input", function () { historyFilter.search = searchIn.value; render(); });
+  filterBar.appendChild(searchIn);
+
+  panel.appendChild(filterBar);
+
+  var filtered = state.entries.filter(function (e) {
+    if (historyFilter.type !== "all" && e.type !== historyFilter.type) return false;
+    if (historyFilter.categoryId !== "all" && e.categoryId !== historyFilter.categoryId) return false;
+    if (historyFilter.month !== "all" && monthKeyOfDate(e.date) !== historyFilter.month) return false;
+    if (historyFilter.search.trim() && (e.note || "").toLowerCase().indexOf(historyFilter.search.trim().toLowerCase()) < 0) return false;
+    return true;
+  }).sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+
+  if (!filtered.length) {
+    panel.appendChild(el("div", "empty-hint", "No entries match these filters."));
+  } else {
+    filtered.forEach(function (e) {
+      var row = el("div", "entry-row");
+      var cat = e.type === "expense" ? categoryById(e.categoryId) : null;
+      row.appendChild(el("div", "entry-icon", e.type === "income" ? "💰" : (cat ? cat.emoji : "💸")));
+      var main = el("div", "entry-main");
+      var title = e.type === "income" ? (e.sourceName || "Income") : (cat ? cat.name : "(deleted category)");
+      main.appendChild(el("div", "entry-title", escapeHtml(title)));
+      var subParts = [formatDateLong(e.date)];
+      if (e.type === "expense" && e.paymentMethod) subParts.push(e.paymentMethod);
+      if (e.recurringId) {
+        var rec = recurringById(e.recurringId);
+        subParts.push(rec ? "🔁 " + escapeHtml(rec.name) : "🔁 recurring");
+      }
+      if (e.note) subParts.push(escapeHtml(e.note));
+      main.appendChild(el("div", "entry-sub", subParts.join(" · ")));
+      row.appendChild(main);
+      row.appendChild(el("div", "entry-amount " + e.type, (e.type === "income" ? "+" : "-") + formatMoney(e.amount)));
+
+      var actions = el("div", "entry-actions");
+      var editBtn = el("button", "small secondary", "✏️");
+      editBtn.title = "Edit";
+      editBtn.addEventListener("click", function () {
+        entryDraft = {
+          id: e.id,
+          type: e.type,
+          amount: e.amount,
+          date: e.date,
+          categoryId: e.categoryId || (state.categories[0] ? state.categories[0].id : ""),
+          paymentMethod: e.paymentMethod || "",
+          sourceName: e.sourceName || "",
+          note: e.note || ""
+        };
+        currentTab = "add";
+        render();
+      });
+      var delBtn = el("button", "small danger", "✕");
+      delBtn.title = "Delete";
+      delBtn.addEventListener("click", function () {
+        if (confirm("Delete this entry?")) deleteEntry(e.id);
+      });
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+      row.appendChild(actions);
+      panel.appendChild(row);
+    });
+  }
+  app.appendChild(panel);
+}
+
+// ----- Settings -----
+
+function renderSettings() {
+  app.appendChild(renderAccountLine());
+
+  var generalPanel = el("div", "panel");
+  generalPanel.appendChild(el("h2", null, "⚙️ General"));
+  var currencyField = field("Currency symbol", (function () {
+    var input = document.createElement("input");
+    input.type = "text";
+    input.maxLength = 3;
+    input.style.maxWidth = "80px";
+    input.value = state.currencySymbol;
+    input.addEventListener("input", function () {
+      state.currencySymbol = input.value || "₹";
+      saveState();
+    });
+    return input;
+  })());
+  generalPanel.appendChild(currencyField);
+  app.appendChild(generalPanel);
+
+  var catPanel = el("div", "panel");
+  catPanel.appendChild(el("h2", null, "🏷️ Categories & budgets"));
+  catPanel.appendChild(el("p", "panel-hint", "Set a monthly budget (optional) per category to track it on the Dashboard. Leave budget at 0 for no limit."));
+
+  state.categories.forEach(function (cat) {
+    if (editingCategoryId === cat.id) {
+      catPanel.appendChild(renderCategoryEditForm(cat));
+      return;
+    }
+    var row = el("div", "cat-row");
+    row.appendChild(el("div", "cat-emoji", cat.emoji));
+    row.appendChild(el("div", "cat-name", escapeHtml(cat.name)));
+    row.appendChild(el("div", "cat-budget", cat.budget > 0 ? "Budget: " + formatMoney(cat.budget) : "No budget"));
+    var actions = el("div", "row-actions");
+    var editBtn = el("button", "small secondary", "Edit");
+    editBtn.addEventListener("click", function () { editingCategoryId = cat.id; render(); });
+    var delBtn = el("button", "small danger", "Delete");
+    delBtn.addEventListener("click", function () {
+      if (confirm('Delete category "' + cat.name + '"? Past entries keep their record but will show as deleted.')) deleteCategory(cat.id);
+    });
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    row.appendChild(actions);
+    catPanel.appendChild(row);
+  });
+
+  catPanel.appendChild(renderNewCategoryForm());
+  app.appendChild(catPanel);
+}
+
+function renderCategoryEditForm(cat) {
+  var wrap = el("div", "cat-row");
+  var emojiIn = document.createElement("input");
+  emojiIn.value = cat.emoji;
+  emojiIn.maxLength = 4;
+  emojiIn.style.maxWidth = "60px";
+  var nameIn = document.createElement("input");
+  nameIn.value = cat.name;
+  nameIn.style.flex = "1 1 140px";
+  var budgetIn = document.createElement("input");
+  budgetIn.type = "number";
+  budgetIn.min = "0";
+  budgetIn.step = "0.01";
+  budgetIn.placeholder = "Budget";
+  budgetIn.value = cat.budget || "";
+  budgetIn.style.maxWidth = "120px";
+  var saveBtn = el("button", "small", "Save");
+  saveBtn.addEventListener("click", function () {
+    if (!nameIn.value.trim()) return;
+    upsertCategory({ id: cat.id, name: nameIn.value.trim(), emoji: emojiIn.value.trim() || "⭐", budget: Number(budgetIn.value) || 0 });
+    editingCategoryId = null;
+    render();
+  });
+  var cancelBtn = el("button", "small secondary", "Cancel");
+  cancelBtn.addEventListener("click", function () { editingCategoryId = null; render(); });
+  wrap.appendChild(emojiIn);
+  wrap.appendChild(nameIn);
+  wrap.appendChild(budgetIn);
+  wrap.appendChild(saveBtn);
+  wrap.appendChild(cancelBtn);
+  return wrap;
+}
+
+function renderNewCategoryForm() {
+  var wrap = el("div", "cat-row");
+  var palette = el("div", null);
+  var emojiIn = document.createElement("input");
+  emojiIn.value = newCategoryDraft.emoji;
+  emojiIn.maxLength = 4;
+  emojiIn.style.maxWidth = "60px";
+  emojiIn.addEventListener("input", function () { newCategoryDraft.emoji = emojiIn.value; });
+  var nameIn = document.createElement("input");
+  nameIn.placeholder = "New category name";
+  nameIn.style.flex = "1 1 140px";
+  nameIn.value = newCategoryDraft.name;
+  nameIn.addEventListener("input", function () { newCategoryDraft.name = nameIn.value; });
+  var budgetIn = document.createElement("input");
+  budgetIn.type = "number";
+  budgetIn.min = "0";
+  budgetIn.step = "0.01";
+  budgetIn.placeholder = "Budget (optional)";
+  budgetIn.style.maxWidth = "140px";
+  budgetIn.value = newCategoryDraft.budget;
+  budgetIn.addEventListener("input", function () { newCategoryDraft.budget = budgetIn.value; });
+  var addBtn = el("button", "small", "Add category");
+  addBtn.addEventListener("click", function () {
+    if (!nameIn.value.trim()) return;
+    upsertCategory({ id: genId("cat"), name: nameIn.value.trim(), emoji: emojiIn.value.trim() || "⭐", budget: Number(budgetIn.value) || 0 });
+    newCategoryDraft = { name: "", emoji: "⭐", budget: "" };
+    render();
+  });
+  wrap.appendChild(emojiIn);
+  wrap.appendChild(nameIn);
+  wrap.appendChild(budgetIn);
+  wrap.appendChild(addBtn);
+  return wrap;
+}
+
+// ---------- Init ----------
+
+render();
+initFirebase();
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+
+})();
+</script>
+</body>
+</html>
