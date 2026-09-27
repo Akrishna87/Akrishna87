@@ -33,5 +33,16 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Expense",
+      "short_name": "Add Expense",
+      "description": "Jump straight to logging a new expense",
+      "url": "./index.html?tab=add",
+      "icons": [
+        { "src": "icons/icon-192.png", "sizes": "192x192" }
+      ]
+    }
   ]
 }

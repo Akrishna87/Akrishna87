@@ -120,6 +120,52 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .type-toggle button.income.active { background: var(--income); color: #06301f; }
 .type-toggle button.expense.active { background: var(--expense); color: #3a1400; }
 
+input.amount-input { font-size: 1.7rem; font-weight: 700; padding: 14px 12px; }
+
+.chip-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  background: var(--well);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip.active { background: var(--expense); color: #3a1400; border-color: var(--expense); }
+
+button.link-toggle {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 8px 0 4px;
+  cursor: pointer;
+  text-align: left;
+  display: block;
+}
+
+.fab {
+  position: fixed;
+  bottom: 22px;
+  right: 20px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--expense);
+  color: #3a1400;
+  font-size: 1.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  z-index: 50;
+  padding: 0;
+}
+.fab:active { transform: scale(0.94); }
+
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .summary-card {
   background: var(--well);
@@ -213,7 +259,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .app-footer { max-width: 860px; margin: 24px auto 0; text-align: center; color: var(--muted); font-size: 0.78rem; }
 
 @media (max-width: 600px) {
-  body { padding: 14px 10px 40px; }
+  body { padding: 14px 10px 90px; }
   .app-header h1 { font-size: 1.4rem; }
   .panel { padding: 14px; }
   .entry-row { flex-wrap: wrap; }
@@ -411,6 +457,9 @@ if (!Array.isArray(state.recurringItems)) state.recurringItems = [];
 if (!Array.isArray(state.entries)) state.entries = [];
 
 var currentTab = "dashboard";
+try {
+  if (new URLSearchParams(location.search).get("tab") === "add") currentTab = "add";
+} catch (e) {}
 var selectedMonth = currentMonthKey();
 var entryDraft = null;      // being edited/created on the Add tab
 var recurringDraft = null;  // being edited/created on the Recurring tab
@@ -484,6 +533,13 @@ function categoryById(id) {
 function recurringById(id) {
   for (var i = 0; i < state.recurringItems.length; i++) {
     if (state.recurringItems[i].id === id) return state.recurringItems[i];
+  }
+  return null;
+}
+
+function mostRecentExpenseEntry() {
+  for (var i = state.entries.length - 1; i >= 0; i--) {
+    if (state.entries[i].type === "expense") return state.entries[i];
   }
   return null;
 }
@@ -644,6 +700,18 @@ function paymentMethodOptions() {
 var app = document.getElementById("app");
 var tabBar = document.getElementById("tabBar");
 
+var fab = document.createElement("button");
+fab.type = "button";
+fab.className = "fab";
+fab.title = "Quick add expense";
+fab.textContent = "➕";
+fab.addEventListener("click", function () {
+  entryDraft = blankEntryDraft();
+  currentTab = "add";
+  render();
+});
+document.body.appendChild(fab);
+
 function renderTabBar() {
   tabBar.innerHTML = "";
   TABS.forEach(function (t) {
@@ -662,10 +730,12 @@ function renderTabBar() {
 
 function render() {
   renderTabBar();
-  tabBar.style.display = (authState.required && !authState.user) ? "none" : "flex";
+  var signedOut = authState.required && !authState.user;
+  tabBar.style.display = signedOut ? "none" : "flex";
+  fab.style.display = (signedOut || currentTab === "add") ? "none" : "flex";
   app.innerHTML = "";
 
-  if (authState.required && !authState.user) {
+  if (signedOut) {
     renderSignIn();
     return;
   }
@@ -844,15 +914,18 @@ function renderDueItem(item, periodIndex, dueDate) {
 // ----- Add -----
 
 function blankEntryDraft() {
+  var last = mostRecentExpenseEntry();
+  var lastCategoryValid = last && categoryById(last.categoryId);
   return {
     id: null,
     type: "expense",
     amount: "",
     date: todayKey(),
-    categoryId: state.categories[0] ? state.categories[0].id : "",
-    paymentMethod: state.paymentMethods[0] || "",
+    categoryId: lastCategoryValid ? last.categoryId : (state.categories[0] ? state.categories[0].id : ""),
+    paymentMethod: (last && last.paymentMethod) ? last.paymentMethod : (state.paymentMethods[0] || ""),
     sourceName: "",
-    note: ""
+    note: "",
+    _showMore: false
   };
 }
 
@@ -872,50 +945,51 @@ function renderAdd() {
   toggle.appendChild(expBtn);
   panel.appendChild(toggle);
 
-  var form = el("form", "form-grid");
-
   var amountIn = document.createElement("input");
   amountIn.type = "number";
+  amountIn.inputMode = "decimal";
   amountIn.step = "0.01";
   amountIn.min = "0";
   amountIn.required = true;
+  amountIn.placeholder = "0.00";
+  amountIn.className = "amount-input";
   amountIn.value = entryDraft.amount;
   amountIn.addEventListener("input", function () { entryDraft.amount = amountIn.value; });
-  form.appendChild(field("Amount", amountIn));
-
-  var dateIn = document.createElement("input");
-  dateIn.type = "date";
-  dateIn.required = true;
-  dateIn.value = entryDraft.date;
-  dateIn.addEventListener("input", function () { entryDraft.date = dateIn.value; });
-  form.appendChild(field("Date", dateIn));
+  panel.appendChild(field("Amount", amountIn));
 
   if (entryDraft.type === "expense") {
-    var catSelect = document.createElement("select");
+    var catField = el("div", "field");
+    catField.appendChild(el("label", null, "Category (tap one)"));
+    var catChips = el("div", "chip-grid");
     state.categories.forEach(function (c) {
-      var o = document.createElement("option");
-      o.value = c.id;
-      o.textContent = c.emoji + " " + c.name;
-      if (c.id === entryDraft.categoryId) o.selected = true;
-      catSelect.appendChild(o);
+      var chip = el("button", "chip" + (c.id === entryDraft.categoryId ? " active" : ""), c.emoji + " " + escapeHtml(c.name));
+      chip.type = "button";
+      chip.addEventListener("click", function () { entryDraft.categoryId = c.id; render(); });
+      catChips.appendChild(chip);
     });
-    catSelect.addEventListener("change", function () { entryDraft.categoryId = catSelect.value; });
-    form.appendChild(field("Category", catSelect));
+    catField.appendChild(catChips);
+    panel.appendChild(catField);
 
-    var pmInput = document.createElement("input");
-    pmInput.setAttribute("list", "paymentMethodList");
-    pmInput.value = entryDraft.paymentMethod || "";
-    pmInput.addEventListener("input", function () { entryDraft.paymentMethod = pmInput.value; });
-    form.appendChild(field("Payment method", pmInput));
-
-    var datalist = document.createElement("datalist");
-    datalist.id = "paymentMethodList";
-    paymentMethodOptions().forEach(function (pm) {
-      var o = document.createElement("option");
-      o.value = pm;
-      datalist.appendChild(o);
+    var pmField = el("div", "field");
+    pmField.appendChild(el("label", null, "Payment method (tap one)"));
+    var pmChips = el("div", "chip-grid");
+    var pmOptions = paymentMethodOptions();
+    if (entryDraft.paymentMethod && pmOptions.indexOf(entryDraft.paymentMethod) < 0) pmOptions = pmOptions.concat([entryDraft.paymentMethod]);
+    pmOptions.forEach(function (pm) {
+      var chip = el("button", "chip" + (pm === entryDraft.paymentMethod ? " active" : ""), escapeHtml(pm));
+      chip.type = "button";
+      chip.addEventListener("click", function () { entryDraft.paymentMethod = pm; render(); });
+      pmChips.appendChild(chip);
     });
-    form.appendChild(datalist);
+    var customChip = el("button", "chip", "+ Custom");
+    customChip.type = "button";
+    customChip.addEventListener("click", function () {
+      var custom = prompt("Payment method:", "");
+      if (custom && custom.trim()) { entryDraft.paymentMethod = custom.trim(); render(); }
+    });
+    pmChips.appendChild(customChip);
+    pmField.appendChild(pmChips);
+    panel.appendChild(pmField);
   } else {
     var sourceIn = document.createElement("input");
     sourceIn.type = "text";
@@ -923,17 +997,31 @@ function renderAdd() {
     sourceIn.required = true;
     sourceIn.value = entryDraft.sourceName || "";
     sourceIn.addEventListener("input", function () { entryDraft.sourceName = sourceIn.value; });
-    form.appendChild(field("Income source", sourceIn));
+    panel.appendChild(field("Income source", sourceIn));
   }
 
-  var noteIn = document.createElement("input");
-  noteIn.type = "text";
-  noteIn.placeholder = "optional note";
-  noteIn.value = entryDraft.note || "";
-  noteIn.addEventListener("input", function () { entryDraft.note = noteIn.value; });
-  form.appendChild(field("Note", noteIn));
+  if (!entryDraft._showMore) {
+    var moreBtn = el("button", "link-toggle", "＋ Date &amp; note (defaults to today, optional)");
+    moreBtn.type = "button";
+    moreBtn.addEventListener("click", function () { entryDraft._showMore = true; render(); });
+    panel.appendChild(moreBtn);
+  } else {
+    var moreGrid = el("div", "form-grid");
+    var dateIn = document.createElement("input");
+    dateIn.type = "date";
+    dateIn.required = true;
+    dateIn.value = entryDraft.date;
+    dateIn.addEventListener("input", function () { entryDraft.date = dateIn.value; });
+    moreGrid.appendChild(field("Date", dateIn));
 
-  panel.appendChild(form);
+    var noteIn = document.createElement("input");
+    noteIn.type = "text";
+    noteIn.placeholder = "optional note";
+    noteIn.value = entryDraft.note || "";
+    noteIn.addEventListener("input", function () { entryDraft.note = noteIn.value; });
+    moreGrid.appendChild(field("Note", noteIn));
+    panel.appendChild(moreGrid);
+  }
 
   var actions = el("div", "form-actions");
   var saveBtn = el("button", null, entryDraft.id ? "Save changes" : "Add " + (entryDraft.type === "income" ? "income" : "expense"));
@@ -968,6 +1056,8 @@ function renderAdd() {
   }
   panel.appendChild(actions);
   app.appendChild(panel);
+
+  if (!entryDraft.id) amountIn.focus();
 }
 
 // ----- Recurring -----
@@ -1243,7 +1333,8 @@ function renderHistory() {
           categoryId: e.categoryId || (state.categories[0] ? state.categories[0].id : ""),
           paymentMethod: e.paymentMethod || "",
           sourceName: e.sourceName || "",
-          note: e.note || ""
+          note: e.note || "",
+          _showMore: true
         };
         currentTab = "add";
         render();

@@ -7,6 +7,16 @@ to the home screen on both iOS and Android.
 
 ## Features
 
+- **Quick add, built for one-thumb phone use** — a floating ➕ button
+  (bottom-right, on every screen but Add) drops you straight into a
+  minimal entry: type the amount, tap a category chip, tap a payment
+  method chip, done. It defaults to whatever category/payment method you
+  used last time, so a repeat expense (like a daily coffee or the same
+  auto-rickshaw fare) is amount + tap + Save. Date and note are tucked
+  behind an optional "＋ Date & note" link — only open it if you need to
+  backdate an entry or add a comment. If you've installed the app to
+  your home screen on Android, long-press the icon for an "Add Expense"
+  shortcut that jumps straight into this screen.
 - **Income & expenses** — log entries with amount, date, note, category
   (expenses) and payment method (expenses). Income entries just need a
   source name (e.g. "Salary – Primary", "Salary – Spouse").
