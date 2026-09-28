@@ -293,6 +293,29 @@ a.btn { text-decoration: none; color: var(--text); }
 .fulltext-note .link-btn { padding: 2px 0; }
 .icon-btn.busy svg { animation: spin 0.9s linear infinite; }
 .icon-btn.active { color: var(--accent); }
+.item.hl-item { box-shadow: inset 3px 0 0 var(--star); }
+.tag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: var(--star); background: color-mix(in srgb, var(--star) 14%, transparent); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.muted-note { padding: 10px 14px; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); }
+/* Discover */
+dialog.wide { width: min(680px, calc(100vw - 32px)); }
+.topics { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+.topics::-webkit-scrollbar { display: none; }
+.topic { border: 1px solid var(--border); background: none; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.topic.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.dir-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dir-row:last-child { border-bottom: 0; }
+.dir-row .info { flex: 1; min-width: 0; }
+.dir-row .info b { display: block; font-size: 15px; }
+.dir-row .info span { display: block; font-size: 13px; color: var(--muted); }
+.dir-row .btn { min-width: 84px; padding: 7px 12px; min-height: 36px; }
+.dir-row .btn.added { color: var(--muted); }
+.quick { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.quick select { width: auto; }
+/* Filters */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.chip-x { display: inline-flex; align-items: center; gap: 4px; background: var(--side); border: 1px solid var(--border); border-radius: 999px; padding: 3px 4px 3px 10px; font-size: 13px; }
+.chip-x button { border: 0; background: none; color: var(--muted); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; line-height: 1; }
+.chip-x button:hover { background: var(--hover); color: var(--danger); }
 mark.hl { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
 .placeholder { min-height: 100%; display: grid; place-items: center; color: var(--faint); text-align: center; padding: 24px; }
 .placeholder svg { width: 56px; height: 56px; stroke-width: 1.4; margin-bottom: 8px; }
@@ -380,6 +403,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   .article { padding: 20px 18px calc(64px + env(safe-area-inset-bottom)); }
   .article h2 { font-size: 23px; }
   .item .thumb { width: 64px; height: 64px; }
+  .quick { grid-template-columns: 1fr auto; }
+  .quick select { grid-column: 1 / -1; width: 100%; }
 }
 .only-mobile { display: none; }
 @media (prefers-reduced-motion: reduce) {
@@ -544,6 +569,21 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
       </div>
 
       <div class="section">
+        <h4>Keyword filters</h4>
+        <p class="hint">Matched against each article's title and opening text. Not case-sensitive.</p>
+        <form class="field" id="formMute" style="margin-bottom:6px">
+          <span>🔇 Mute — hide articles mentioning</span>
+          <div class="row" style="flex-wrap:nowrap"><input class="input" id="muteInput" autocomplete="off" placeholder="e.g. sponsored, giveaway" /><button class="btn" type="submit">Add</button></div>
+          <div class="chips" id="muteChips"></div>
+        </form>
+        <form class="field" id="formHighlight">
+          <span>⭐ Highlight — flag articles mentioning</span>
+          <div class="row" style="flex-wrap:nowrap"><input class="input" id="hlInput" autocomplete="off" placeholder="e.g. Azure, machine learning" /><button class="btn" type="submit">Add</button></div>
+          <div class="chips" id="hlChips"></div>
+        </form>
+      </div>
+
+      <div class="section">
         <h4>Subscriptions (<span id="feedCount">0</span>)</h4>
         <div id="feedRows"></div>
       </div>
@@ -568,6 +608,40 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
     </div>
     <div class="dlg-foot">
       <button class="btn primary" type="button" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Discover -->
+<dialog id="dlgDiscover" class="wide">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h3>Discover feeds</h3>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dlg-body">
+      <form class="field" id="formQuick" style="margin-top:0">
+        <span>Add from a site</span>
+        <div class="quick">
+          <select class="input" id="quickType" aria-label="Source type">
+            <option value="youtube">YouTube channel</option>
+            <option value="reddit">Subreddit</option>
+            <option value="github">GitHub releases</option>
+            <option value="mastodon">Mastodon account</option>
+            <option value="medium">Medium / Substack</option>
+          </select>
+          <input class="input" id="quickInput" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <button class="btn primary" type="submit" id="quickSubmit">Add</button>
+        </div>
+        <small id="quickHint"></small>
+        <p class="err-msg" id="quickErr" hidden style="margin-top:6px"></p>
+      </form>
+      <div class="section" style="margin-top:6px">
+        <input class="input" id="dirSearch" type="search" placeholder="Search the directory…" autocomplete="off" style="margin-bottom:10px" />
+        <div class="topics" id="topics"></div>
+        <label class="check"><input type="checkbox" id="dirFolder" checked /> Put feeds in a folder named after the topic</label>
+        <div id="dirList"></div>
+      </div>
     </div>
   </div>
 </dialog>
@@ -630,12 +704,165 @@ var LOG_MAX_AGE_MS = 60 * 86400000;   // read/unstar history older than this isn
 var LOG_MAX_ENTRIES = 5000;
 var TOMBSTONE_MAX_AGE_MS = 120 * 86400000;
 
+// Curated directory for Discover. Sites occasionally move their feeds —
+// if one fails to add, its website address usually works instead.
+var DIRECTORY = [
+  { topic: "Tech", feeds: [
+    ["Hacker News", "https://hnrss.org/frontpage", "Top stories from the tech community"],
+    ["The Verge", "https://www.theverge.com/rss/index.xml", "Technology, science, culture"],
+    ["Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", "In-depth tech news and analysis"],
+    ["TechCrunch", "https://techcrunch.com/feed/", "Startups and technology news"],
+    ["Wired", "https://www.wired.com/feed/rss", "Tech, science and ideas"],
+    ["GitHub Blog", "https://github.blog/feed/", "Updates from GitHub"],
+    ["Smashing Magazine", "https://www.smashingmagazine.com/feed/", "Web design and development"],
+  ]},
+  { topic: "Cloud & AI", feeds: [
+    ["Azure Blog", "https://azure.microsoft.com/en-us/blog/feed/", "Microsoft Azure announcements"],
+    ["AWS News Blog", "https://aws.amazon.com/blogs/aws/feed/", "New AWS services and features"],
+    ["Google Cloud Blog", "https://cloudblog.withgoogle.com/rss/", "Google Cloud news and guides"],
+    ["Microsoft Research", "https://www.microsoft.com/en-us/research/feed/", "Research from Microsoft"],
+    ["OpenAI News", "https://openai.com/news/rss.xml", "Announcements from OpenAI"],
+    ["Google AI", "https://blog.google/technology/ai/rss/", "AI news from Google"],
+    ["Hugging Face Blog", "https://huggingface.co/blog/feed.xml", "Open-source machine learning"],
+    ["MIT Technology Review: AI", "https://www.technologyreview.com/topic/artificial-intelligence/feed", "AI coverage and analysis"],
+  ]},
+  { topic: "News", feeds: [
+    ["BBC News", "https://feeds.bbci.co.uk/news/rss.xml", "Top stories"],
+    ["BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml", "World news"],
+    ["NPR News", "https://feeds.npr.org/1001/rss.xml", "US and world news"],
+    ["The Guardian: World", "https://www.theguardian.com/world/rss", "International news"],
+    ["Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", "Global news"],
+  ]},
+  { topic: "India", feeds: [
+    ["The Hindu", "https://www.thehindu.com/news/national/feeder/default.rss", "National news"],
+    ["Times of India", "https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Top stories"],
+    ["Indian Express", "https://indianexpress.com/feed/", "Latest news"],
+    ["NDTV", "https://feeds.feedburner.com/ndtvnews-top-stories", "Top stories"],
+    ["Mint", "https://www.livemint.com/rss/news", "Business and economy news"],
+  ]},
+  { topic: "Business", feeds: [
+    ["The Economic Times", "https://economictimes.indiatimes.com/rssfeedsdefault.cms", "Business news"],
+    ["Moneycontrol", "https://www.moneycontrol.com/rss/latestnews.xml", "Markets and finance"],
+    ["Harvard Business Review", "https://feeds.hbr.org/harvardbusiness", "Management and leadership"],
+  ]},
+  { topic: "Science", feeds: [
+    ["NASA", "https://www.nasa.gov/news-release/feed/", "News releases"],
+    ["Quanta Magazine", "https://www.quantamagazine.org/feed/", "Math, physics, biology, CS"],
+    ["ScienceDaily", "https://www.sciencedaily.com/rss/all.xml", "Latest research news"],
+    ["New Scientist", "https://www.newscientist.com/feed/home/", "Science and technology news"],
+    ["Nature", "https://www.nature.com/nature.rss", "Research and news"],
+  ]},
+  { topic: "Learning & productivity", feeds: [
+    ["freeCodeCamp", "https://www.freecodecamp.org/news/rss/", "Programming tutorials"],
+    ["DEV Community", "https://dev.to/feed", "Articles by developers"],
+    ["Farnam Street", "https://fs.blog/feed/", "Thinking and decision-making"],
+    ["Cal Newport", "https://calnewport.com/feed/", "Deep work and focus"],
+    ["Zen Habits", "https://zenhabits.net/feed/", "Simplicity and habits"],
+  ]},
+];
+
+// Turn common site addresses into their feed URLs (YouTube, Reddit, GitHub, …).
+function feedUrlFor(type, raw) {
+  var v = String(raw || "").trim();
+  if (!v) return null;
+  var m;
+  switch (type) {
+    case "youtube":
+      if ((m = v.match(/(?:channel\/|^)(UC[\w-]{22})\b/))) return "https://www.youtube.com/feeds/videos.xml?channel_id=" + m[1];
+      if ((m = v.match(/[?&]list=([\w-]+)/))) return "https://www.youtube.com/feeds/videos.xml?playlist_id=" + m[1];
+      if ((m = v.match(/(?:youtube\.com\/)?@([\w.-]+)/))) return "https://www.youtube.com/@" + m[1]; // page → its feed is auto-discovered
+      if (/youtube\.com\//.test(v)) return normalizeUrl(v);
+      return "https://www.youtube.com/@" + v.replace(/^@/, "");
+    case "reddit":
+      if ((m = v.match(/(?:reddit\.com\/)?\/?(r|u|user)\/([\w-]+)/i))) {
+        return "https://www.reddit.com/" + (m[1].toLowerCase() === "r" ? "r/" : "user/") + m[2] + "/.rss";
+      }
+      return "https://www.reddit.com/r/" + v.replace(/^\/?r\//i, "").replace(/\W+$/, "") + "/.rss";
+    case "github":
+      if ((m = v.match(/(?:github\.com\/)?([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:\/|$)/))) return "https://github.com/" + m[1] + "/" + m[2] + "/releases.atom";
+      return null;
+    case "mastodon":
+      if ((m = v.match(/^@?([\w.]+)@([\w.-]+\.[a-z]{2,})$/i))) return "https://" + m[2] + "/@" + m[1] + ".rss";
+      if ((m = v.match(/^(?:https?:\/\/)?([\w.-]+)\/@([\w.]+)/i))) return "https://" + m[1] + "/@" + m[2] + ".rss";
+      return null;
+    case "medium":
+      if ((m = v.match(/^@([\w.-]+)$/))) return "https://medium.com/feed/@" + m[1];
+      if ((m = v.match(/medium\.com\/@([\w.-]+)/))) return "https://medium.com/feed/@" + m[1];
+      if ((m = v.match(/^(?:https?:\/\/)?([\w-]+)\.substack\.com/))) return "https://" + m[1] + ".substack.com/feed";
+      return normalizeUrl(v);
+  }
+  return null;
+}
+
+// Pasted into the normal Add box: rewrite known site pages to their feeds.
+function rewriteKnownUrl(url) {
+  var u;
+  try { u = new URL(url); } catch (e) { return url; }
+  var host = u.hostname.replace(/^(www\.|old\.|m\.)/, ""), path = u.pathname;
+  if (host === "reddit.com" && /^\/(r|u|user)\/[\w-]+\/?$/i.test(path)) return feedUrlFor("reddit", path);
+  if (host === "github.com" && /^\/[\w.-]+\/[\w.-]+\/?$/.test(path)) return feedUrlFor("github", path.slice(1));
+  if (host === "youtube.com" && /^\/channel\/UC/.test(path)) return feedUrlFor("youtube", path);
+  if (host === "youtube.com" && path === "/playlist") return feedUrlFor("youtube", u.search);
+  if (host === "medium.com" && /^\/@[\w.-]+\/?$/.test(path)) return feedUrlFor("medium", path.slice(1).replace(/\/$/, ""));
+  if (/\.substack\.com$/.test(host) && (path === "/" || path === "")) return "https://" + host + "/feed";
+  return url;
+}
+
+var QUICK_HINTS = {
+  youtube: ["@veritasium, or a channel link", "Paste a channel's @handle or link. Playlists work too."],
+  reddit: ["r/programming", "A subreddit (r/name) or a user (u/name)."],
+  github: ["microsoft/vscode", "Get notified of new releases of a GitHub project."],
+  mastodon: ["@user@mastodon.social", "A Mastodon (or other fediverse) account."],
+  medium: ["@username or name.substack.com", "A Medium writer, or any Substack newsletter."],
+};
+
+/* =========================================================================
+   Keyword filters (mute / highlight)
+   ========================================================================= */
+
+var filtersVersion = 0, compiled = { v: -1 }, matchCache = new Map();
+function compileTerms(list) {
+  return (list || []).map(function (t) {
+    var body = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    // Whole-word match for plain words ("ai" shouldn't match "said"); substring otherwise.
+    var re = new RegExp((/^\w/.test(t) ? "\\b" : "") + body + (/\w$/.test(t) ? "\\b" : ""), "i");
+    return { term: t, re: re };
+  });
+}
+function itemMatch(it) {
+  if (compiled.v !== filtersVersion) {
+    compiled = { v: filtersVersion, mute: compileTerms(state.settings.mute), hl: compileTerms(state.settings.highlight) };
+    matchCache.clear();
+  }
+  var c = matchCache.get(it.id);
+  if (c && c.title === it.title && c.snippet === it.snippet) return c;
+  var text = (it.title || "") + " \n " + (it.snippet || "");
+  c = { title: it.title, snippet: it.snippet, muted: null, hl: null };
+  var i;
+  for (i = 0; i < compiled.mute.length; i++) if (compiled.mute[i].re.test(text)) { c.muted = compiled.mute[i].term; break; }
+  for (i = 0; i < compiled.hl.length; i++) if (compiled.hl[i].re.test(text)) { c.hl = compiled.hl[i].term; break; }
+  matchCache.set(it.id, c);
+  return c;
+}
+// Starred articles are never hidden.
+function isMuted(it) { return !it.starred && !!itemMatch(it).muted; }
+function hlTerm(it) { return itemMatch(it).hl; }
+function filtersChanged() {
+  filtersVersion++;
+  state.settings.ts = Date.now();
+  save();
+  render();
+  renderFilterChips();
+}
+
 var FETCH_TIMEOUT_MS = 15000;
 var MAX_ITEMS_PER_FEED = 200;   // older read, unstarred items beyond this are dropped
 var MAX_CONTENT_CHARS = 150000; // per-article cap to keep storage sane
 var PAGE_SIZE = 150;
 
 var ICON = {
+  bolt: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  compass: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>',
   starFill: '<svg class="i" viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
   all: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   star: '<svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
@@ -653,7 +880,7 @@ function defaultState() {
     feeds: [],      // {id, url, title, customTitle, folder, fullText, site, via, error, lastFetched, added, ts}
     items: {},      // id -> {id, feedId, title, link, date, seen, author, content, fullContent, snippet, thumb, read, starred}
     // Synced settings (ts = last local change, for last-write-wins)
-    settings: { theme: "auto", unreadOnly: false, customProxy: "", refreshMins: 30, ts: 0 },
+    settings: { theme: "auto", unreadOnly: false, customProxy: "", refreshMins: 30, mute: [], highlight: [], ts: 0 },
     // History used for sync: readLog[id] = +ts (read) / -ts (unread);
     // starLog[id] = {on, ts, item}; deletedFeeds[feedId] = ts.
     readLog: {},
@@ -667,7 +894,7 @@ function defaultState() {
 }
 
 var state = defaultState();
-var ui = { refreshing: false, progress: "", currentId: null, shown: PAGE_SIZE, visibleIds: [], query: "", fullBusy: {}, fullError: {}, showFeedVersion: {} };
+var ui = { refreshing: false, progress: "", currentId: null, shown: PAGE_SIZE, visibleIds: [], query: "", fullBusy: {}, fullError: {}, showFeedVersion: {}, showMuted: false, mutedHidden: 0 };
 
 var DB_NAME = "rss-reader", DB_STORE = "kv", LS_KEY = "rss-reader-state";
 
@@ -1193,7 +1420,7 @@ function mergeItems(feed, parsed) {
       var r = state.readLog[id], st = state.starLog[id];
       state.items[id] = Object.assign({ id: id, feedId: feed.id, date: p.date || now - idx * 1000, seen: now,
         read: r ? r > 0 : false, starred: !!(st && st.on) }, fields);
-      if (!(r > 0)) added++;
+      if (!(r > 0) && !isMuted(state.items[id])) added++;
     }
   });
   pruneFeed(feed.id);
@@ -1216,6 +1443,7 @@ function pruneFeed(feedId) {
 function addFeed(rawUrl, folder) {
   var url = normalizeUrl(rawUrl);
   if (!url) return Promise.reject(new Error("That doesn't look like a valid URL"));
+  url = rewriteKnownUrl(url);
   if (state.feeds.some(function (f) { return f.url === url; })) return Promise.reject(new Error("You're already subscribed to this feed"));
   return loadFeed(url, null, true).then(function (r) {
     var existing = state.feeds.find(function (f) { return f.url === r.url; });
@@ -1304,6 +1532,7 @@ function removeFeed(id, fromSync) {
 
 function setView(v) {
   state.view = v;
+  ui.showMuted = false;
   ui.shown = PAGE_SIZE;
   closeSidebar();
   save();
@@ -1363,6 +1592,7 @@ function itemsForView(includeRead) {
       return terms.every(function (w) { return t.indexOf(w) > -1; });
     }).sort(function (a, b) { return b.date - a.date || b.seen - a.seen; });
   }
+  ui.mutedHidden = 0;
   var folderFeeds = null;
   if (v.type === "folder") {
     folderFeeds = {};
@@ -1372,6 +1602,8 @@ function itemsForView(includeRead) {
     if (v.type === "starred") { if (!it.starred) return false; }
     else if (v.type === "feed") { if (it.feedId !== v.feedId) return false; }
     else if (folderFeeds) { if (!folderFeeds[it.feedId]) return false; }
+    else if (v.type === "highlights") { if (!hlTerm(it) || isMuted(it)) return false; }
+    if (!ui.showMuted && isMuted(it)) { ui.mutedHidden++; return false; }
     // Keep the open article in the list even after it's been marked read.
     if (!includeRead && state.settings.unreadOnly && v.type !== "starred" && it.read && it.id !== ui.currentId) return false;
     return true;
@@ -1382,7 +1614,7 @@ function unreadCount(feedId) {
   var n = 0;
   for (var k in state.items) {
     var it = state.items[k];
-    if (!it.read && (!feedId || it.feedId === feedId)) n++;
+    if (!it.read && (!feedId || it.feedId === feedId) && !isMuted(it)) n++;
   }
   return n;
 }
@@ -1403,6 +1635,12 @@ function renderNav() {
     '<span class="name">All articles</span><span class="count">' + (unreadCount() || "") + "</span></button>" +
     '<button class="nav-item' + (v.type === "starred" ? " active" : "") + '" data-view="starred">' + ICON.star +
     '<span class="name">Starred</span><span class="count">' + (starred || "") + "</span></button>";
+  if ((state.settings.highlight || []).length) {
+    var hlUnread = Object.values(state.items).filter(function (i) { return !i.read && hlTerm(i) && !isMuted(i); }).length;
+    html += '<button class="nav-item' + (v.type === "highlights" ? " active" : "") + '" data-view="highlights">' + ICON.bolt +
+      '<span class="name">Highlights</span><span class="count">' + (hlUnread || "") + "</span></button>";
+  }
+  html += '<button class="nav-item" data-action="discover">' + ICON.compass + '<span class="name">Discover feeds</span></button>';
   function feedBtn(f, inFolder) {
     var n = unreadCount(f.id);
     return '<button class="nav-item' + (inFolder ? " in-folder" : "") + (v.type === "feed" && v.feedId === f.id ? " active" : "") + '" data-feed="' + esc(f.id) + '" title="' + esc(feedName(f)) + '">' +
@@ -1435,6 +1673,7 @@ function viewTitle() {
   if (v.type === "starred") return "Starred";
   if (v.type === "feed") return feedName(feedById(v.feedId));
   if (v.type === "folder") return v.name;
+  if (v.type === "highlights") return "Highlights";
   return "All articles";
 }
 
@@ -1486,27 +1725,37 @@ function renderList() {
         '<div class="suggest">' + SUGGESTED.map(function (s) {
           return '<button class="btn" data-suggest="' + esc(s.url) + '">+ ' + esc(s.title) + "</button>";
         }).join("") + "</div>" +
-        '<div class="suggest"><button class="btn primary" data-action="add">Add a feed</button><button class="btn" data-action="import">Import OPML</button></div>';
+        '<div class="suggest"><button class="btn primary" data-action="discover">Discover feeds</button><button class="btn" data-action="add">Add a feed</button><button class="btn" data-action="import">Import OPML</button></div>';
     } else if (ui.query) {
       empty.innerHTML = "<h2>No matches</h2><p>Nothing in your saved articles matches “" + esc(ui.query) + "”.</p>";
+    } else if (state.view.type === "highlights") {
+      empty.innerHTML = "<h2>No highlights yet</h2><p>Articles mentioning your highlight keywords (" + esc(state.settings.highlight.join(", ")) + ") will show up here.</p>";
     } else if (state.view.type === "starred") {
       empty.innerHTML = "<h2>No starred articles</h2><p>Tap the ☆ on any article to save it here.</p>";
     } else {
       empty.innerHTML = "<h2>All caught up ✨</h2><p>" + (state.settings.unreadOnly ? "No unread articles here." : "No articles yet — try refreshing.") + "</p>";
     }
+    if (ui.mutedHidden) empty.innerHTML += '<button class="link-btn" data-action="muted">Show ' + ui.mutedHidden + " muted article" + (ui.mutedHidden === 1 ? "" : "s") + "</button>";
     return;
   }
 
   list.hidden = false;
   empty.hidden = true;
   var showFeed = state.view.type !== "feed" || !!ui.query;
-  var html = items.slice(0, ui.shown).map(function (it) {
+  var html = "";
+  if (ui.mutedHidden || (ui.showMuted && !ui.query)) {
+    html += '<li class="muted-note">🔇 ' + (ui.showMuted ? "Showing muted articles" : ui.mutedHidden + " muted article" + (ui.mutedHidden === 1 ? "" : "s") + " hidden") +
+      ' <button class="link-btn" data-action="muted">' + (ui.showMuted ? "Hide" : "Show") + "</button></li>";
+  }
+  html += items.slice(0, ui.shown).map(function (it) {
     var f = feedById(it.feedId);
-    return '<li class="item' + (it.read ? " read" : "") + (it.id === ui.currentId ? " selected" : "") + '" data-id="' + esc(it.id) + '">' +
+    var hl = hlTerm(it), muted = ui.showMuted && isMuted(it);
+    return '<li class="item' + (it.read ? " read" : "") + (hl && !muted ? " hl-item" : "") + (it.id === ui.currentId ? " selected" : "") + '" data-id="' + esc(it.id) + '"' + (muted ? ' style="opacity:.55"' : "") + ">" +
       '<span class="dot"></span><div class="body"><div class="meta">' +
       (showFeed && f ? '<span class="src">' + esc(feedName(f)) + "</span><span>·</span>" : "") +
       "<span>" + esc(relTime(it.date)) + "</span>" +
       (it.starred ? '<span class="star">' + ICON.starFill + "</span>" : "") +
+      (muted ? '<span class="tag" style="color:var(--muted)">🔇 ' + esc(itemMatch(it).muted) + "</span>" : hl ? '<span class="tag">⭐ ' + esc(hl) + "</span>" : "") +
       '</div><p class="title">' + highlight(it.title) + "</p>" +
       (it.snippet ? '<p class="snip">' + highlight(it.snippet) + "</p>" : "") +
       "</div>" +
@@ -1664,9 +1913,70 @@ function renderSettings() {
   }).join("") : '<p style="margin:0;color:var(--muted);font-size:13px">No feeds yet.</p>';
 }
 
+function renderFilterChips() {
+  function chips(list, kind) {
+    return (list || []).map(function (t, i) {
+      return '<span class="chip-x">' + esc(t) + '<button type="button" data-remove-' + kind + '="' + i + '" aria-label="Remove ' + esc(t) + '">×</button></span>';
+    }).join("");
+  }
+  $("muteChips").innerHTML = chips(state.settings.mute, "mute");
+  $("hlChips").innerHTML = chips(state.settings.highlight, "hl");
+}
+
+function addFilterTerms(kind, raw) {
+  var key = kind === "mute" ? "mute" : "highlight";
+  var list = (state.settings[key] || []).slice(), added = 0;
+  raw.split(",").map(function (t) { return t.trim(); }).filter(Boolean).forEach(function (t) {
+    if (!list.some(function (x) { return x.toLowerCase() === t.toLowerCase(); })) { list.push(t); added++; }
+  });
+  if (!added) return;
+  state.settings[key] = list;
+  filtersChanged();
+}
+
+var dirTopic = null;
+function showDiscover() {
+  closeSidebar();
+  if (!dirTopic) dirTopic = DIRECTORY[0].topic;
+  $("quickErr").hidden = true;
+  $("dirSearch").value = "";
+  updateQuickHint();
+  renderDiscover();
+  $("dlgDiscover").showModal();
+}
+function updateQuickHint() {
+  var h = QUICK_HINTS[$("quickType").value];
+  $("quickInput").placeholder = h[0];
+  $("quickHint").textContent = h[1];
+}
+function renderDiscover() {
+  var q = $("dirSearch").value.trim().toLowerCase();
+  $("topics").innerHTML = DIRECTORY.map(function (t) {
+    return '<button type="button" class="topic' + (!q && t.topic === dirTopic ? " on" : "") + '" data-topic="' + esc(t.topic) + '">' + esc(t.topic) + "</button>";
+  }).join("");
+  var rows = [];
+  DIRECTORY.forEach(function (t) {
+    if (!q && t.topic !== dirTopic) return;
+    t.feeds.forEach(function (d) {
+      if (q && (d[0] + " " + d[2] + " " + t.topic).toLowerCase().indexOf(q) < 0) return;
+      rows.push({ topic: t.topic, name: d[0], url: d[1], desc: d[2] });
+    });
+  });
+  $("dirList").innerHTML = rows.length ? rows.map(function (r) {
+    var subscribed = !!feedById(feedIdFor(r.url));
+    var busy = ui.dirBusy && ui.dirBusy[r.url];
+    var host = hostOf(r.url);
+    return '<div class="dir-row">' + favHtml({ url: r.url, title: r.name }) +
+      '<div class="info"><b>' + esc(r.name) + "</b><span>" + esc(r.desc) + (q ? " · " + esc(r.topic) : "") + "</span></div>" +
+      '<button type="button" class="btn' + (subscribed ? " added" : "") + '" data-dir-url="' + esc(r.url) + '" data-dir-topic="' + esc(r.topic) + '"' + (subscribed || busy ? " disabled" : "") + ">" +
+      (subscribed ? "✓ Added" : busy ? "Adding…" : "+ Add") + "</button></div>";
+  }).join("") : '<p class="hint">No feeds match “' + esc(q) + '”. You can paste any site into Add feed instead.</p>';
+}
+
 function showSettings() {
   closeSidebar();
   renderSettings();
+  renderFilterChips();
   renderSyncUi();
   $("dlgSettings").showModal();
 }
@@ -1801,7 +2111,7 @@ var Sync = (function () {
       feeds: feeds,
       read: state.readLog,
       star: state.starLog,
-      settings: { theme: s.theme, refreshMins: s.refreshMins, customProxy: s.customProxy || "", ts: s.ts || 0 },
+      settings: { theme: s.theme, refreshMins: s.refreshMins, customProxy: s.customProxy || "", mute: s.mute || [], highlight: s.highlight || [], ts: s.ts || 0 },
     }));
   }
 
@@ -1888,6 +2198,9 @@ var Sync = (function () {
       state.settings.theme = rset.theme || "auto";
       state.settings.refreshMins = typeof rset.refreshMins === "number" ? rset.refreshMins : 30;
       state.settings.customProxy = rset.customProxy || "";
+      state.settings.mute = Array.isArray(rset.mute) ? rset.mute : [];
+      state.settings.highlight = Array.isArray(rset.highlight) ? rset.highlight : [];
+      filtersVersion++;
       state.settings.ts = rset.ts;
       scheduleAutoRefresh();
       changed = true;
@@ -1903,7 +2216,7 @@ var Sync = (function () {
       var res = merge(remote);
       if (res.changed) {
         render();
-        if ($("dlgSettings").open) renderSettings();
+        if ($("dlgSettings").open) { renderSettings(); renderFilterChips(); }
       }
       if (res.added.length) {
         Promise.all(res.added.map(function (f) { return refreshFeed(f).catch(function () {}); })).then(function () { save(); render(); });
@@ -2135,6 +2448,7 @@ $("nav").onclick = function (e) {
   }
   var b = e.target.closest(".nav-item");
   if (!b) return;
+  if (b.dataset.action === "discover") { showDiscover(); return; }
   if (ui.query) closeSearch(true);
   if (b.dataset.feed) setView({ type: "feed", feedId: b.dataset.feed });
   else if (b.dataset.folder) setView({ type: "folder", name: b.dataset.folder });
@@ -2142,6 +2456,12 @@ $("nav").onclick = function (e) {
 };
 
 $("list").onclick = function (e) {
+  if (e.target.closest('[data-action="muted"]')) {
+    ui.showMuted = !ui.showMuted;
+    renderList();
+    renderChrome();
+    return;
+  }
   if (e.target.closest('[data-action="more"]')) {
     ui.shown += PAGE_SIZE;
     renderList();
@@ -2162,6 +2482,8 @@ $("empty").onclick = function (e) {
   var a = e.target.closest("[data-action]");
   if (!a) return;
   if (a.dataset.action === "add") showAdd("");
+  if (a.dataset.action === "discover") showDiscover();
+  if (a.dataset.action === "muted") { ui.showMuted = true; renderList(); renderChrome(); }
   if (a.dataset.action === "import") $("fileOpml").click();
 };
 
@@ -2275,6 +2597,60 @@ $("syncBox").onclick = function (e) {
   if (b.dataset.sync === "in") Sync.signIn();
   if (b.dataset.sync === "out") Sync.signOut();
   if (b.dataset.sync === "retry") Sync.retry();
+};
+$("formMute").onsubmit = function (e) { e.preventDefault(); addFilterTerms("mute", $("muteInput").value); $("muteInput").value = ""; };
+$("formHighlight").onsubmit = function (e) { e.preventDefault(); addFilterTerms("hl", $("hlInput").value); $("hlInput").value = ""; };
+$("dlgSettings").addEventListener("click", function (e) {
+  var m = e.target.closest("[data-remove-mute]"), h = e.target.closest("[data-remove-hl]");
+  if (!m && !h) return;
+  var key = m ? "mute" : "highlight";
+  var list = state.settings[key].slice();
+  list.splice(+(m || h).getAttribute(m ? "data-remove-mute" : "data-remove-hl"), 1);
+  state.settings[key] = list;
+  if (key === "highlight" && !list.length && state.view.type === "highlights") state.view = { type: "all" };
+  filtersChanged();
+});
+
+$("quickType").onchange = updateQuickHint;
+$("dirSearch").oninput = renderDiscover;
+$("topics").onclick = function (e) {
+  var b = e.target.closest("[data-topic]");
+  if (!b) return;
+  dirTopic = b.dataset.topic;
+  $("dirSearch").value = "";
+  renderDiscover();
+};
+$("dirList").onclick = function (e) {
+  var b = e.target.closest("[data-dir-url]");
+  if (!b || b.disabled) return;
+  var url = b.dataset.dirUrl;
+  ui.dirBusy = ui.dirBusy || {};
+  ui.dirBusy[url] = true;
+  renderDiscover();
+  addFeed(url, $("dirFolder").checked ? b.dataset.dirTopic : "").then(function (f) {
+    toast("Subscribed to " + feedName(f));
+  }, function (err) {
+    toast((err && err.message) || "Couldn't add that feed");
+  }).then(function () {
+    delete ui.dirBusy[url];
+    if ($("dlgDiscover").open) renderDiscover();
+  });
+};
+$("formQuick").onsubmit = function (e) {
+  e.preventDefault();
+  var url = feedUrlFor($("quickType").value, $("quickInput").value), err = $("quickErr"), btn = $("quickSubmit");
+  err.hidden = true;
+  if (!url) { err.textContent = "That doesn't look right — see the example in the box."; err.hidden = false; return; }
+  btn.disabled = true;
+  btn.textContent = "Adding…";
+  addFeed(url, "").then(function (f) {
+    $("quickInput").value = "";
+    toast("Subscribed to " + feedName(f));
+    renderDiscover();
+  }, function (e2) {
+    err.textContent = (e2 && e2.message) || "Couldn't add that";
+    err.hidden = false;
+  }).then(function () { btn.disabled = false; btn.textContent = "Add"; });
 };
 $("feedRows").onclick = function (e) {
   var r = e.target.closest("[data-rename]"), d = e.target.closest("[data-remove]");
