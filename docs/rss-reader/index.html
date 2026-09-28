@@ -694,10 +694,17 @@ var SUGGESTED = [
 ];
 
 // ---- Optional cross-device sync (Firebase: Google sign-in + Firestore) ----
-// Leave null to keep the app fully local. To turn sync on, paste your
-// Firebase web app's config object here — see README → "Sync across
+// Uses the same Firebase project as Tomorrow's Bag (Google sign-in already
+// set up there). Set to null to turn sync off — see README → "Sync across
 // devices". Each Google account gets one private document: rssReader/{email}.
-var FIREBASE_CONFIG = null;
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCk68zOHD-pn75g63XnJ5NrK6iRSs4e3iw",
+  authDomain: "school-notebook-tracker.firebaseapp.com",
+  projectId: "school-notebook-tracker",
+  storageBucket: "school-notebook-tracker.firebasestorage.app",
+  messagingSenderId: "799196048612",
+  appId: "1:799196048612:web:dd48060af1203e2d1e10f1"
+};
 var FIREBASE_SDK_VERSION = "10.14.1";
 var SYNC_COLLECTION = "rssReader";
 var LOG_MAX_AGE_MS = 60 * 86400000;   // read/unstar history older than this isn't synced
