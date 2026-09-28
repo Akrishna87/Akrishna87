@@ -1,6 +1,6 @@
 // App-shell cache. Feed fetches (cross-origin, via CORS proxies) are never
 // intercepted here — articles are stored by the app itself in IndexedDB.
-const CACHE_NAME = "rss-reader-v1";
+const CACHE_NAME = "rss-reader-v2";
 const PRECACHE_URLS = [
   "./",
   "./index.html",
@@ -10,6 +10,7 @@ const PRECACHE_URLS = [
   "./icons/icon-180.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./vendor/Readability.js",
 ];
 
 self.addEventListener("install", (event) => {
