@@ -11,6 +11,7 @@ A small, dependency-free web app for live world clocks and timezone conversion. 
 - Add any other IANA timezone as an extra clock; your selection is saved in `localStorage` so it's still there next time you open the app.
 - Time converter: pick a date, time, and source timezone (e.g. "10 pm in London"), and see the equivalent time in India and every other clock you've added.
 - Mobile-friendly layout, and installable as a home-screen app (see below).
+- Each clock card and converter result switches between a light "day" look and the default dark "night" look based on that city's own local hour (6am–6pm counts as day) — so you can tell at a glance whether it's a reasonable time to call, without reading the clock.
 
 ## Running it
 
