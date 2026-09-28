@@ -18,6 +18,17 @@ own device — no account, no server.
 - **Folders** — group feeds (Tech, News, …); each folder has its own
   combined view and unread count, and can be collapsed. Set a folder when
   adding a feed or from ✎ Edit feed. OPML import/export keeps folders.
+- **Discover feeds** — a built-in directory of popular feeds by topic
+  (Tech, Cloud & AI, News, India, Business, Science, Learning), plus
+  one-step adding of YouTube channels and playlists, subreddits, GitHub
+  releases, Mastodon accounts and Medium/Substack writers. Pasting those
+  sites' normal links into Add feed works too.
+- **Keyword filters** (Settings) — *mute* words to hide articles that
+  mention them (e.g. "sponsored"), and *highlight* words to flag articles
+  you care about (e.g. "Azure"). Highlighted articles get a ⭐ tag and
+  their own **Highlights** view. Matching uses the title and opening
+  text, whole words, not case-sensitive. Starred articles are never
+  hidden, and a "Show" link reveals what's been muted. Filters sync.
 - **Search** (🔍 or `/`) across every saved article's title, author and
   full text, with matches highlighted.
 - **Full article text** — for feeds that only include a summary, tap the
