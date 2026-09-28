@@ -31,6 +31,12 @@
   --accent-text: #06301f;
   --danger: #ff8a75;
   --well: #0d2119;
+  --day-bg: #eafbf1;
+  --day-border: #b9e8cf;
+  --day-text: #08321f;
+  --day-muted: #3f7d63;
+  --day-badge-bg: #ffffff;
+  --day-badge-text: #1f8a5c;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -197,6 +203,34 @@ button:hover {
   line-height: 1;
   padding: 4px;
   cursor: pointer;
+}
+
+.phase {
+  font-size: 0.85em;
+  margin-left: 2px;
+}
+
+.clock-card.is-day,
+.result-row.is-day {
+  background: var(--day-bg);
+  border-color: var(--day-border);
+  color: var(--day-text);
+}
+
+.clock-card.is-day .zone-name,
+.clock-card.is-day .date,
+.result-row.is-day .rr-zone {
+  color: var(--day-muted);
+}
+
+.clock-card.is-day .offset {
+  background: var(--day-badge-bg);
+  border-color: var(--day-border);
+  color: var(--day-badge-text);
+}
+
+.clock-card.is-day .remove-btn {
+  color: #c23b2e;
 }
 
 .hint {
@@ -457,6 +491,12 @@ function formatParts(date, tz) {
   return parts;
 }
 
+// A fixed local-hour cutoff, not real sunrise/sunset times for each city —
+// close enough to tell "daylight-ish" from "night-ish" at a glance.
+function isDaytime(hour) {
+  return hour >= 6 && hour < 18;
+}
+
 function utcOffsetLabel(date, tz) {
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
@@ -480,7 +520,7 @@ function renderClocks() {
       card.dataset.tz = zone.tz;
       card.innerHTML = `
         ${zone.removable ? '<button class="remove-btn" title="Remove clock" aria-label="Remove clock">&times;</button>' : ""}
-        <div class="city">${zone.city}</div>
+        <div class="city">${zone.city} <span class="phase"></span></div>
         <div class="zone-name">${zone.tz}</div>
         <div class="time"></div>
         <div class="date"></div>
@@ -502,9 +542,12 @@ function renderClocks() {
     const card = grid.querySelector(`.clock-card[data-tz="${cssEscape(zone.tz)}"]`);
     if (!card) return;
     const parts = formatParts(now, zone.tz);
+    const day = isDaytime(Number(parts.hour));
     card.querySelector(".time").textContent = `${parts.hour}:${parts.minute}:${parts.second}`;
     card.querySelector(".date").textContent = `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year}`;
     card.querySelector(".offset").textContent = `${parts.timeZoneName}, ${utcOffsetLabel(now, zone.tz)}`;
+    card.querySelector(".phase").textContent = day ? "☀️" : "🌙";
+    card.classList.toggle("is-day", day);
   });
 }
 
@@ -612,11 +655,12 @@ function renderConverterResults(utcInstant) {
     if (seen.has(zone.tz)) return;
     seen.add(zone.tz);
     const parts = formatParts(utcInstant, zone.tz);
+    const day = isDaytime(Number(parts.hour));
     const row = document.createElement("div");
-    row.className = "result-row";
+    row.className = "result-row" + (day ? " is-day" : "");
     row.innerHTML = `
       <div>
-        <div>${zone.city}</div>
+        <div>${zone.city} <span class="phase">${day ? "☀️" : "🌙"}</span></div>
         <div class="rr-zone">${zone.tz} &middot; ${parts.timeZoneName}, ${utcOffsetLabel(utcInstant, zone.tz)}</div>
       </div>
       <div class="rr-time">${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} &middot; ${parts.hour}:${parts.minute}</div>
