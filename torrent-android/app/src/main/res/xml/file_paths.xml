@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Only the folders downloads are saved in (see TorrentsApp.downloadDir), so the "open file"
+     share can never reach anything else on the phone. -->
 <paths>
-    <external-path name="storage" path="." />
-    <external-files-path name="app" path="." />
+    <external-path name="torrents" path="Download/Torrents/" />
+    <external-files-path name="app" path="Download/Torrents/" />
 </paths>

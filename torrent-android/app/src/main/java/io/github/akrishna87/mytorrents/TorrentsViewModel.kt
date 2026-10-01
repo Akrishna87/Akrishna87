@@ -35,6 +35,15 @@ sealed interface Screen {
 
 enum class Filter(val label: String) { All("All"), Active("Active"), Done("Done") }
 
+/** A torrent another app sent us, waiting for the person to say "Download". */
+sealed interface PendingAdd {
+    val name: String
+
+    data class Magnet(val link: String, override val name: String) : PendingAdd
+
+    class File(val bytes: ByteArray, override val name: String) : PendingAdd
+}
+
 class TorrentsViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as TorrentsApp
 
@@ -47,6 +56,10 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
         private set
     var filter by mutableStateOf(Filter.All)
     var showAdd by mutableStateOf(false)
+
+    /** Set while asking "Add this torrent?" about a link or file from another app. */
+    var pendingAdd by mutableStateOf<PendingAdd?>(null)
+        private set
 
     init {
         // Opening the app restarts the background service if anything is still running.
@@ -68,7 +81,11 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
         return true
     }
 
-    /** Magnet links and .torrent files opened from other apps (browser, Files, share sheet), or a notification tap. */
+    /**
+     * Magnet links and .torrent files opened from other apps (browser, Files, share sheet), or a
+     * notification tap. Anything from another app is shown first and only added once the person
+     * taps Download, so no other app can make this phone download (and share) something by itself.
+     */
     fun handleIntent(intent: Intent?) {
         intent ?: return
         intent.getStringExtra(MainActivity.EXTRA_TORRENT_ID)?.let {
@@ -78,23 +95,62 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
         when (intent.action) {
             Intent.ACTION_VIEW -> {
                 val uri = intent.data ?: return
-                if (uri.scheme == "magnet") addMagnet(uri.toString()) else addTorrentFile(uri)
+                if (uri.scheme == "magnet") askMagnet(uri.toString()) else askTorrentFile(uri)
             }
             Intent.ACTION_SEND -> {
                 val stream = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT)
                 when {
-                    stream != null -> addTorrentFile(stream)
+                    stream != null -> askTorrentFile(stream)
                     text != null -> {
                         val magnet = Regex("magnet:\\?\\S+").find(text)?.value
-                        if (magnet != null) addMagnet(magnet) else app.say("That doesn't contain a magnet link")
+                        if (magnet != null) askMagnet(magnet) else app.say("That doesn't contain a magnet link")
                     }
                 }
             }
         }
-        // Don't add it again if the screen is rotated.
+        // Don't ask again if the screen is rotated.
         intent.action = null
         intent.data = null
+    }
+
+    private fun askMagnet(link: String) {
+        if (!link.trim().startsWith("magnet:?")) return
+        pendingAdd = PendingAdd.Magnet(link, magnetName(link) ?: "a magnet link")
+    }
+
+    /** Reads the file straight away: another app's permission to read it may not last. */
+    private fun askTorrentFile(uri: Uri) {
+        // Only files shared through Android's content system. file:// paths would be read with this
+        // app's own permissions, which isn't something another app should be able to point us at.
+        if (uri.scheme != "content") {
+            app.say("Can't open that file. Try opening it from your Files app.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val bytes = readTorrentFile(uri)
+                val name = app.ready().torrentName(bytes)
+                pendingAdd = PendingAdd.File(bytes, name)
+            } catch (e: IllegalArgumentException) {
+                app.say("That isn't a valid .torrent file")
+            } catch (e: Exception) {
+                app.say("Couldn't open the .torrent file (${e.message})")
+            }
+        }
+    }
+
+    /** "Download" in the "Add this torrent?" box. */
+    fun confirmPendingAdd() {
+        when (val p = pendingAdd ?: return) {
+            is PendingAdd.Magnet -> addMagnet(p.link)
+            is PendingAdd.File -> addTorrentBytes(p.bytes)
+        }
+        pendingAdd = null
+    }
+
+    fun cancelPendingAdd() {
+        pendingAdd = null
     }
 
     fun addMagnet(link: String) {
@@ -103,13 +159,10 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
             val engine = app.ready()
             try {
                 val dir = withContext(Dispatchers.IO) { app.downloadDir() }
-                // (Uri.getQueryParameter doesn't work on magnet links: Android sees them as "opaque".)
-                val name = Regex("[?&]dn=([^&]*)").find(link)?.groupValues?.get(1)
-                    ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrNull() }
                 val known = torrents.value.map { it.id }.toSet()
                 val id = engine.addMagnet(link, dir)
                 Log.i(TorrentsApp.TAG, "added magnet $id into $dir")
-                app.say(if (id in known) "Already in your list" else "Added ${name ?: "the magnet link"}")
+                app.say(if (id in known) "Already in your list" else "Added ${magnetName(link) ?: "the magnet link"}")
                 showAdd = false
                 TorrentService.start(app)
             } catch (e: IllegalArgumentException) {
@@ -122,15 +175,22 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /** A .torrent file the person picked in the Add sheet. */
     fun addTorrentFile(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                addTorrentBytes(readTorrentFile(uri))
+            } catch (e: Exception) {
+                app.say("Couldn't open the .torrent file (${e.message})")
+            }
+        }
+    }
+
+    private fun addTorrentBytes(bytes: ByteArray) {
         viewModelScope.launch {
             val engine = app.ready()
             try {
-                val (bytes, dir) = withContext(Dispatchers.IO) {
-                    val bytes = app.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: throw IllegalStateException("couldn't open the file")
-                    bytes to app.downloadDir()
-                }
+                val dir = withContext(Dispatchers.IO) { app.downloadDir() }
                 val known = torrents.value.map { it.id }.toSet()
                 val id = engine.addTorrentFile(bytes, dir)
                 app.say(if (id in known) "Already in your list" else "Added the torrent")
@@ -139,10 +199,31 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
             } catch (e: IllegalArgumentException) {
                 app.say("That isn't a valid .torrent file")
             } catch (e: Exception) {
-                app.say("Couldn't open the .torrent file (${e.message})")
+                app.say("Couldn't add the torrent (${e.message})")
             }
         }
     }
+
+    private suspend fun readTorrentFile(uri: Uri): ByteArray = withContext(Dispatchers.IO) {
+        app.contentResolver.openInputStream(uri)?.use { input ->
+            // Real .torrent files are at most a few MB; don't read something huge into memory.
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                out.write(buffer, 0, n)
+                if (out.size() > MAX_TORRENT_FILE) throw IllegalArgumentException("too big for a .torrent file")
+            }
+            out.toByteArray()
+        } ?: throw IllegalStateException("couldn't open the file")
+    }
+
+    /** The "dn" (display name) of a magnet link. Uri.getQueryParameter doesn't work on them: Android sees them as "opaque". */
+    private fun magnetName(link: String): String? =
+        Regex("[?&]dn=([^&]*)").find(link)?.groupValues?.get(1)
+            ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+            ?.takeIf { it.isNotBlank() }
 
     fun togglePause(t: Torrent) {
         val engine = app.engine
@@ -188,7 +269,13 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
             return
         }
         val path = app.engine.filePath(id, file.index) ?: return
-        val uri = FileProvider.getUriForFile(app, "${app.packageName}.files", path)
+        // Only files inside the download folders can be shared (see res/xml/file_paths.xml).
+        val uri = try {
+            FileProvider.getUriForFile(app, "${app.packageName}.files", path)
+        } catch (e: IllegalArgumentException) {
+            app.say("Open ${path.name} from your Files app instead (it's in ${path.parent})")
+            return
+        }
         val ext = path.extension.lowercase()
         val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "*/*"
         val view = Intent(Intent.ACTION_VIEW)
@@ -206,6 +293,10 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
         val link = app.engine.magnetLink(t.id) ?: return
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link)
         app.startActivity(Intent.createChooser(send, "Share magnet link").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    private companion object {
+        const val MAX_TORRENT_FILE = 10 * 1024 * 1024
     }
 
     /** The folder new downloads go into, for showing in Settings. */

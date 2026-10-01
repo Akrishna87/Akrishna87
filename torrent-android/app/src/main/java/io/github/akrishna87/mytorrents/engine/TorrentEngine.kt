@@ -204,6 +204,13 @@ class TorrentEngine(private val stateDir: File) {
         return id
     }
 
+    /** The name inside a .torrent file, without adding it. Throws [IllegalArgumentException] if it isn't one. */
+    fun torrentName(bytes: ByteArray): String = try {
+        TorrentInfo(bytes).name()
+    } catch (e: Throwable) {
+        throw IllegalArgumentException("That isn't a valid .torrent file", e)
+    }
+
     private fun add(params: AddTorrentParams, saveDir: File) {
         saveDir.mkdirs()
         params.savePath = saveDir.absolutePath

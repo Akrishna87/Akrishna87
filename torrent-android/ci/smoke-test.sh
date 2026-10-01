@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the Android emulator job: installs the APK and downloads two torrents from a seeder
 # running on the CI machine (ci/seed.py, reachable from the emulator at 10.0.2.2). Checks that:
+# links from other apps are only added after "Download" in an "Add this torrent?" question;
 # a magnet link shared to the app and one opened like a browser link both download, the files land
 # in Download/Torrents with the right contents, pausing works, a background service runs while
 # downloading, a "finished" notification appears, torrents are remembered after the app is
@@ -94,18 +95,34 @@ sleep 2
 
 echo "--- Sharing a magnet link to the app"
 # (Typing a long link with the emulator's keyboard is too slow and unreliable to test.)
-adb shell "am start -W -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'Check this out: $ALBUM' -n $PKG/.MainActivity" > /dev/null
+share_album() {
+  adb shell "am start -W -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'Check this out: $ALBUM' -n $PKG/.MainActivity" > /dev/null
+}
+share_album
+wait_for 20 confirm-album "Add this torrent?" "the 'Add this torrent?' question"
+grep -q "Smoke Album" "$OUT/confirm-album.xml" || fail "the question doesn't name the torrent"
+shot 3-confirm
+tap confirm-album "Cancel"
+sleep 3
+dump after-cancel
+grep -q "No torrents yet" "$OUT/after-cancel.xml" || fail "a link from another app was added without saying Download"
+echo "PASS: links from other apps aren't added until you say so"
+share_album
+wait_for 20 confirm-album-2 "Add this torrent?" "the 'Add this torrent?' question again"
+tap confirm-album-2 "Download"
 wait_for 20 list-album "Smoke Album" "the shared magnet link to show up"
 echo "PASS: a shared magnet link is added"
 
 echo "--- Opening a magnet link like a browser does"
 adb shell "am start -W -a android.intent.action.VIEW -d '$SINGLE'" > /dev/null
+wait_for 20 confirm-single "Add this torrent?" "the 'Add this torrent?' question"
+tap confirm-single "Download"
 wait_for 20 list-both "Smoke Single.bin" "the opened magnet link to show up"
 echo "PASS: an opened magnet link is added"
 
 echo "--- Downloading"
 wait_for 30 downloading "% of " "a download in progress"
-shot 3-downloading
+shot 4-downloading
 adb shell dumpsys activity services "$PKG" > "$OUT/services.txt"
 grep -q "isForeground=true" "$OUT/services.txt" || fail "no foreground service while downloading"
 echo "PASS: downloads run in a foreground service"
@@ -118,7 +135,7 @@ grep -q 'text="Pause"' "$OUT/single.xml" || fail "Smoke Single.bin already finis
 tap single "Pause"
 wait_for 10 single-paused 'text="Resume"' "the Resume button"
 grep -q "Paused" "$OUT/single-paused.xml" || fail "the torrent doesn't say it's paused"
-shot 4-paused
+shot 5-paused
 echo "PASS: pausing works"
 tap single-paused "Resume"
 wait_for 10 single-resumed 'text="Pause"' "the Pause button again"
@@ -133,7 +150,7 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 [ "$(grep -o 'Finished · ' "$OUT/list-done.xml" | wc -l)" -ge 2 ] || fail "both torrents didn't finish"
-shot 5-finished
+shot 6-finished
 echo "PASS: both torrents finished"
 check_file "Smoke Album/Track 1.bin"
 check_file "Smoke Album/Track 2.bin"
@@ -147,7 +164,7 @@ echo "--- Torrent details and files"
 tap list-done "Smoke Album"
 sleep 2
 dump album
-shot 6-album
+shot 7-album
 grep -q "Track 2.bin" "$OUT/album.xml" || fail "the album's files aren't listed"
 echo "PASS: the details screen lists the files"
 adb shell input keyevent KEYCODE_BACK
@@ -160,7 +177,7 @@ launch
 wait_for 15 relaunched "Smoke Single.bin" "the torrents after reopening"
 grep -q "Smoke Album" "$OUT/relaunched.xml" || fail "the album is gone after reopening"
 wait_for 15 relaunched "Finished · " "the torrents to show as finished after reopening"
-shot 7-reopened
+shot 8-reopened
 echo "PASS: torrents are remembered"
 
 echo "--- Deleting a torrent and its files"
@@ -176,7 +193,7 @@ dump delete-dialog-checked
 tap delete-dialog-checked "Remove"
 sleep 4
 dump after-delete
-shot 8-after-delete
+shot 9-after-delete
 grep -q "Smoke Single.bin" "$OUT/after-delete.xml" && fail "the deleted torrent is still listed"
 adb shell "ls '$DIR/Smoke Single.bin'" > /dev/null 2>&1 && fail "the deleted torrent's file is still there"
 check_file "Smoke Album/Track 1.bin"
