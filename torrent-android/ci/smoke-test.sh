@@ -23,6 +23,8 @@ fail() {
     echo "On screen:"; grep -o 'text="[^"]\+"' "$OUT/failure.xml" | head -40 || true
   fi
   adb logcat -d > "$OUT/logcat.txt" || true
+  echo "Crashes in logcat:"; grep -A25 "FATAL EXCEPTION" "$OUT/logcat.txt" | head -60 || true
+  echo "My Torrents log lines:"; grep -i "mytorrents\|libtorrent" "$OUT/logcat.txt" | tail -30 || true
   exit 1
 }
 dump() {
@@ -86,11 +88,10 @@ tap add "Magnet link"
 sleep 1
 adb shell "input text '$ALBUM'"
 sleep 1
-adb shell input keyevent KEYCODE_BACK # hide the keyboard
-sleep 1
 dump add-filled
 shot 2-add
-tap add-filled "Download"
+grep -q "Smoke+Album" "$OUT/add-filled.xml" || fail "the magnet link didn't get typed into the box"
+adb shell input keyevent KEYCODE_ENTER # the keyboard's Go key
 wait_for 20 list-album "Smoke Album" "the pasted magnet link to show up"
 echo "PASS: a pasted magnet link is added"
 

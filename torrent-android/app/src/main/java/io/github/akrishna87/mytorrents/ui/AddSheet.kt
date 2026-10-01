@@ -86,7 +86,7 @@ fun AddSheet(vm: TorrentsViewModel) {
                         Icon(Icons.Rounded.ContentPaste, "Paste")
                     }
                 },
-                maxLines = 4,
+                singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = { if (link.isNotBlank()) vm.addMagnet(link) }),
