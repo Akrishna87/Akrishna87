@@ -88,10 +88,9 @@ grep -q "Open a .torrent file" "$OUT/add.xml" || fail "the Add sheet didn't open
 tap add "Magnet link"
 sleep 1
 adb shell "input text '$ALBUM'"
-sleep 1
-dump add-filled
+# Typing into the emulator is slow; wait until the whole link is in the box.
+wait_for 60 add-filled "10.0.2.2:6881" "the magnet link to be typed into the box"
 shot 2-add
-grep -q "Smoke+Album" "$OUT/add-filled.xml" || fail "the magnet link didn't get typed into the box"
 adb shell input keyevent KEYCODE_ENTER # the keyboard's Go key
 wait_for 20 list-album "Smoke Album" "the pasted magnet link to show up"
 echo "PASS: a pasted magnet link is added"
