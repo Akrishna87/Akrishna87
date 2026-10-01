@@ -27,10 +27,15 @@ dump() {
   local i
   for i in 1 2 3 4 5 6; do
     rm -f "$OUT/$1.xml"
-    # While a video plays the screen is never "idle", and uiautomator sometimes gives up; try again.
-    if ! { adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 && adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null 2>&1; } \
+    # Remove the last reading first: when uiautomator gives up (a playing video means the screen
+    # is never "idle") it leaves the old file behind, which would describe the wrong screen.
+    adb shell rm -f /sdcard/ui.xml
+    local said
+    said=$(adb shell uiautomator dump /sdcard/ui.xml 2>&1 || true)
+    if ! echo "$said" | grep -q "dumped to" || ! adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null 2>&1 \
       || ! grep -q '<hierarchy' "$OUT/$1.xml"; then
-      echo "(couldn't read the screen, trying again)"
+      echo "(couldn't read the screen: ${said//$'\n'/ }; trying again)"
+      rm -f "$OUT/$1.xml"
       sleep 1
       continue
     fi
@@ -116,12 +121,13 @@ adb shell input keyevent KEYCODE_MEDIA_PAUSE
 sleep 2
 playing && fail "the media pause button didn't pause the video"
 dump controls
-if ! grep -q 'content-desc="Load subtitles"' "$OUT/controls.xml"; then
-  echo "(controls hidden; tapping the video to show them)"
+for _ in 1 2; do # a tap shows hidden controls (and hides visible ones), so try twice
+  grep -q 'content-desc="Load subtitles"' "$OUT/controls.xml" && break
+  echo "(controls hidden; tapping the video)"
   tap_center controls
   sleep 2
   dump controls
-fi
+done
 shot 3-player-controls
 grep -q 'content-desc="Load subtitles"' "$OUT/controls.xml" || fail "the player's top bar (subtitles, rotate…) didn't show"
 grep -q 'content-desc="Rotate"' "$OUT/controls.xml" || fail "the rotate button is missing"
