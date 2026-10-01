@@ -29,6 +29,12 @@ dump() {
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null && adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null
     # The emulator's own apps sometimes freeze while it warms up; wave the "isn't responding"
     # popup away so it doesn't cover the app. Crashes of My Videos are caught from logcat at the end.
+    if grep -q 'text="Viewing full screen"' "$OUT/$1.xml"; then # in case the tip shows anyway
+      echo "(dismissing the 'Viewing full screen' tip)"
+      adb shell input tap $(python3 "$HERE/find_text.py" "$OUT/$1.xml" "Got it")
+      sleep 2
+      continue
+    fi
     grep -q "isn&apos;t responding\|isn't responding" "$OUT/$1.xml" || return 0
     echo "(dismissing a system 'isn't responding' popup)"
     python3 "$HERE/find_text.py" "$OUT/$1.xml" "Wait" > /dev/null 2>&1 && adb shell input tap $(python3 "$HERE/find_text.py" "$OUT/$1.xml" "Wait")
@@ -70,6 +76,8 @@ adb shell content query --uri content://media/external/video/media --projection 
 echo "--- Launching the app"
 # Don't let other apps' "isn't responding" popups cover the screen during the test.
 adb shell settings put global hide_error_dialogs 1 || true
+# Skip Android's one-time "Viewing full screen" tip, which would cover the player.
+adb shell settings put secure immersive_mode_confirmations confirmed || true
 adb shell pm grant "$PKG" android.permission.READ_MEDIA_VIDEO
 adb logcat -c
 adb shell am start -W -n "$PKG/.MainActivity"
