@@ -1,0 +1,109 @@
+name: Torrent app APK
+
+on:
+  push:
+    paths:
+      - "torrent-android/**"
+      - ".github/workflows/torrent-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: torrent-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: torrent-android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew --no-daemon --stacktrace assembleRelease
+      - name: Name the APK
+        run: cp app/build/outputs/apk/release/app-release.apk MyTorrents.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyTorrents-apk
+          path: torrent-android/MyTorrents.apk
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MyTorrents-apk
+          path: apk
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Start a test seeder on this machine
+        run: |
+          pip install libtorrent
+          mkdir -p seedwork
+          nohup python torrent-android/ci/seed.py seedwork 6881 127.0.0.1 > seeder.log 2>&1 &
+          for _ in $(seq 1 30); do [ -f seedwork/Smoke-Single.magnet ] && break; sleep 1; done
+          cat seeder.log
+          test -f seedwork/Smoke-Single.magnet
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and run on an Android 14 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
+          script: bash torrent-android/ci/smoke-test.sh apk/MyTorrents.apk seedwork smoke-out
+      - name: Seeder log
+        if: always()
+        run: cp seeder.log smoke-out/ 2>/dev/null || true; tail -50 seeder.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: torrent-smoke-test-screens
+          path: smoke-out
+
+  publish:
+    needs: [build, smoke-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MyTorrents-apk
+          path: out
+      - uses: actions/download-artifact@v4
+        with:
+          name: torrent-smoke-test-screens
+          path: out/screens
+      - name: Publish the APK as the "torrent-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete torrent-latest --cleanup-tag --yes || true
+          gh release create torrent-latest out/MyTorrents.apk out/screens/*.png \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "My Torrents for Android (build ${{ github.run_number }})" \
+            --notes "Download **MyTorrents.apk** on your Android phone, open it, and allow installing from your browser when asked. Each new build installs as an update over the last one. The PNG files are screenshots from the automatic emulator test of this build."
