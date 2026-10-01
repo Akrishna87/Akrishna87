@@ -37,6 +37,7 @@ import org.libtorrent4j.alerts.TorrentErrorAlert
 import org.libtorrent4j.alerts.TorrentFinishedAlert
 import org.libtorrent4j.swig.error_code
 import org.libtorrent4j.swig.libtorrent
+import org.libtorrent4j.swig.settings_pack
 import org.libtorrent4j.swig.torrent_flags_t
 
 /** One torrent as the screens show it. */
@@ -206,14 +207,14 @@ class TorrentEngine(private val stateDir: File) {
     private fun add(params: AddTorrentParams, saveDir: File) {
         saveDir.mkdirs()
         params.savePath = saveDir.absolutePath
-        // Start right away (libtorrent's queue still limits how many run at once).
-        params.flags = params.flags.and_(TorrentFlags.PAUSED.inv()).or_(TorrentFlags.AUTO_MANAGED)
+        // Start right away, and not "auto-managed": libtorrent's queue would otherwise decide when it
+        // runs (only every 30 s or so), which makes pause/resume feel broken.
+        params.flags = params.flags.and_(TorrentFlags.PAUSED.inv()).and_(TorrentFlags.AUTO_MANAGED.inv())
         session.swig().async_add_torrent(params.swig())
     }
 
     fun pause(id: String) {
         val h = handles[id]?.takeIf { it.isValid } ?: return
-        // Not auto-managed, or libtorrent's queue would start it again.
         h.unsetFlags(TorrentFlags.AUTO_MANAGED)
         h.pause()
         h.saveResumeData(TorrentHandle.SAVE_INFO_DICT)
@@ -223,7 +224,7 @@ class TorrentEngine(private val stateDir: File) {
     fun resume(id: String) {
         val h = handles[id]?.takeIf { it.isValid } ?: return
         h.swig().clear_error()
-        h.setFlags(TorrentFlags.AUTO_MANAGED)
+        h.unsetFlags(TorrentFlags.AUTO_MANAGED)
         h.resume()
         h.saveResumeData(TorrentHandle.SAVE_INFO_DICT)
         refresh()
@@ -293,6 +294,9 @@ class TorrentEngine(private val stateDir: File) {
     private fun settingsPack(settings: EngineSettings): SettingsPack = SettingsPack()
         .downloadRateLimit(settings.downloadLimitKb * 1024)
         .uploadRateLimit(settings.uploadLimitKb * 1024)
+        // libtorrent waits 60 s before reconnecting to a peer it was connected to, so a paused and
+        // resumed torrent would sit at "Looking for peers" for a minute. 10 s is still polite.
+        .setInteger(settings_pack.int_types.min_reconnect_time.swigValue(), 10)
 
     private fun restore() {
         stateDir.listFiles { f -> f.name.endsWith(".resume") }?.forEach { file ->
@@ -416,6 +420,12 @@ class TorrentEngine(private val stateDir: File) {
         if (!h.isValid) return
         val id = idOf(h)
         handles[id] = h
+        // Saved by an older version as "queued" (auto-managed): run it, under the app's own control.
+        val flags = h.status(true).flags()
+        if (flags.has(TorrentFlags.AUTO_MANAGED)) {
+            h.unsetFlags(TorrentFlags.AUTO_MANAGED)
+            if (flags.has(TorrentFlags.PAUSED)) h.resume()
+        }
         // Write the resume file straight away, so the torrent is remembered even if the app is closed now.
         h.saveResumeData(TorrentHandle.SAVE_INFO_DICT)
         refresh()
@@ -436,7 +446,11 @@ class TorrentEngine(private val stateDir: File) {
 
     private fun idOf(h: TorrentHandle): String = idOf(InfoHash(h.swig().info_hashes()))
 
-    private fun idOf(hashes: InfoHash): String = hashes.best.toHex()
+    /**
+     * The v1 info-hash when there is one, else the (shortened) v2 one. Not simply "the best" hash:
+     * a hybrid v1+v2 torrent added from a v1-only magnet link would change id once its info arrives.
+     */
+    private fun idOf(hashes: InfoHash): String = (if (hashes.hasV1()) hashes.v1 else hashes.best).toHex()
 
     private fun torrent_flags_t.has(flag: torrent_flags_t) = and_(flag).non_zero()
 }
