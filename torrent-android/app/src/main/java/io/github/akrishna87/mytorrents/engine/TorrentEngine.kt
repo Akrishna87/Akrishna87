@@ -107,6 +107,7 @@ class TorrentEngine(private val stateDir: File) {
 
     @Volatile
     private var pendingSaves: CountDownLatch? = null
+    private var refreshFailed = false
 
     private val _torrents = MutableStateFlow<List<Torrent>>(emptyList())
 
@@ -328,6 +329,10 @@ class TorrentEngine(private val stateDir: File) {
             try {
                 toTorrent(id, h.status(TorrentHandle.QUERY_NAME.or_(TorrentHandle.QUERY_SAVE_PATH)))
             } catch (e: Throwable) {
+                if (!refreshFailed) {
+                    refreshFailed = true
+                    events.onMessage("Couldn't read a torrent's status: $e")
+                }
                 null
             }
         }.sortedByDescending { it.addedAt }
@@ -394,7 +399,7 @@ class TorrentEngine(private val stateDir: File) {
                     is FileErrorAlert -> events.onMessage("${alert.handle().name}: ${alert.error().message} (${alert.filename()})")
                 }
             } catch (e: Throwable) {
-                events.onMessage("Torrent engine error: ${e.message}")
+                events.onMessage("Torrent engine error: $e")
             }
         }
     }
