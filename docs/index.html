@@ -466,7 +466,7 @@
   // Kill switch: set to true to take the app offline for everyone —
   // no rendering, no Firebase calls, nothing. Flip back to false and
   // push to reactivate; nothing else in this file needs to change.
-  var MAINTENANCE_MODE = true;
+  var MAINTENANCE_MODE = false;
   if (MAINTENANCE_MODE) {
     var modeToggle = document.querySelector(".mode-toggle");
     if (modeToggle) modeToggle.style.display = "none";
