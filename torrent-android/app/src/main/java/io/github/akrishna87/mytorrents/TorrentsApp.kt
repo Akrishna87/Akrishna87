@@ -7,6 +7,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Environment
+import android.util.Log
 import io.github.akrishna87.mytorrents.engine.Status
 import io.github.akrishna87.mytorrents.engine.Torrent
 import io.github.akrishna87.mytorrents.engine.TorrentEngine
@@ -54,13 +55,19 @@ class TorrentsApp : Application() {
             }
 
             override fun onMessage(message: String) {
-                _messages.tryEmit(message)
+                say(message)
             }
         }
         scope.launch(Dispatchers.IO) {
-            engine.seedWhenFinished = settings.seedWhenFinished.value
-            engine.start(settings.engineSettings())
-            started.value = true
+            try {
+                engine.seedWhenFinished = settings.seedWhenFinished.value
+                engine.start(settings.engineSettings())
+                Log.i(TAG, "torrent engine started")
+                started.value = true
+            } catch (e: Throwable) {
+                Log.e(TAG, "couldn't start the torrent engine", e)
+                say("Couldn't start downloading: ${e.message}")
+            }
         }
         watchNetwork()
         scope.launch {
@@ -85,6 +92,7 @@ class TorrentsApp : Application() {
     }
 
     fun say(message: String) {
+        Log.i(TAG, message)
         _messages.tryEmit(message)
     }
 
@@ -126,6 +134,8 @@ class TorrentsApp : Application() {
     }
 
     companion object {
+        const val TAG = "MyTorrents"
+
         /** Torrents that need the app to keep running. */
         fun isActive(t: Torrent) = t.status in setOf(Status.GettingInfo, Status.Checking, Status.Queued, Status.Downloading, Status.Seeding)
     }

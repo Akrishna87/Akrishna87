@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -96,6 +97,7 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addMagnet(link: String) {
+        Log.i(TorrentsApp.TAG, "adding a magnet link")
         viewModelScope.launch {
             val engine = app.ready()
             try {
@@ -103,12 +105,15 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
                 val name = Uri.parse(link.trim()).getQueryParameter("dn")
                 val known = torrents.value.map { it.id }.toSet()
                 val id = engine.addMagnet(link, dir)
+                Log.i(TorrentsApp.TAG, "added magnet $id into $dir")
                 app.say(if (id in known) "Already in your list" else "Added ${name ?: "the magnet link"}")
                 showAdd = false
                 TorrentService.start(app)
             } catch (e: IllegalArgumentException) {
+                Log.w(TorrentsApp.TAG, "bad magnet link", e)
                 app.say("That isn't a valid magnet link")
             } catch (e: Exception) {
+                Log.w(TorrentsApp.TAG, "couldn't add a magnet link", e)
                 app.say("Couldn't add it: ${e.message}")
             }
         }

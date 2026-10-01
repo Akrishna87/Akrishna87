@@ -24,7 +24,8 @@ fail() {
   fi
   adb logcat -d > "$OUT/logcat.txt" || true
   echo "Crashes in logcat:"; grep -A25 "FATAL EXCEPTION" "$OUT/logcat.txt" | head -60 || true
-  echo "My Torrents log lines:"; grep -i "mytorrents\|libtorrent" "$OUT/logcat.txt" | tail -30 || true
+  echo "My Torrents log lines:"; grep "MyTorrents\|libtorrent\|torrent4j\|UnsatisfiedLink" "$OUT/logcat.txt" | tail -40 || true
+  echo "App process log:"; pid=$(adb shell pidof "$PKG" | tr -d '\r'); [ -n "$pid" ] && grep " $pid " "$OUT/logcat.txt" | grep -v "ImeTracker\|InputMethod" | tail -40 || true
   exit 1
 }
 dump() {
