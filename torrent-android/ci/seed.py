@@ -51,7 +51,11 @@ session = lt.session({
     "enable_upnp": False,
     "enable_natpmp": False,
     "allow_multiple_connections_per_ip": True,
-    "alert_mask": lt.alert_category.error | lt.alert_category.status,
+    # TCP only: uTP (BitTorrent over UDP) through the emulator's network address translation
+    # stalls now and then, which would make the test flaky without saying anything about the app.
+    "enable_incoming_utp": False,
+    "enable_outgoing_utp": False,
+    "alert_mask": lt.alert_category.error | lt.alert_category.status | lt.alert_category.connect,
 })
 
 # Wait until it's listening, and use the port it actually got.
@@ -88,7 +92,15 @@ for name in ["Smoke Album", "Smoke Single.bin"]:
     print(magnet, flush=True)
 
 print(f"Seeding on port {port}", flush=True)
+ticks = 0
 while True:
     for a in session.pop_alerts():
         print("seeder:", a.message(), flush=True)
+    ticks += 1
+    if ticks % 5 == 0:
+        for h in session.get_torrents():
+            st = h.status()
+            if st.num_peers or st.upload_rate:
+                print(f"seeder status: {st.name}: {st.num_peers} peers, up {st.upload_rate // 1024} KB/s, "
+                      f"sent {st.total_payload_upload // 1024} KB", flush=True)
     time.sleep(1)
