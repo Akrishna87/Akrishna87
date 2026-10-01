@@ -66,8 +66,8 @@ touches this folder:
 1. **build**: `./gradlew assembleRelease`.
 2. **smoke-test**: starts a small seeder on the CI machine (`ci/seed.py`, using
    libtorrent's Python package) and installs the APK on an Android 14
-   emulator. It adds one magnet link by pasting it into **Add** and another by
-   opening it like a browser would, then checks they download into
+   emulator. It checks the **Add** sheet opens, adds one magnet link by
+   sharing it to the app and another by opening it like a browser would, then checks they download into
    Download/Torrents with the right contents, that pausing and resuming work, a
    foreground service runs while downloading, a "Download finished"
    notification appears, the torrents are still there after the app is closed,

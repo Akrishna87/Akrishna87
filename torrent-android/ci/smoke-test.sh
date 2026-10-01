@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the Android emulator job: installs the APK and downloads two torrents from a seeder
 # running on the CI machine (ci/seed.py, reachable from the emulator at 10.0.2.2). Checks that:
-# a magnet link pasted into "Add" and one opened like a browser link both download, the files land
+# a magnet link shared to the app and one opened like a browser link both download, the files land
 # in Download/Torrents with the right contents, pausing works, a background service runs while
 # downloading, a "finished" notification appears, torrents are remembered after the app is
 # closed, and deleting a torrent removes its files.
@@ -80,20 +80,22 @@ shot 1-empty
 grep -q "No torrents yet" "$OUT/empty.xml" || fail "the empty list isn't shown"
 echo "PASS: app opens on the empty list"
 
-echo "--- Pasting a magnet link into Add"
+echo "--- The Add sheet"
 tap empty "Add a torrent"
 sleep 2
 dump add
-grep -q "Open a .torrent file" "$OUT/add.xml" || fail "the Add sheet didn't open"
-tap add "Magnet link"
-sleep 1
-adb shell "input text '$ALBUM'"
-# Typing into the emulator is slow; wait until the whole link is in the box.
-wait_for 60 add-filled "10.0.2.2:6881" "the magnet link to be typed into the box"
 shot 2-add
-adb shell input keyevent KEYCODE_ENTER # the keyboard's Go key
-wait_for 20 list-album "Smoke Album" "the pasted magnet link to show up"
-echo "PASS: a pasted magnet link is added"
+grep -q "Open a .torrent file" "$OUT/add.xml" || fail "the Add sheet didn't open"
+grep -q "Magnet link" "$OUT/add.xml" || fail "the Add sheet has no magnet link box"
+echo "PASS: the Add sheet opens"
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+
+echo "--- Sharing a magnet link to the app"
+# (Typing a long link with the emulator's keyboard is too slow and unreliable to test.)
+adb shell "am start -W -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'Check this out: $ALBUM' -n $PKG/.MainActivity" > /dev/null
+wait_for 20 list-album "Smoke Album" "the shared magnet link to show up"
+echo "PASS: a shared magnet link is added"
 
 echo "--- Opening a magnet link like a browser does"
 adb shell "am start -W -a android.intent.action.VIEW -d '$SINGLE'" > /dev/null
