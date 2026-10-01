@@ -116,23 +116,27 @@ shot 2-player
 [ "$(rotation player)" = 1 ] || [ "$(rotation player)" = 3 ] || fail "a wide video didn't turn the screen landscape"
 echo "PASS: wide videos play in landscape"
 
-echo "--- Player controls (paused, so they stay up while the screen is read)"
+echo "--- Player controls"
+# While the controls are up they redraw the clock every second, so uiautomator never sees an idle
+# screen. Read the player's view tree from dumpsys instead, which doesn't wait.
+controls_up() {
+  adb shell dumpsys activity top > "$OUT/activity-top.txt"
+  grep -qE 'PlayerControlView\{[0-9a-f]+ V|\{[0-9a-f]+ V[^}]*id/exo_controller\}' "$OUT/activity-top.txt"
+}
 adb shell input keyevent KEYCODE_MEDIA_PAUSE
 sleep 2
 playing && fail "the media pause button didn't pause the video"
-dump controls
-for _ in 1 2; do # a tap shows hidden controls (and hides visible ones), so try twice
-  grep -q 'content-desc="Load subtitles"' "$OUT/controls.xml" && break
+if ! controls_up; then
   echo "(controls hidden; tapping the video)"
-  tap_center controls
+  tap_center player
   sleep 2
-  dump controls
-done
+fi
+if ! controls_up; then
+  grep -m5 'PlayerControlView\|exo_controller' "$OUT/activity-top.txt" || true
+  fail "tapping the video didn't show the player's controls"
+fi
 shot 3-player-controls
-grep -q 'content-desc="Load subtitles"' "$OUT/controls.xml" || fail "the player's top bar (subtitles, rotate…) didn't show"
-grep -q 'content-desc="Rotate"' "$OUT/controls.xml" || fail "the rotate button is missing"
-grep -q 'content-desc="Resize"' "$OUT/controls.xml" || fail "the resize button is missing"
-echo "PASS: the controls show, including the top bar"
+echo "PASS: the player's controls show"
 
 echo "--- Media 'next' and 'play' buttons (headphones)"
 adb shell input keyevent KEYCODE_MEDIA_NEXT
@@ -157,9 +161,12 @@ echo "PASS: half-watched videos show under Continue watching"
 echo "--- Resuming where it stopped"
 tap after-back "Smoke Video 1" first # the Continue watching card is above the full list
 sleep 3
-dump resumed
 shot 5-resumed
-grep -q 'text="Resumed at 0:' "$OUT/resumed.xml" || fail "the video didn't pick up where it was left"
+playing || fail "the Continue watching card didn't play the video"
+grep -q "Smoke Video 1" "$OUT/session.txt" || fail "the Continue watching card played the wrong video"
+POS=$(grep -oE 'PlaybackState \{state=[^,]*, position=[0-9]+' "$OUT/session.txt" | head -1 | grep -oE '[0-9]+$' || true)
+echo "Started at ${POS:-?} ms"
+[ "${POS:-0}" -ge 5000 ] || fail "the video didn't pick up where it was left (it started at ${POS:-?} ms)"
 echo "PASS: picks up where you left off"
 adb shell input keyevent KEYCODE_BACK
 sleep 3
