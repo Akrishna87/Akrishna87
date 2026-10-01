@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.URLDecoder
 
 sealed interface Screen {
     data object List : Screen
@@ -102,7 +103,9 @@ class TorrentsViewModel(application: Application) : AndroidViewModel(application
             val engine = app.ready()
             try {
                 val dir = withContext(Dispatchers.IO) { app.downloadDir() }
-                val name = Uri.parse(link.trim()).getQueryParameter("dn")
+                // (Uri.getQueryParameter doesn't work on magnet links: Android sees them as "opaque".)
+                val name = Regex("[?&]dn=([^&]*)").find(link)?.groupValues?.get(1)
+                    ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrNull() }
                 val known = torrents.value.map { it.id }.toSet()
                 val id = engine.addMagnet(link, dir)
                 Log.i(TorrentsApp.TAG, "added magnet $id into $dir")
