@@ -387,8 +387,17 @@ var FIREBASE_CONFIG = null;
 var FIREBASE_SDK_VERSION = "10.14.1";
 var REQUIRE_SIGN_IN = true;
 
-var cloud = { docRef: null, setDoc: null, ready: false, failed: false };
+// Settings (categories, payment methods, recurring items, currency) live in
+// one doc and sync as a whole - they're only ever edited from this app, by
+// one person, so last-write-wins is fine. Entries are different: anything
+// else that can create expenses (e.g. an email-based logging pipeline) can
+// write at the same time as this app is open, so each entry is its own
+// document in a subcollection instead of a field inside one big doc - that
+// way two writers adding/editing different entries can never clobber each
+// other's data, which a single whole-document overwrite could.
+var cloud = { ready: false, failed: false, fs: null, settingsDocRef: null, entriesColRef: null };
 var applyingRemoteUpdate = false;
+var remoteEntriesLoaded = false;
 var authApi = { signIn: null, signOut: null };
 var authState = {
   required: !!(FIREBASE_CONFIG && REQUIRE_SIGN_IN),
@@ -409,11 +418,16 @@ function initFirebase() {
     var appMod = mods[0], fsMod = mods[1], authMod = mods[2];
     var app = appMod.initializeApp(FIREBASE_CONFIG);
     var db = fsMod.getFirestore(app);
+    cloud.fs = fsMod;
+
+    function enterAccount(email) {
+      cloud.settingsDocRef = fsMod.doc(db, "expenseTracker", email);
+      cloud.entriesColRef = fsMod.collection(db, "expenseTracker", email, "entries");
+      startFirestoreSync();
+    }
 
     if (!authState.required) {
-      cloud.docRef = fsMod.doc(db, "expenseTracker", "default");
-      cloud.setDoc = fsMod.setDoc;
-      startFirestoreSync(fsMod);
+      enterAccount("default");
       return;
     }
 
@@ -429,10 +443,7 @@ function initFirebase() {
       authState.ready = true;
       authState.user = user || null;
       if (user) {
-        var myEmail = (user.email || "").toLowerCase();
-        cloud.docRef = fsMod.doc(db, "expenseTracker", myEmail);
-        cloud.setDoc = fsMod.setDoc;
-        startFirestoreSync(fsMod);
+        enterAccount((user.email || "").toLowerCase());
       } else {
         cloud.ready = false;
         render();
@@ -446,34 +457,85 @@ function initFirebase() {
   });
 }
 
-function startFirestoreSync(fsMod) {
+function startFirestoreSync() {
+  var fsMod = cloud.fs;
   cloud.ready = true;
   cloud.failed = false;
+  remoteEntriesLoaded = false;
   render();
-  fsMod.onSnapshot(cloud.docRef, function (snap) {
+
+  fsMod.onSnapshot(cloud.settingsDocRef, function (snap) {
     if (!snap.exists()) {
-      pushCloudUpdate();
+      pushSettingsUpdate();
       return;
     }
     var remote = snap.data();
-    if (JSON.stringify(remote) === JSON.stringify(state)) return;
     applyingRemoteUpdate = true;
-    state = remote;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    if (Array.isArray(remote.categories)) state.categories = remote.categories;
+    if (Array.isArray(remote.paymentMethods) && remote.paymentMethods.length) state.paymentMethods = remote.paymentMethods;
+    if (Array.isArray(remote.recurringItems)) state.recurringItems = remote.recurringItems;
+    if (remote.currencySymbol) state.currencySymbol = remote.currencySymbol;
+    saveLocal();
     render();
     applyingRemoteUpdate = false;
   }, function (err) {
-    console.warn("Cloud sync: listen failed", err);
+    console.warn("Cloud sync: settings listen failed", err);
     cloud.ready = false;
     cloud.failed = true;
     render();
   });
+
+  fsMod.onSnapshot(cloud.entriesColRef, function (snap) {
+    var firstLoad = !remoteEntriesLoaded;
+    remoteEntriesLoaded = true;
+    if (firstLoad && snap.empty && state.entries.length) {
+      // Nothing in the cloud yet but we already have local history (first
+      // time enabling sync on a device with existing data) - seed it up.
+      state.entries.forEach(function (e) { pushEntryUpsert(e); });
+      return;
+    }
+    var entries = [];
+    snap.forEach(function (doc) {
+      var data = doc.data();
+      data.id = doc.id;
+      entries.push(data);
+    });
+    entries.sort(function (a, b) { return (a.date || "") < (b.date || "") ? -1 : ((a.date || "") > (b.date || "") ? 1 : 0); });
+    applyingRemoteUpdate = true;
+    state.entries = entries;
+    saveLocal();
+    render();
+    applyingRemoteUpdate = false;
+  }, function (err) {
+    console.warn("Cloud sync: entries listen failed", err);
+  });
 }
 
-function pushCloudUpdate() {
-  if (!cloud.ready || applyingRemoteUpdate) return;
-  cloud.setDoc(cloud.docRef, state).catch(function (err) {
-    console.warn("Cloud sync: push failed", err);
+function pushSettingsUpdate() {
+  if (!cloud.ready || applyingRemoteUpdate || !cloud.settingsDocRef) return;
+  cloud.fs.setDoc(cloud.settingsDocRef, {
+    currencySymbol: state.currencySymbol,
+    categories: state.categories,
+    paymentMethods: state.paymentMethods,
+    recurringItems: state.recurringItems
+  }, { merge: true }).catch(function (err) {
+    console.warn("Cloud sync: settings push failed", err);
+  });
+}
+
+function pushEntryUpsert(entry) {
+  if (!cloud.ready || applyingRemoteUpdate || !cloud.entriesColRef) return;
+  var copy = Object.assign({}, entry);
+  delete copy.id;
+  cloud.fs.setDoc(cloud.fs.doc(cloud.entriesColRef, entry.id), copy).catch(function (err) {
+    console.warn("Cloud sync: entry push failed", err);
+  });
+}
+
+function pushEntryDelete(id) {
+  if (!cloud.ready || applyingRemoteUpdate || !cloud.entriesColRef) return;
+  cloud.fs.deleteDoc(cloud.fs.doc(cloud.entriesColRef, id)).catch(function (err) {
+    console.warn("Cloud sync: entry delete failed", err);
   });
 }
 
@@ -535,9 +597,8 @@ function loadState() {
   };
 }
 
-function saveState() {
+function saveLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
-  pushCloudUpdate();
 }
 
 var state = loadState();
@@ -689,7 +750,7 @@ function allPendingItems() {
 }
 
 function confirmDueItem(item, periodIndex, amount, date) {
-  state.entries.push({
+  var entry = {
     id: genId("e"),
     type: item.type,
     amount: Number(amount) || 0,
@@ -700,9 +761,9 @@ function confirmDueItem(item, periodIndex, amount, date) {
     sourceName: item.type === "income" ? item.name : null,
     recurringId: item.id,
     periodIndex: periodIndex
-  });
+  };
+  upsertEntry(entry);
   delete dueOverrides[item.id + "_" + periodIndex];
-  saveState();
   render();
 }
 
@@ -710,7 +771,8 @@ function skipDueItem(item, periodIndex) {
   if (!Array.isArray(item.skippedPeriods)) item.skippedPeriods = [];
   if (item.skippedPeriods.indexOf(periodIndex) < 0) item.skippedPeriods.push(periodIndex);
   delete dueOverrides[item.id + "_" + periodIndex];
-  saveState();
+  saveLocal();
+  pushSettingsUpdate();
   render();
 }
 
@@ -740,12 +802,14 @@ function upsertEntry(entry) {
   var idx = state.entries.findIndex(function (e) { return e.id === entry.id; });
   if (idx >= 0) state.entries[idx] = entry;
   else state.entries.push(entry);
-  saveState();
+  saveLocal();
+  pushEntryUpsert(entry);
 }
 
 function deleteEntry(id) {
   state.entries = state.entries.filter(function (e) { return e.id !== id; });
-  saveState();
+  saveLocal();
+  pushEntryDelete(id);
   render();
 }
 
@@ -753,12 +817,14 @@ function upsertRecurring(item) {
   var idx = state.recurringItems.findIndex(function (r) { return r.id === item.id; });
   if (idx >= 0) state.recurringItems[idx] = item;
   else state.recurringItems.push(item);
-  saveState();
+  saveLocal();
+  pushSettingsUpdate();
 }
 
 function deleteRecurring(id) {
   state.recurringItems = state.recurringItems.filter(function (r) { return r.id !== id; });
-  saveState();
+  saveLocal();
+  pushSettingsUpdate();
   render();
 }
 
@@ -766,12 +832,14 @@ function upsertCategory(cat) {
   var idx = state.categories.findIndex(function (c) { return c.id === cat.id; });
   if (idx >= 0) state.categories[idx] = cat;
   else state.categories.push(cat);
-  saveState();
+  saveLocal();
+  pushSettingsUpdate();
 }
 
 function deleteCategory(id) {
   state.categories = state.categories.filter(function (c) { return c.id !== id; });
-  saveState();
+  saveLocal();
+  pushSettingsUpdate();
   render();
 }
 
@@ -1545,7 +1613,8 @@ function renderSettings() {
     input.value = state.currencySymbol;
     input.addEventListener("input", function () {
       state.currencySymbol = input.value || "₹";
-      saveState();
+      saveLocal();
+      pushSettingsUpdate();
     });
     return input;
   })());
