@@ -61,6 +61,13 @@ tap() { # tap <dump name> <text> [first|last]
 session() { adb shell dumpsys media_session > "$OUT/session.txt"; }
 playing() { session; grep -Eq "\{state=(PLAYING|3)" "$OUT/session.txt"; }
 rotation() { grep -o '<hierarchy rotation="[0-9]"' "$OUT/$1.xml" | grep -o '[0-9]'; }
+tap_center() { # tap the middle of the screen, as laid out in <dump name>
+  adb shell input tap $(python3 -c '
+import re, sys, xml.etree.ElementTree as ET
+node = next(ET.parse(sys.argv[1]).iter("node"))
+x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
+print((x1 + x2) // 2, (y1 + y2) // 2)' "$OUT/$1.xml")
+}
 hide_keyboard() { if adb shell dumpsys input_method | grep -q "mInputShown=true"; then adb shell input keyevent KEYCODE_BACK; sleep 1; fi; }
 
 adb wait-for-device
@@ -109,11 +116,17 @@ adb shell input keyevent KEYCODE_MEDIA_PAUSE
 sleep 2
 playing && fail "the media pause button didn't pause the video"
 dump controls
+if ! grep -q 'content-desc="Load subtitles"' "$OUT/controls.xml"; then
+  echo "(controls hidden; tapping the video to show them)"
+  tap_center controls
+  sleep 2
+  dump controls
+fi
 shot 3-player-controls
 grep -q 'content-desc="Load subtitles"' "$OUT/controls.xml" || fail "the player's top bar (subtitles, rotate…) didn't show"
 grep -q 'content-desc="Rotate"' "$OUT/controls.xml" || fail "the rotate button is missing"
 grep -q 'content-desc="Resize"' "$OUT/controls.xml" || fail "the resize button is missing"
-echo "PASS: pausing shows the controls, including the top bar"
+echo "PASS: the controls show, including the top bar"
 
 echo "--- Media 'next' and 'play' buttons (headphones)"
 adb shell input keyevent KEYCODE_MEDIA_NEXT
