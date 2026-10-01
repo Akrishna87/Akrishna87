@@ -20,7 +20,7 @@ fail() {
   echo "SMOKE TEST FAILED: $*"
   adb exec-out screencap -p > "$OUT/failure.png" || true
   if adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 && adb pull /sdcard/ui.xml "$OUT/failure.xml" > /dev/null 2>&1; then
-    echo "On screen:"; grep -o 'text="[^"]\+"' "$OUT/failure.xml" | head -40 || true
+    echo "On screen:"; grep -o '\(text\|content-desc\)="[^"]\+"' "$OUT/failure.xml" | head -60 || true
   fi
   adb logcat -d > "$OUT/logcat.txt" || true
   echo "Crashes in logcat:"; grep -A25 "FATAL EXCEPTION" "$OUT/logcat.txt" | head -60 || true
@@ -81,9 +81,10 @@ grep -q "No torrents yet" "$OUT/empty.xml" || fail "the empty list isn't shown"
 echo "PASS: app opens on the empty list"
 
 echo "--- Pasting a magnet link into Add"
-tap empty "Add"
+tap empty "Add a torrent"
 sleep 2
 dump add
+grep -q "Open a .torrent file" "$OUT/add.xml" || fail "the Add sheet didn't open"
 tap add "Magnet link"
 sleep 1
 adb shell "input text '$ALBUM'"
