@@ -156,7 +156,7 @@ class PlayerActivity : ComponentActivity() {
             player = this@PlayerActivity.player
             setShowSubtitleButton(true)
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-            controllerShowTimeoutMs = 3500
+            controllerShowTimeoutMs = 5000
             setBackgroundColor(android.graphics.Color.BLACK)
             setControllerVisibilityListener(
                 PlayerView.ControllerVisibilityListener { visibility -> ui.controlsVisible = visibility == View.VISIBLE },
