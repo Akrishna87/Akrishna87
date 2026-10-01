@@ -25,21 +25,32 @@ fail() {
 }
 dump() {
   local i
-  for i in 1 2 3; do
-    adb shell uiautomator dump /sdcard/ui.xml > /dev/null && adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null
-    # The emulator's own apps sometimes freeze while it warms up; wave the "isn't responding"
-    # popup away so it doesn't cover the app. Crashes of My Videos are caught from logcat at the end.
-    if grep -q 'text="Viewing full screen"' "$OUT/$1.xml"; then # in case the tip shows anyway
+  for i in 1 2 3 4 5 6; do
+    rm -f "$OUT/$1.xml"
+    # While a video plays the screen is never "idle", and uiautomator sometimes gives up; try again.
+    if ! { adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 && adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null 2>&1; } \
+      || ! grep -q '<hierarchy' "$OUT/$1.xml"; then
+      echo "(couldn't read the screen, trying again)"
+      sleep 1
+      continue
+    fi
+    if grep -q 'text="Viewing full screen"' "$OUT/$1.xml"; then # Android's one-time full-screen tip
       echo "(dismissing the 'Viewing full screen' tip)"
       adb shell input tap $(python3 "$HERE/find_text.py" "$OUT/$1.xml" "Got it")
       sleep 2
       continue
     fi
-    grep -q "isn&apos;t responding\|isn't responding" "$OUT/$1.xml" || return 0
-    echo "(dismissing a system 'isn't responding' popup)"
-    python3 "$HERE/find_text.py" "$OUT/$1.xml" "Wait" > /dev/null 2>&1 && adb shell input tap $(python3 "$HERE/find_text.py" "$OUT/$1.xml" "Wait")
-    sleep 3
+    # The emulator's own apps sometimes freeze while it warms up; wave the "isn't responding"
+    # popup away so it doesn't cover the app. Crashes of My Videos are caught from logcat at the end.
+    if grep -q "isn&apos;t responding\|isn't responding" "$OUT/$1.xml"; then
+      echo "(dismissing a system 'isn't responding' popup)"
+      python3 "$HERE/find_text.py" "$OUT/$1.xml" "Wait" > /dev/null 2>&1 && adb shell input tap $(python3 "$HERE/find_text.py" "$OUT/$1.xml" "Wait")
+      sleep 3
+      continue
+    fi
+    return 0
   done
+  [ -f "$OUT/$1.xml" ] || fail "couldn't read what's on screen ($1)"
 }
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
 tap() { # tap <dump name> <text> [first|last]
