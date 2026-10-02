@@ -186,9 +186,10 @@ private fun SpotRow(rank: Int, spot: Spot, result: SpotResult, best: Boolean, fr
             else Text("$rank", Modifier.width(24.dp), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    spot.name + if (fresh) "  · just now" else "",
+                    spot.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    color = if (fresh) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     RatingDot(result.rating)
@@ -202,7 +203,8 @@ private fun SpotRow(rank: Int, spot: Spot, result: SpotResult, best: Boolean, fr
                     listOfNotNull(
                         "${result.minDbm} to ${result.maxDbm} dBm",
                         result.avgSinr?.let { "${result.tech.qualityName ?: "quality"} $it dB" },
-                        DateUtils.getRelativeTimeSpanString(spot.atMillis).toString(),
+                        if (System.currentTimeMillis() - spot.atMillis < DateUtils.MINUTE_IN_MILLIS) "just now"
+                        else DateUtils.getRelativeTimeSpanString(spot.atMillis).toString(),
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

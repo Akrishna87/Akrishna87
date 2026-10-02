@@ -278,7 +278,12 @@ class SignalMonitor(private val context: Context) {
                 type = runCatching { sim.tm.voiceNetworkType }.getOrDefault(TelephonyManager.NETWORK_TYPE_UNKNOWN)
             }
         }
-        val label = networkTypeLabel(type)
+        var label = networkTypeLabel(type)
+        // The reported type can lag behind, or describe the other SIM's data connection; a 4G or
+        // 5G cell the phone is registered on is the better witness.
+        if (label != null && label != "Wi-Fi calling" && main != null && (main.tech == Tech.LTE || main.tech == Tech.NR) &&
+            !label.startsWith(main.tech.label)
+        ) label = null
         return when {
             label == "4G" && nr != null -> "5G (on 4G)"
             label != null -> label
