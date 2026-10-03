@@ -26,7 +26,8 @@ dump() {
   rm -f "$OUT/$1.xml"
   adb shell rm -f /sdcard/ui.xml
   for i in 1 2 3; do
-    adb shell uiautomator dump /sdcard/ui.xml > /dev/null && adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null
+    # uiautomator often can't capture the animated wind map; callers check for an empty dump.
+    { adb shell uiautomator dump /sdcard/ui.xml > /dev/null && adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null; } 2>&1 || true
     # The emulator's own apps sometimes freeze while it warms up; wave the "isn't responding"
     # popup away so it doesn't cover the app.
     [ -s "$OUT/$1.xml" ] || { echo "(no screen dump this time)"; return 0; }
