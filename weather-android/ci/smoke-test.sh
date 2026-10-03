@@ -32,8 +32,14 @@ dump() {
     # popup away so it doesn't cover the app.
     [ -s "$OUT/$1.xml" ] || { echo "(no screen dump this time)"; return 0; }
     grep -q "isn&apos;t responding\|isn't responding" "$OUT/$1.xml" || return 0
-    echo "(dismissing a system 'isn't responding' popup)"
-    python3 "$FIND" "$OUT/$1.xml" "Wait" > /dev/null 2>&1 && adb shell input tap $(python3 "$FIND" "$OUT/$1.xml" "Wait")
+    # "Close app" restarts the frozen app (usually the launcher, in the background), so the popup
+    # stops coming back; "Wait" would leave it hanging and the popup returns every few seconds.
+    echo "(closing a frozen system app: $(grep -o 'text="[^"]*isn[^"]*responding"' "$OUT/$1.xml" | head -1))"
+    if python3 "$FIND" "$OUT/$1.xml" "Close app" > /dev/null 2>&1; then
+      adb shell input tap $(python3 "$FIND" "$OUT/$1.xml" "Close app")
+    elif python3 "$FIND" "$OUT/$1.xml" "Wait" > /dev/null 2>&1; then
+      adb shell input tap $(python3 "$FIND" "$OUT/$1.xml" "Wait")
+    fi
     sleep 3
   done
 }
