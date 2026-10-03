@@ -111,7 +111,20 @@ object OpenMeteo {
                 "&models=${MODELS.joinToString(",") { it.id }}&current=$NOW",
         )
         val c = JSONObject(text).getJSONObject("current")
-        return MODELS.map { m -> reading(c, m.id, m.name, m.agency, suffix = "_${m.id}") }
+        val all = MODELS.map { m -> reading(c, m.id, m.name, m.agency, suffix = "_${m.id}") }
+        if (all.any { it.hasData }) return all
+        // Not in the shape expected: ask each model on its own, one at a time.
+        android.util.Log.i("Vaanilai", "Combined model reply had keys ${c.keys().asSequence().toList()}; asking one by one")
+        return MODELS.map { m -> modelReading(place, m) }
+    }
+
+    /** What one particular model says right now. Regional models answer with nulls outside their area. */
+    suspend fun modelReading(place: Place, model: Model): Reading {
+        val text = Http.get(
+            "https://api.open-meteo.com/v1/forecast?${at(place)}&timezone=auto&forecast_days=1" +
+                "&models=${model.id}&current=$NOW",
+        )
+        return reading(JSONObject(text).getJSONObject("current"), model.id, model.name, model.agency)
     }
 
     private fun reading(c: JSONObject, id: String, name: String, agency: String, suffix: String = "") = Reading(

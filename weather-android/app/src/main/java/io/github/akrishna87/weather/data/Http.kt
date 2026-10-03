@@ -18,7 +18,7 @@ object Http {
     const val USER_AGENT = "Vaanilai/1.0 (+https://github.com/Akrishna87/Akrishna87)"
 
     /** Open-Meteo's free tier refuses too many requests at once, so at most this many run together. */
-    private val openMeteoSlots = Semaphore(3)
+    private val openMeteoSlots = Semaphore(2)
 
     /** GET with a retry or two when the server says "too many requests" or is slow to answer. */
     suspend fun get(url: String, accept: String = "application/json", timeoutMs: Int = 20_000): String {
