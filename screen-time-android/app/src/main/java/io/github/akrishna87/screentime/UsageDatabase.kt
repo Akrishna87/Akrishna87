@@ -54,6 +54,9 @@ abstract class UsageDao {
     @Query("SELECT MIN(day) FROM app_day")
     abstract fun firstDay(): Flow<Long?>
 
+    @Query("SELECT COALESCE(SUM(foregroundMs), 0) FROM app_day WHERE day BETWEEN :from AND :to")
+    abstract fun total(from: Long, to: Long): Flow<Long>
+
     @Query("SELECT COALESCE(SUM(foregroundMs), 0) FROM app_day WHERE day = :day")
     abstract suspend fun dayTotal(day: Long): Long
 

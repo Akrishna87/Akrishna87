@@ -15,6 +15,12 @@ Each new build installs as an update over the last one.
   through earlier days, weeks or months.
 - **Total screen time** for the period, plus the **daily average** for a week
   or month.
+- **Compared with before**: "25 min less than yesterday at this time
+  (−18%)", or more than last week or last month. While a day, week or month
+  is still going, it's compared with the one before *up to the same point*
+  (today until 10:30 against yesterday until 10:30), so checking in the
+  morning doesn't always say "less". A finished one is compared with the
+  whole one before. It appears once the earlier period has been tracked.
 - **A bar chart**: screen time per hour for a day, per day for a week or a
   month. Tap a day's bar to open that day.
 - **Every app you used**, longest first, with its icon, its time, a bar for its

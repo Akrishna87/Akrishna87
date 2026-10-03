@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.TrendingDown
+import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +53,7 @@ import androidx.core.graphics.drawable.toBitmap
 import io.github.akrishna87.screentime.AppTotal
 import io.github.akrishna87.screentime.Bar
 import io.github.akrishna87.screentime.Period
+import io.github.akrishna87.screentime.Trend
 import io.github.akrishna87.screentime.UsageViewModel
 import io.github.akrishna87.screentime.spanLabel
 import kotlinx.coroutines.Dispatchers
@@ -105,6 +109,35 @@ fun TotalHeader(total: Long, subtitle: String, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(formatDuration(total), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** "↓ 25 min less than yesterday at this time (−18%)", in a pill under the total. */
+@Composable
+fun TrendPill(trend: Trend, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val icon = when {
+        trend.same -> Icons.AutoMirrored.Rounded.TrendingFlat
+        trend.difference < 0 -> Icons.AutoMirrored.Rounded.TrendingDown
+        else -> Icons.AutoMirrored.Rounded.TrendingUp
+    }
+    val (background, content) = when {
+        trend.same -> colors.surfaceVariant to colors.onSurfaceVariant
+        trend.difference < 0 -> colors.primaryContainer to colors.onPrimaryContainer
+        else -> colors.secondaryContainer to colors.onSecondaryContainer
+    }
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(background)
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(trendText(trend), style = MaterialTheme.typography.labelLarge, color = content, textAlign = TextAlign.Center)
+        }
     }
 }
 

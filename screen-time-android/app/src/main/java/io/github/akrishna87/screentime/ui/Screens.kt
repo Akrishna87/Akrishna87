@@ -153,6 +153,7 @@ private fun OverviewScreen(vm: UsageViewModel) {
                 val average = r.dailyAverage
                 TotalHeader(r.total, if (average != null) "Daily average ${formatDuration(average)}" else "Screen time")
             }
+            r.trend?.let { trend -> item { TrendPill(trend, Modifier.padding(bottom = 8.dp)) } }
             item { BarChart(r.bars, Modifier.padding(vertical = 8.dp), onDayClick = vm::openDay) }
             if (r.apps.isEmpty()) {
                 item {

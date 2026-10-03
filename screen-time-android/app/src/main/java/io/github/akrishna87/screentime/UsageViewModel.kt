@@ -50,7 +50,15 @@ data class Span(val period: Period, val start: LocalDate, val end: LocalDate) {
 /** One bar of a chart. Tapping a bar that has a [day] opens that day. */
 data class Bar(val value: Long, val label: String?, val day: LocalDate? = null, val highlight: Boolean = true)
 
-data class Report(val span: Span, val total: Long, val dailyAverage: Long?, val bars: List<Bar>, val apps: List<AppTotal>)
+data class Report(
+    val span: Span,
+    val total: Long,
+    val dailyAverage: Long?,
+    val bars: List<Bar>,
+    val apps: List<AppTotal>,
+    /** Against the day, week or month before; null until that one has been tracked. */
+    val trend: Trend?,
+)
 
 data class AppReport(
     val total: Long,
@@ -96,9 +104,20 @@ class UsageViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 dao.dayTotals(from, to).map { dayBars(span, it, today, highlight = today) }
             }
-            combine(dao.appTotals(from, to), bars, firstDay) { apps, chart, first ->
+            val earlier = previousWindow(span, today)
+            // Whole days of the earlier period, plus (if it's only counted up to now) its last day's hours.
+            val earlierWhole = dao.total(
+                earlier.start.toEpochDay(),
+                earlier.end.toEpochDay() - if (earlier.partial) 1 else 0,
+            )
+            val earlierLastDay = if (earlier.partial) dao.hours(earlier.end.toEpochDay()) else flowOf(emptyList<HourTotal>())
+            combine(dao.appTotals(from, to), bars, firstDay, earlierWhole, earlierLastDay) { apps, chart, first, whole, lastDay ->
                 val total = apps.sumOf { it.foregroundMs }
-                Report(span, total, dailyAverage(span, total, first, today), chart, apps)
+                // "Now" is read here, not above, so it stays current as new usage comes in.
+                val previous = whole + if (earlier.partial) usedBefore(lastDay, LocalTime.now()) else 0L
+                val tracked = first != null && !first.isAfter(earlier.start)
+                val trend = if (tracked) Trend(total, previous, earlier.against) else null
+                Report(span, total, dailyAverage(span, total, first, today), chart, apps, trend)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
