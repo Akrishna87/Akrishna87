@@ -54,86 +54,92 @@ fun SourcesScreen(vm: WeatherViewModel) {
     val units by vm.units.collectAsState()
     val sources by vm.sources.collectAsState()
     val ok = sources.count { it.state == SourceState.Ok }
+    // Sources that don't cover this place (e.g. US-only ones) aren't counted as misses.
+    val used = sources.count { it.state != SourceState.Skipped }
+    val skipped = sources.size - used
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        item {
-            Column {
-                Text("Sources & settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    "No accounts or API keys: every source is free and open.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        item {
-            Section("Units") {
-                Text("Temperature, rain and pressure", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 8.dp))
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf(false to "°C · mm · hPa", true to "°F · in · inHg").forEachIndexed { i, (f, label) ->
-                        SegmentedButton(
-                            selected = units.fahrenheit == f,
-                            onClick = { vm.setUnits(units.copy(fahrenheit = f)) },
-                            shape = SegmentedButtonDefaults.itemShape(i, 2),
-                        ) { Text(label) }
-                    }
-                }
-                Text("Wind speed", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    WindUnit.entries.forEachIndexed { i, w ->
-                        SegmentedButton(
-                            selected = units.wind == w,
-                            onClick = { vm.setUnits(units.copy(wind = w)) },
-                            shape = SegmentedButtonDefaults.itemShape(i, WindUnit.entries.size),
-                        ) { Text(w.label) }
-                    }
-                }
-            }
-        }
-        item {
-            Section("Data sources") {
-                if (sources.isEmpty()) {
-                    Text("Nothing fetched yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("$ok", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, color = OK_GREEN)
-                        Text(
-                            " of ${sources.size} answered on the last refresh",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
-                    LinearProgressIndicator(
-                        progress = { ok.toFloat() / sources.size },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
-                        color = OK_GREEN,
-                        drawStopIndicator = {},
+    Box {
+        LazyColumn(
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                Column {
+                    Text("Sources & settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "No accounts or API keys: every source is free and open.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    sources.forEachIndexed { i, s ->
-                        if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        SourceRow(s)
+                }
+            }
+            item {
+                Section("Units") {
+                    Text("Temperature, rain and pressure", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 8.dp))
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        listOf(false to "°C · mm · hPa", true to "°F · in · inHg").forEachIndexed { i, (f, label) ->
+                            SegmentedButton(
+                                selected = units.fahrenheit == f,
+                                onClick = { vm.setUnits(units.copy(fahrenheit = f)) },
+                                shape = SegmentedButtonDefaults.itemShape(i, 2),
+                            ) { Text(label) }
+                        }
+                    }
+                    Text("Wind speed", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        WindUnit.entries.forEachIndexed { i, w ->
+                            SegmentedButton(
+                                selected = units.wind == w,
+                                onClick = { vm.setUnits(units.copy(wind = w)) },
+                                shape = SegmentedButtonDefaults.itemShape(i, WindUnit.entries.size),
+                            ) { Text(w.label) }
+                        }
+                    }
+                }
+            }
+            item {
+                Section("Data sources") {
+                    if (sources.isEmpty()) {
+                        Text("Nothing fetched yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text("$ok", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, color = OK_GREEN)
+                            Text(
+                                " of $used answered on the last refresh" + if (skipped > 0) " · $skipped not used here" else "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { if (used == 0) 0f else ok.toFloat() / used },
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
+                            color = OK_GREEN,
+                            drawStopIndicator = {},
+                        )
+                        sources.forEachIndexed { i, s ->
+                            if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            SourceRow(s)
+                        }
+                    }
+                }
+            }
+            item {
+                Section("Credits") {
+                    listOf(
+                        "Weather and air-quality data by Open-Meteo.com (CC BY 4.0), from ECMWF, NOAA, DWD, Environment Canada, JMA, Météo-France, UK Met Office, CMA, BoM and Copernicus CAMS.",
+                        "Forecast from MET Norway (api.met.no, CC BY 4.0).",
+                        "US forecasts and alerts from the National Weather Service (public domain).",
+                        "Tropical cyclones from GDACS, the Global Disaster Alert and Coordination System (UN / European Commission JRC), and the NOAA National Hurricane Center.",
+                        "Map outlines from Natural Earth (public domain).",
+                    ).forEach {
+                        Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 3.dp))
                     }
                 }
             }
         }
-        item {
-            Section("Credits") {
-                listOf(
-                    "Weather and air-quality data by Open-Meteo.com (CC BY 4.0), from ECMWF, NOAA, DWD, Environment Canada, JMA, Météo-France, UK Met Office, CMA, BoM and Copernicus CAMS.",
-                    "Forecast from MET Norway (api.met.no, CC BY 4.0).",
-                    "US forecasts and alerts from the National Weather Service (public domain).",
-                    "Tropical cyclones from GDACS, the Global Disaster Alert and Coordination System (UN / European Commission JRC), and the NOAA National Hurricane Center.",
-                    "Map outlines from Natural Earth (public domain).",
-                ).forEach {
-                    Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 3.dp))
-                }
-            }
-        }
+        StatusBarScrim(MaterialTheme.colorScheme.background.copy(alpha = 0.92f))
     }
 }
 

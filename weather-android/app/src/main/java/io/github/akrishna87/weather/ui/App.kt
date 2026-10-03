@@ -15,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +28,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -64,11 +66,15 @@ fun WeatherApp(vm: WeatherViewModel = viewModel()) {
     // The Weather tab's sky and the wind map are dark, so the status bar icons there are light.
     val view = LocalView.current
     val darkTheme = isSystemInDarkTheme()
-    val lightBars = !darkTheme && tab != Tab.Weather.ordinal && tab != Tab.Wind.ordinal
+    val darkChrome = tab == Tab.Weather.ordinal || tab == Tab.Wind.ordinal
+    val lightBars = !darkTheme && !darkChrome
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = lightBars
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = lightBars
+                isAppearanceLightNavigationBars = lightBars
+            }
         }
     }
 
@@ -76,13 +82,26 @@ fun WeatherApp(vm: WeatherViewModel = viewModel()) {
         // Screens draw behind the status bar themselves (the sky and the map go edge to edge).
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+            // Dark under the sky and the map, the theme's colour elsewhere.
+            val itemColors = if (darkChrome) {
+                NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    indicatorColor = Color.White.copy(alpha = 0.16f),
+                    unselectedIconColor = Color.White.copy(alpha = 0.6f),
+                    unselectedTextColor = Color.White.copy(alpha = 0.6f),
+                )
+            } else {
+                NavigationBarItemDefaults.colors()
+            }
+            NavigationBar(containerColor = if (darkChrome) Color(0xFF0B1220) else MaterialTheme.colorScheme.surfaceContainer) {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
                         selected = tab == t.ordinal,
                         onClick = { tab = t.ordinal },
                         icon = { Icon(t.icon, contentDescription = null) },
                         label = { Text(t.label) },
+                        colors = itemColors,
                     )
                 }
             }

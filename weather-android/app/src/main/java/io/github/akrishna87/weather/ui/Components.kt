@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -56,7 +59,12 @@ private val CLEAR_NIGHT = listOf(Color(0xFF070B1F), Color(0xFF15214A), Color(0xF
 private val CLOUDY_NIGHT = listOf(Color(0xFF0F131B), Color(0xFF212938), Color(0xFF364256))
 
 /** The sky behind the Weather screen: it follows the current weather and whether it's day or night. */
-fun skyBrush(code: Int?, isDay: Boolean): Brush = Brush.verticalGradient(
+fun skyBrush(code: Int?, isDay: Boolean): Brush = Brush.verticalGradient(skyColors(code, isDay))
+
+/** The colour at the top of the sky, for the strip behind the status bar. */
+fun skyTop(code: Int?, isDay: Boolean): Color = skyColors(code, isDay).first()
+
+private fun skyColors(code: Int?, isDay: Boolean): List<Color> =
     when (code) {
         95, 96, 99 -> STORM
         71, 73, 75, 77, 85, 86 -> if (isDay) SNOW_DAY else CLOUDY_NIGHT
@@ -64,8 +72,18 @@ fun skyBrush(code: Int?, isDay: Boolean): Brush = Brush.verticalGradient(
         45, 48 -> FOG
         3 -> if (isDay) CLOUDY_DAY else CLOUDY_NIGHT
         else -> if (isDay) CLEAR_DAY else CLEAR_NIGHT
-    },
-)
+    }
+
+/** Keeps scrolled content from running under the clock and status icons. */
+@Composable
+fun StatusBarScrim(color: Color) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .windowInsetsTopHeight(WindowInsets.statusBars)
+            .background(color),
+    )
+}
 
 /** Text on the sky: white, and a softer white for secondary text. */
 val OnSky = Color.White

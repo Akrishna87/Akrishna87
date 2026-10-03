@@ -213,6 +213,7 @@ fun WeatherScreen(vm: WeatherViewModel) {
                     )
                 }
             }
+            StatusBarScrim(skyTop(f?.now?.code, f?.isDay ?: true).copy(alpha = 0.9f))
         }
     }
 }
@@ -473,7 +474,7 @@ private fun HourlyCard(f: Forecast, units: Units) {
     val hours = f.hours
     if (hours.isEmpty()) return
     val itemW = 58.dp
-    val curveH = 72.dp
+    val curveH = 64.dp
     val measurer = rememberTextMeasurer()
     val labelStyle = TextStyle(color = OnSky, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     GlassCard(contentPadding = PaddingValues(vertical = 16.dp)) {
@@ -491,9 +492,9 @@ private fun HourlyCard(f: Forecast, units: Units) {
             val known = temps.filterNotNull()
             Canvas(Modifier.width(itemW * hours.size).height(curveH)) {
                 if (known.isEmpty()) return@Canvas
-                val lo = known.min()
-                val hi = known.max()
-                val span = (hi - lo).coerceAtLeast(1.0)
+                // At least 6° of headroom, centred, so a nearly flat day draws a gentle line mid-band.
+                val span = (known.max() - known.min()).coerceAtLeast(6.0)
+                val lo = (known.max() + known.min()) / 2 - span / 2
                 val labelSpace = 22.dp.toPx()
                 val pad = 6.dp.toPx()
                 val w = itemW.toPx()

@@ -71,62 +71,65 @@ fun StormsScreen(vm: WeatherViewModel) {
     LaunchedEffect(Unit) { vm.refreshStormsIfNeeded() }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Named storms", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        (if (state.storms.isEmpty()) "Hurricanes, typhoons and cyclones" else "${state.storms.size} active now") +
-                            (if (state.updatedAt > 0) " · updated ${ago(state.updatedAt)}" else ""),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (state.loading) CircularProgressIndicator(Modifier.size(24.dp))
-                else IconButton(onClick = vm::refreshStorms) { Icon(Icons.Outlined.Refresh, "Refresh storms") }
-            }
-        }
-        state.error?.let { err ->
+    Box {
+        LazyColumn(
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             item {
-                Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.errorContainer) {
-                    Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(err, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
-                        TextButton(onClick = vm::refreshStorms) { Text("Try again") }
-                    }
-                }
-            }
-        }
-        if (!state.loading && state.error == null && state.storms.isEmpty()) {
-            item {
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                    Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🌤️", fontSize = 48.sp)
-                        Text("No named storms right now", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Named storms", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            "Checked GDACS (every ocean) and the US National Hurricane Center. The wind map still shows strong winds wherever they are.",
+                            (if (state.storms.isEmpty()) "Hurricanes, typhoons and cyclones" else "${state.storms.size} active now") +
+                                (if (state.updatedAt > 0) " · updated ${ago(state.updatedAt)}" else ""),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp),
                         )
+                    }
+                    if (state.loading) CircularProgressIndicator(Modifier.size(24.dp))
+                    else IconButton(onClick = vm::refreshStorms) { Icon(Icons.Outlined.Refresh, "Refresh storms") }
+                }
+            }
+            state.error?.let { err ->
+                item {
+                    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.errorContainer) {
+                        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(err, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                            TextButton(onClick = vm::refreshStorms) { Text("Try again") }
+                        }
                     }
                 }
             }
+            if (!state.loading && state.error == null && state.storms.isEmpty()) {
+                item {
+                    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                        Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("🌤️", fontSize = 48.sp)
+                            Text("No named storms right now", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                            Text(
+                                "Checked GDACS (every ocean) and the US National Hurricane Center. The wind map still shows strong winds wherever they are.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
+                }
+            }
+            items(state.storms, key = { it.key }) { s -> StormCard(s, units, you) { vm.showOnMap(s) } }
+            item {
+                Text(
+                    "Sources: GDACS (UN / European Commission) for every ocean, with tracks and wind areas; NOAA National Hurricane Center " +
+                        "for the latest official figures in the Atlantic and East/Central Pacific. Categories use the Saffir–Simpson scale. " +
+                        "Always follow your national weather service's warnings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
         }
-        items(state.storms, key = { it.key }) { s -> StormCard(s, units, you) { vm.showOnMap(s) } }
-        item {
-            Text(
-                "Sources: GDACS (UN / European Commission) for every ocean, with tracks and wind areas; NOAA National Hurricane Center " +
-                    "for the latest official figures in the Atlantic and East/Central Pacific. Categories use the Saffir–Simpson scale. " +
-                    "Always follow your national weather service's warnings.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
-        }
+        StatusBarScrim(MaterialTheme.colorScheme.background.copy(alpha = 0.92f))
     }
 }
 
@@ -229,7 +232,7 @@ private fun MetricTile(icon: androidx.compose.ui.graphics.vector.ImageVector, la
             Spacer(Modifier.width(4.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, color = LocalContentColor.current.copy(alpha = 0.7f))
         }
-        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
