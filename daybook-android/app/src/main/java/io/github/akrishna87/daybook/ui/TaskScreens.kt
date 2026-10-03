@@ -108,7 +108,7 @@ fun TodayScreen(data: Data, padding: PaddingValues) {
             item(key = "today-header") { SectionHeader(Dates.dayHeading(today, today)) }
         }
         items(due, key = { it.id }) { t ->
-            SwipeTask(t, Modifier.animateItem()) { TaskRow(t, data, showDue = t.time != null) { nav.push(Page.TaskPage(t.id)) } }
+            SwipeTask(t, Modifier.animateItem()) { TaskRow(t, data, showDue = t.time != null, timeOnly = true) { nav.push(Page.TaskPage(t.id)) } }
         }
         if (overdue.isEmpty() && due.isEmpty()) {
             item(key = "empty") {
@@ -217,7 +217,8 @@ fun UpcomingScreen(data: Data, padding: PaddingValues) {
                     UpRow.Overdue -> SectionHeader("Overdue", color = extra.overdue)
                     is UpRow.Day -> DayHeader(row.day, today) { nav.quickAdd = QuickAddDefaults(due = row.day) }
                     is UpRow.Item -> SwipeTask(row.task, Modifier.animateItem()) {
-                        TaskRow(row.task, data, showDue = row.task.time != null || row.task.due?.isBefore(today) == true) {
+                        val overdueRow = row.task.due?.isBefore(today) == true
+                        TaskRow(row.task, data, showDue = row.task.time != null || overdueRow, timeOnly = !overdueRow) {
                             nav.push(Page.TaskPage(row.task.id))
                         }
                     }

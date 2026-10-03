@@ -125,6 +125,8 @@ fun TaskRow(
     modifier: Modifier = Modifier,
     showProject: Boolean = true,
     showDue: Boolean = true,
+    /** Under a day's heading, show just the time rather than repeating the day. */
+    timeOnly: Boolean = false,
     onClick: () -> Unit,
 ) {
     val clock = LocalClock.current
@@ -149,7 +151,11 @@ fun TaskRow(
                 if (task.description.isNotBlank()) {
                     Text(task.description.lineSequence().first(), style = MaterialTheme.typography.bodySmall, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                val due = if (showDue) Dates.dueLabel(task, clock.today, clock.is24Hour) else null
+                val due = when {
+                    !showDue -> null
+                    timeOnly && task.time != null -> Dates.timeFormatter(clock.is24Hour).format(task.time)
+                    else -> Dates.dueLabel(task, clock.today, clock.is24Hour)
+                }
                 val project = data.project(task.projectId).takeIf { showProject && (task.projectId != INBOX_ID || task.parentId == null) }
                 val hasMeta = due != null || subs.isNotEmpty() || task.labels.isNotEmpty() || task.noteId != null || task.parentId != null ||
                     (showProject && task.projectId != INBOX_ID)
