@@ -164,6 +164,8 @@ if adb shell dumpsys wallpaper | grep -q "$PKG"; then
 else
   echo "WARNING: couldn't confirm the wallpaper was set"
 fi
+# The emulator starts with no lock screen at all; turn on the swipe lock so there's one to photograph.
+adb shell locksettings set-disabled false || true
 adb shell input keyevent KEYCODE_SLEEP
 sleep 3
 adb shell input keyevent KEYCODE_WAKEUP
