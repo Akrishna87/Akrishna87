@@ -15,6 +15,13 @@ fail() {
   adb exec-out screencap -p > "$OUT/failure.png" || true
   if adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 && adb pull /sdcard/ui.xml "$OUT/failure.xml" > /dev/null 2>&1; then
     echo "On screen:"; grep -o 'text="[^"]\+"' "$OUT/failure.xml" | head -60 || true
+    echo "Tappable:"; python3 - "$OUT/failure.xml" <<'PY' || true
+import sys, xml.etree.ElementTree as ET
+for n in ET.parse(sys.argv[1]).iter("node"):
+    if n.get("clickable") == "true":
+        print(" ", n.get("class"), repr(n.get("text")), repr(n.get("content-desc")), n.get("bounds"))
+PY
+    adb shell wm size || true
   fi
   adb logcat -d > "$OUT/logcat.txt" || true
   echo "Crashes and errors from the app:"
