@@ -1,11 +1,15 @@
 package io.github.akrishna87.weather.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.Locale
 
@@ -13,7 +17,26 @@ import java.util.Locale
 object Http {
     const val USER_AGENT = "Vaanilai/1.0 (+https://github.com/Akrishna87/Akrishna87)"
 
-    suspend fun get(url: String, accept: String = "application/json", timeoutMs: Int = 20_000): String =
+    /** Open-Meteo's free tier refuses too many requests at once, so at most this many run together. */
+    private val openMeteoSlots = Semaphore(3)
+
+    /** GET with a retry or two when the server says "too many requests" or is slow to answer. */
+    suspend fun get(url: String, accept: String = "application/json", timeoutMs: Int = 20_000): String {
+        val limited = "open-meteo.com" in url
+        var attempt = 0
+        while (true) {
+            try {
+                return if (limited) openMeteoSlots.withPermit { fetch(url, accept, timeoutMs) } else fetch(url, accept, timeoutMs)
+            } catch (e: Exception) {
+                val retry = (e is HttpException && e.code == 429 && attempt < 3) || (e is SocketTimeoutException && attempt < 1)
+                if (!retry) throw e
+                attempt++
+                delay(1_500L * attempt)
+            }
+        }
+    }
+
+    private suspend fun fetch(url: String, accept: String, timeoutMs: Int): String =
         withContext(Dispatchers.IO) {
             val conn = URL(url).openConnection() as HttpURLConnection
             try {

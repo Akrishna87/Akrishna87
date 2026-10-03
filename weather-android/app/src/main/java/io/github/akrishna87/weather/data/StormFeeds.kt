@@ -37,7 +37,8 @@ object StormFeeds {
             if (!p.optString("eventtype").equals("TC", true)) continue
             val current = p.optString("iscurrent").equals("true", true)
             val ends = p.str("todate")?.let { runCatching { LocalDateTime.parse(it.take(19)) }.getOrNull() }
-            if (!current && (ends == null || ends.isBefore(cutoff))) continue
+            // GDACS can keep "iscurrent" set for days after a storm dies, so go by its last update too.
+            if (ends?.isBefore(cutoff) ?: !current) continue
             val coords = f.optJSONObject("geometry")?.optJSONArray("coordinates") ?: continue
             val lon = coords.optDouble(0)
             val lat = coords.optDouble(1)
@@ -52,14 +53,17 @@ object StormFeeds {
                     else -> s // km/h
                 }
             }
-            val name = (p.str("eventname") ?: p.str("name")?.substringAfterLast(" ")?.substringBefore("-") ?: continue)
+            val name = (p.str("eventname") ?: p.str("name")?.substringAfterLast(" ") ?: continue)
+                .replace(Regex("""[-\s]\d{2}$"""), "") // "POLO-26" → "POLO"
                 .let { titleCase(it) }
+            val (kind, level) = kindFromGdacs(sevText, wind, lat, lon)
             val urls = p.optJSONObject("url")
             val eventId = p.optString("eventid")
             val storm = Storm(
                 key = "gdacs-$eventId",
                 name = name,
-                kind = kindFromGdacs(sevText, wind, lat, lon),
+                kind = kind,
+                level = level,
                 lat = lat,
                 lon = lon,
                 windKmh = wind,
@@ -108,6 +112,18 @@ object StormFeeds {
                 "Polygon" -> c.optJSONArray(0)?.let { areas += ring(it, maxPoints = 300) }
                 "MultiPolygon" -> for (k in 0 until c.length()) {
                     c.optJSONArray(k)?.optJSONArray(0)?.let { areas += ring(it, maxPoints = 300) }
+                }
+            }
+        }
+        // GDACS often sends one position plus a wind area around each position along the track;
+        // the centres of those areas mark the track.
+        if (points.size <= 1) {
+            for (area in areas) {
+                val spanLat = area.maxOf { it.lat } - area.minOf { it.lat }
+                if (area.size < 3 || spanLat > 15) continue // skip forecast cones and other big shapes
+                val c = LatLon(area.sumOf { it.lat } / area.size, area.sumOf { it.lon } / area.size)
+                if (points.none { kotlin.math.abs(it.lat - c.lat) < 0.25 && kotlin.math.abs(it.lon - c.lon) < 0.25 }) {
+                    points += TrackPoint(c.lat, c.lon, null, forecast = false)
                 }
             }
         }
@@ -179,16 +195,25 @@ object StormFeeds {
         return (merged + left).sortedByDescending { it.windKmh ?: 0.0 }
     }
 
-    private fun kindFromGdacs(severityText: String, wind: Double?, lat: Double, lon: Double): String {
-        val label = severityText.substringBefore("(").trim()
+    /**
+     * GDACS describes the storm's current class in words ("Tropical Depression", "Category 3",
+     * "Hurricane/Typhoon > 74 mph") but gives only its peak wind; turn that into a clean name and
+     * a current level, so a storm that has weakened isn't coloured by its peak.
+     */
+    private fun kindFromGdacs(severityText: String, wind: Double?, lat: Double, lon: Double): Pair<String, Int?> {
+        val label = severityText.substringBefore("(").trim().lowercase(Locale.ROOT)
         val regional = regionalName(lat, lon)
+        val category = Regex("""category\s*(\d)""").find(label)?.groupValues?.get(1)?.toIntOrNull()
         return when {
-            label.startsWith("Category", true) -> "$regional · ${label.replaceFirstChar { it.uppercase() }}"
-            label.isNotBlank() -> label
-            wind == null -> "Tropical Cyclone"
-            categoryFor(wind) >= 1 -> "$regional · Category ${categoryFor(wind)}"
-            categoryFor(wind) == 0 -> "Tropical Storm"
-            else -> "Tropical Depression"
+            "depression" in label -> "Tropical Depression" to -1
+            "tropical storm" in label -> "Tropical Storm" to 0
+            category != null -> "$regional · Category $category" to category
+            "hurricane" in label || "typhoon" in label || "cyclone" in label ->
+                regional to (wind?.let { categoryFor(it) } ?: 1).coerceAtLeast(1)
+            wind == null -> "Tropical Cyclone" to null
+            categoryFor(wind) >= 1 -> "$regional · Category ${categoryFor(wind)}" to categoryFor(wind)
+            categoryFor(wind) == 0 -> "Tropical Storm" to 0
+            else -> "Tropical Depression" to -1
         }
     }
 

@@ -159,11 +159,13 @@ data class Storm(
     val link: String?,
     val geometryUrl: String?,
     val track: StormTrack? = null,
+    /** The storm's current strength on the same scale as [category], when the feed says so in words. */
+    val level: Int? = null,
 ) {
     val basin: String get() = basinOf(lat, lon)
 
     /** Saffir–Simpson category 1–5, 0 for a tropical storm, -1 for a depression, null if unknown. */
-    val category: Int? get() = windKmh?.let(::categoryFor)
+    val category: Int? get() = level ?: windKmh?.let(::categoryFor)
 
     val regionalName: String get() = regionalName(lat, lon)
 }
