@@ -1,0 +1,65 @@
+# Builds the RSS Reader Android app (a Trusted Web Activity wrapping the
+# live web app) and publishes the signed APK as a GitHub Release.
+# Latest download: https://github.com/Akrishna87/Akrishna87/releases/latest/download/rss-reader.apk
+name: Android APK
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secret
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Add the ANDROID_KEYSTORE_PASSWORD repository secret (Settings → Secrets and variables → Actions). See android/README.md."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build signed APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          gradle -p android assembleRelease --no-daemon
+          cp android/app/build/outputs/apk/release/app-release.apk rss-reader.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rss-reader-apk
+          path: rss-reader.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rss-reader-v1.0.${{ github.run_number }}
+          name: RSS Reader for Android 1.0.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: rss-reader.apk
+          body: |
+            Install on Android: download **rss-reader.apk** below on your phone, open it, and allow installing from your browser when asked.
+            Updates install over the previous version. The app always runs the latest web version of the reader.

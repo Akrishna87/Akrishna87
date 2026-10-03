@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Reader</string>
+    <string name="launch_url">https://akrishna87.github.io/Akrishna87/docs/rss-reader/index.html</string>
+    <!-- Quotes must be escaped: Android strips bare " from string resources. -->
+    <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://akrishna87.github.io\"}}]</string>
+    <string name="share_target" translatable="false">{\"action\": \"https://akrishna87.github.io/Akrishna87/docs/rss-reader/index.html\", \"method\": \"GET\", \"params\": {\"title\": \"title\", \"text\": \"text\", \"url\": \"url\"}}</string>
+</resources>
