@@ -28,7 +28,17 @@ Each new build installs as an update over the last one.
 The first time you open Neram it asks for **Usage access**, a special
 Android permission that apps can't just pop up a prompt for. Tap **Open Usage
 access settings**, find Neram in the list, turn on **Permit usage access**
-and come back. That's all.
+and come back.
+
+**Switch greyed out ("Controlled by restricted setting")?** Android 13 and
+later block this switch for apps installed from a browser or a file rather
+than the Play Store. After trying the switch once:
+
+1. Open Neram's **App info** (the access screen has a button for it, or
+   long-press Neram's icon and tap ⓘ).
+2. Tap **⋮** at the top right and choose **Allow restricted settings**, then
+   confirm with your PIN or fingerprint.
+3. Go back to Usage access and turn Neram's switch on. It works now.
 
 ## How it works, and a few honest notes
 

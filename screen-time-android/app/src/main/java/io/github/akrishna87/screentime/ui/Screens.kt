@@ -1,5 +1,6 @@
 package io.github.akrishna87.screentime.ui
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -96,11 +97,30 @@ private fun AccessScreen() {
             Button(onClick = { UsageAccess.openSettings(context) }) { Text("Open Usage access settings") }
             Spacer(Modifier.height(12.dp))
             Text(
-                "Find Neram in the list, turn on “Permit usage access”, then come back here.",
+                "Turn on the switch for Neram (find it in the list if asked), then come back here.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            // Android 13+ greys the switch out ("restricted setting") for apps installed from a
+            // browser or file, until the user allows it from the app's App info page.
+            if (Build.VERSION.SDK_INT >= 33) {
+                Spacer(Modifier.height(32.dp))
+                Text("Switch greyed out?", style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Android blocks it for apps installed outside the Play Store. Try the switch once, then " +
+                        "open Neram's App info, tap ⋮ at the top right, choose “Allow restricted settings” " +
+                        "and confirm. The switch then works.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = { UsageAccess.openAppInfo(context, context.packageName) }) {
+                    Text("Open Neram's App info")
+                }
+            }
         }
     }
 }

@@ -65,6 +65,17 @@ adb shell input keyevent KEYCODE_BACK
 sleep 2
 dump access2
 on_screen access2 "Allow usage access" exact || fail "Back from Settings didn't return to the app"
+
+echo "--- The 'switch greyed out' help opens Neram's App info"
+tap access2 "Open Neram's App info" exact
+sleep 4
+adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" > "$OUT/top2.txt" || true
+cat "$OUT/top2.txt"
+grep -qi "settings" "$OUT/top2.txt" || fail "Neram's App info page didn't open"
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+dump access3
+on_screen access3 "Allow usage access" exact || fail "Back from App info didn't return to the app"
 adb shell input keyevent KEYCODE_HOME
 sleep 1
 
