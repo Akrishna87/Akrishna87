@@ -30,8 +30,11 @@ It does let a **live wallpaper** draw there, so Daybook draws your day as the wa
 3. On Android's wallpaper screen tap **Set wallpaper**, and choose **Home and lock
    screens** if it asks.
 
-Android still draws its own clock, notifications and shortcut buttons on top. Use
-**Start below the clock** to move the calendar so it sits just under your phone's clock.
+Android still draws its own clock, notifications and shortcut buttons on top. If a big
+two-line clock covers the middle of your lock screen when you have no notifications, turn
+off **Double-line clock** in your phone's **Settings → Display → Lock screen** (the name
+varies a little between phones), so the clock stays small at the top. Then use **Start
+below the clock** to move the calendar so it sits just under it.
 When the phone is unlocked, the home screen shows only the background, so your icons stay
 clear. Switch on **Show on the home screen too** if you want the layout there as well.
 

@@ -179,7 +179,9 @@ fun LockSettingsScreen(
             Text(
                 "Android draws its own clock and notifications at the top; Daybook fills the rest. " +
                     "On the next screen tap \"Set wallpaper\", and choose \"Home and lock screens\" if asked. " +
-                    "When the phone is unlocked your home screen shows just the background.",
+                    "When the phone is unlocked your home screen shows just the background.\n\n" +
+                    "Tip: if a big clock covers the middle of your lock screen, turn off " +
+                    "\"Double-line clock\" in your phone's Settings → Display → Lock screen.",
                 Modifier.padding(top = 10.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = Palette.SubText,

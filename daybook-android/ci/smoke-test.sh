@@ -166,6 +166,8 @@ else
 fi
 # The emulator starts with no lock screen at all; turn on the swipe lock so there's one to photograph.
 adb shell locksettings set-disabled false || true
+# Use the small clock at the top (as the app tells people to), not the big one across the middle.
+adb shell settings put secure lockscreen_use_double_line_clock 0 || true
 adb shell input keyevent KEYCODE_SLEEP
 sleep 3
 adb shell input keyevent KEYCODE_WAKEUP
