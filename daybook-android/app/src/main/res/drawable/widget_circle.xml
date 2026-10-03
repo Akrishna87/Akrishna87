@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A task's round checkbox; the widget tints it with the task's priority colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp" android:height="20dp" android:viewportWidth="20" android:viewportHeight="20">
+    <path android:pathData="M10,1.75a8.25,8.25 0 1,0 0.0001,0z" android:strokeWidth="1.6" android:strokeColor="#FFFFFFFF" />
+</vector>

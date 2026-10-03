@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Daybook</string>
-    <string name="wallpaper_name">Daybook lock screen</string>
-    <string name="wallpaper_description">Your month, today\'s plan, the year so far and your tasks, under the lock screen clock.</string>
-    <string name="widget_name">Daybook: Today and tasks</string>
-    <string name="widget_description">What\'s next today and tomorrow, and the tasks still to do.</string>
+    <string name="widget_name">Daybook: Today</string>
+    <string name="widget_description">Today\'s and overdue tasks. Tick them off or add one.</string>
 </resources>
