@@ -2,6 +2,7 @@ package io.github.akrishna87.weather
 
 import android.app.Application
 import android.os.SystemClock
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -91,6 +92,8 @@ class MapCamera {
 
 /** A request for the map to fly somewhere (a storm, or your place). */
 data class MapFocus(val lat: Double, val lon: Double, val spanDeg: Double, val stormKey: String? = null, val seq: Long)
+
+private const val TAG = "Vaanilai"
 
 class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
@@ -368,16 +371,30 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private fun skip(id: String, name: String, role: String, why: String) =
         setStatus(SourceStatus(id, name, role, SourceState.Skipped, why))
 
+    /** A few words about what came back, for the log (the CI smoke test prints these). */
+    private fun summary(result: Any?): String = when (result) {
+        is List<*> -> " (${result.size} items${result.filterIsInstance<Storm>().joinToString(prefix = ": ") { it.name }.takeIf { it.length > 2 } ?: ""})"
+        is WindField -> " (${result.nx}×${result.ny} points, ${result.times.size} hours)"
+        is Forecast -> " (${result.now.tempC}°C, ${result.hours.size} hours, ${result.days.size} days)"
+        is Reading -> " (${result.tempC}°C, wind ${result.windKmh} km/h)"
+        else -> ""
+    }
+
     /** Runs one source's fetch, recording how it went for the Sources screen. Returns null on failure. */
     private suspend fun <T> tracked(id: String, name: String, role: String, block: suspend () -> T): T? {
         setStatus(SourceStatus(id, name, role, SourceState.Loading))
         val start = SystemClock.elapsedRealtime()
         return try {
-            block().also { setStatus(SourceStatus(id, name, role, SourceState.Ok, millis = SystemClock.elapsedRealtime() - start)) }
+            block().also {
+                val ms = SystemClock.elapsedRealtime() - start
+                setStatus(SourceStatus(id, name, role, SourceState.Ok, millis = ms))
+                Log.i(TAG, "$name: OK in $ms ms${summary(it)}")
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             setStatus(SourceStatus(id, name, role, SourceState.Failed, e.message ?: e.javaClass.simpleName))
+            Log.w(TAG, "$name: FAILED: ${e.message ?: e.javaClass.simpleName}")
             null
         }
     }

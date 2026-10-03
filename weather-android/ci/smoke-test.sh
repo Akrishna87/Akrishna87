@@ -23,10 +23,13 @@ fail() {
 }
 dump() {
   local i
+  rm -f "$OUT/$1.xml"
+  adb shell rm -f /sdcard/ui.xml
   for i in 1 2 3; do
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null && adb pull /sdcard/ui.xml "$OUT/$1.xml" > /dev/null
     # The emulator's own apps sometimes freeze while it warms up; wave the "isn't responding"
     # popup away so it doesn't cover the app.
+    [ -s "$OUT/$1.xml" ] || { echo "(no screen dump this time)"; return 0; }
     grep -q "isn&apos;t responding\|isn't responding" "$OUT/$1.xml" || return 0
     echo "(dismissing a system 'isn't responding' popup)"
     python3 "$FIND" "$OUT/$1.xml" "Wait" > /dev/null 2>&1 && adb shell input tap $(python3 "$FIND" "$OUT/$1.xml" "Wait")
@@ -41,7 +44,14 @@ tap() { # tap <dump name> <text> [first|last|exact]
   adb shell input tap $xy
 }
 tab() { # tab <dump name> <label>: taps the bottom-most exact match, i.e. the navigation bar entry
-  local xy
+  local xy W H i
+  if [ ! -s "$OUT/$1.xml" ]; then
+    # uiautomator often can't capture the animated wind map; tap the tab by its place in the bar.
+    case "$2" in "Weather") i=1 ;; "Wind map") i=3 ;; "Storms") i=5 ;; *) i=7 ;; esac
+    read -r W H < <(adb shell wm size | grep -o "[0-9]*x[0-9]*" | tail -1 | tr x ' ')
+    adb shell input tap $((W * i / 8)) $((H - 120))
+    return 0
+  fi
   xy=$(python3 - "$OUT/$1.xml" "$2" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
 path, label = sys.argv[1], sys.argv[2].lower()
@@ -58,6 +68,11 @@ PY
 ) || fail "couldn't find the '$2' tab"
   adb shell input tap $xy
 }
+texts() { # texts <dump name>: what was on screen, for the log
+  [ -s "$OUT/$1.xml" ] && grep -o 'text="[^"]\+"' "$OUT/$1.xml" | sed 's/^text=//' | tr '\n' ' ' | fold -w 200 -s || true
+  echo
+}
+sources_log() { adb logcat -d -s Vaanilai:I | grep -v "^---" || true; }
 crashed() {
   adb logcat -d > "$OUT/logcat.txt"
   grep -A3 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "$PKG"
@@ -115,6 +130,7 @@ else
     sleep 2
     dump weather2
     shot 5-sources-compare
+    echo "Weather screen: $(texts weather) $(texts weather2)"
   else
     echo "::warning::The forecast didn't load in the emulator."
     shot 3-weather-offline
@@ -126,9 +142,12 @@ echo "--- Wind map"
 dump tabs
 tab tabs "Wind map"
 sleep 15 # let the wind grid load and the particles run
-dump wind
-on_screen wind "Storms" || fail "the wind map didn't open"
 shot 6-wind-map
+if sources_log | grep -q "wind grid: OK"; then
+  echo "Wind grid loaded: $(sources_log | grep "wind grid" | tail -1)"
+else
+  echo "::warning::The wind grid didn't load in the emulator: $(sources_log | grep "wind grid" | tail -1)"
+fi
 crashed && fail "the app crashed on the wind map (see logcat.txt)"
 
 echo "--- Zooming the map out"
@@ -138,11 +157,13 @@ shot 7-wind-map-moved
 crashed && fail "the app crashed while moving the map (see logcat.txt)"
 
 echo "--- Storms"
+dump wind
 tab wind "Storms"
 sleep 6
 dump storms
 on_screen storms "Named storms" || fail "the storm list didn't open"
 shot 8-storms
+echo "Storms screen: $(texts storms)"
 if on_screen storms "Show on wind map"; then
   tap storms "Show on wind map"
   sleep 12
@@ -160,6 +181,9 @@ sleep 3
 dump sources
 on_screen sources "Data sources" || fail "the sources screen didn't open"
 shot 10-sources
+
+echo "--- What each data source returned"
+sources_log
 
 crashed && fail "the app crashed (see logcat.txt)"
 echo "SMOKE TEST PASSED"
