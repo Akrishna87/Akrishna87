@@ -109,7 +109,10 @@ fun WindMapScreen(vm: WeatherViewModel) {
     val particles = remember { Particles(density) }
     val painter = remember { MapPainter(density) }
 
-    LaunchedEffect(Unit) { world = withContext(Dispatchers.IO) { WorldOutline.load(context) } }
+    LaunchedEffect(Unit) {
+        vm.refreshStormsIfNeeded()
+        world = withContext(Dispatchers.IO) { WorldOutline.load(context) }
+    }
 
     // First layout: centre on your place (or the tropics) at a regional zoom.
     LaunchedEffect(size) {

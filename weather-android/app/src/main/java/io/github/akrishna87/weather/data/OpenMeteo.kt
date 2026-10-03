@@ -99,28 +99,33 @@ object OpenMeteo {
         }
     }
 
-    /** What one particular model says right now. Regional models answer with nulls outside their area. */
-    suspend fun modelReading(place: Place, model: Model): Reading {
+    /**
+     * What every global model says right now, in one request: with several models, Open-Meteo
+     * names each value after its model ("temperature_2m_ecmwf_ifs025"). One request instead of
+     * nine keeps clear of the free tier's limit on simultaneous requests. A model with no data
+     * for the place comes back with nulls (and [Reading.hasData] false).
+     */
+    suspend fun modelReadings(place: Place): List<Reading> {
         val text = Http.get(
             "https://api.open-meteo.com/v1/forecast?${at(place)}&timezone=auto&forecast_days=1" +
-                "&models=${model.id}&current=$NOW",
+                "&models=${MODELS.joinToString(",") { it.id }}&current=$NOW",
         )
         val c = JSONObject(text).getJSONObject("current")
-        return reading(c, model.id, model.name, model.agency)
+        return MODELS.map { m -> reading(c, m.id, m.name, m.agency, suffix = "_${m.id}") }
     }
 
-    private fun reading(c: JSONObject, id: String, name: String, agency: String) = Reading(
+    private fun reading(c: JSONObject, id: String, name: String, agency: String, suffix: String = "") = Reading(
         sourceId = id,
         sourceName = name,
         agency = agency,
-        tempC = c.dbl("temperature_2m"),
-        code = c.dbl("weather_code")?.toInt(),
-        windKmh = c.dbl("wind_speed_10m"),
-        windFromDeg = c.dbl("wind_direction_10m"),
-        gustKmh = c.dbl("wind_gusts_10m"),
-        humidity = c.dbl("relative_humidity_2m"),
-        pressureHpa = c.dbl("pressure_msl"),
-        precipMm = c.dbl("precipitation"),
+        tempC = c.dbl("temperature_2m$suffix"),
+        code = c.dbl("weather_code$suffix")?.toInt(),
+        windKmh = c.dbl("wind_speed_10m$suffix"),
+        windFromDeg = c.dbl("wind_direction_10m$suffix"),
+        gustKmh = c.dbl("wind_gusts_10m$suffix"),
+        humidity = c.dbl("relative_humidity_2m$suffix"),
+        pressureHpa = c.dbl("pressure_msl$suffix"),
+        precipMm = c.dbl("precipitation$suffix"),
     )
 
     suspend fun airQuality(place: Place): AirQuality {

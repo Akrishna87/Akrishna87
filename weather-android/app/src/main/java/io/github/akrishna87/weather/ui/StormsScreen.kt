@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -53,6 +54,7 @@ fun StormsScreen(vm: WeatherViewModel) {
     val units by vm.units.collectAsState()
     val place by vm.place.collectAsState()
     val you = place?.let { LatLon(it.lat, it.lon) }
+    LaunchedEffect(Unit) { vm.refreshStormsIfNeeded() }
 
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {

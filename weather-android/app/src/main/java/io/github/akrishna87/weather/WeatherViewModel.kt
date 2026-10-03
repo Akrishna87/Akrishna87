@@ -213,7 +213,13 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
         if (_place.value != null && !_weather.value.loading && (f == null || System.currentTimeMillis() - f.fetchedAt > 15 * 60_000)) {
             refreshWeather()
         }
-        if (!_storms.value.loading && System.currentTimeMillis() - _storms.value.updatedAt > 30 * 60_000) refreshStorms()
+        refreshStormsIfNeeded()
+    }
+
+    /** Fetches the storms again if the last try failed (say the phone was offline) or is old. */
+    fun refreshStormsIfNeeded() {
+        val s = _storms.value
+        if (!s.loading && (s.error != null || System.currentTimeMillis() - s.updatedAt > 30 * 60_000)) refreshStorms()
     }
 
     fun refreshWeather() {
@@ -235,11 +241,15 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 reading(f?.now)
             }
-            for (m in OpenMeteo.MODELS) jobs += launch {
-                val id = "model-${m.id}"
-                val r = tracked(id, "${m.name} model", m.agency) { OpenMeteo.modelReading(p, m) }
-                if (r != null && !r.hasData) skip(id, "${m.name} model", m.agency, "No data for this place")
-                reading(r)
+            jobs += launch {
+                val all = tracked("models", "Open-Meteo global models", OpenMeteo.MODELS.joinToString(", ") { it.name }) {
+                    OpenMeteo.modelReadings(p)
+                }
+                all?.forEach(::reading)
+                val missing = all?.filterNot { it.hasData }?.map { it.sourceName }.orEmpty()
+                if (missing.isNotEmpty()) {
+                    setStatus(statusOf("models")!!.copy(detail = "No data here from ${missing.joinToString()}"))
+                }
             }
             jobs += launch {
                 reading(tracked("metno", "MET Norway", "Norwegian Meteorological Institute's own forecast") { MetNorway.reading(p) })
@@ -325,7 +335,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
      * already covers it at a fine enough spacing. Open-Meteo counts every grid point as a call,
      * so the grid stays around 150 points and is reused while you pan within it.
      */
-    fun requestWind(view: GeoBox, force: Boolean = false) {
+    fun requestWind(view: GeoBox, force: Boolean = false, attempt: Int = 0) {
         val have = _wind.value.field
         val wantSpacing = view.lonSpan / 9
         val fine = have != null && have.spacingDeg <= wantSpacing * 2.2 && have.spacingDeg >= wantSpacing / 3
@@ -354,6 +364,11 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
             _wind.update {
                 if (f != null) WindState(field = f) else it.copy(loading = false, error = statusOf("wind")?.detail ?: "Couldn't load the wind")
             }
+            // Try again by itself a couple of times (the free service is sometimes busy).
+            if (f == null && attempt < 2) {
+                delay(15_000)
+                if (windRequest === box) requestWind(view, force = true, attempt = attempt + 1)
+            }
         }
     }
 
@@ -373,7 +388,13 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** A few words about what came back, for the log (the CI smoke test prints these). */
     private fun summary(result: Any?): String = when (result) {
-        is List<*> -> " (${result.size} items${result.filterIsInstance<Storm>().joinToString(prefix = ": ") { it.name }.takeIf { it.length > 2 } ?: ""})"
+        is List<*> -> " (${result.size} items: " + result.joinToString {
+            when (it) {
+                is Storm -> it.name
+                is Reading -> "${it.sourceName} ${it.tempC}°C"
+                else -> "…"
+            }
+        } + ")"
         is WindField -> " (${result.nx}×${result.ny} points, ${result.times.size} hours)"
         is Forecast -> " (${result.now.tempC}°C, ${result.hours.size} hours, ${result.days.size} days)"
         is Reading -> " (${result.tempC}°C, wind ${result.windKmh} km/h)"
