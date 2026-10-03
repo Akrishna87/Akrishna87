@@ -39,6 +39,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -103,7 +105,7 @@ fun EventEditor(initial: Event, isNew: Boolean, is24Hour: Boolean, onDismiss: ()
         Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (isNew) "New event" else "Edit event", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
-                Button(onClick = ::save, enabled = title.isNotBlank()) { Text("Save") }
+                Button(onClick = ::save, Modifier.semantics { contentDescription = "Save" }, enabled = title.isNotBlank()) { Text("Save") }
             }
             OutlinedTextField(
                 value = title,

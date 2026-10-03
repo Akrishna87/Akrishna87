@@ -57,6 +57,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -169,10 +171,11 @@ fun LockSettingsScreen(
                     Text("Daybook is on your lock screen", Modifier.padding(start = 6.dp), style = MaterialTheme.typography.titleSmall)
                 }
             }
+            val setLabel = if (wallpaperActive) "Set again" else "Set as lock screen"
             Button(
                 onClick = { openWallpaperPicker(context) },
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            ) { Text(if (wallpaperActive) "Set again" else "Set as lock screen") }
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).semantics { contentDescription = setLabel },
+            ) { Text(setLabel) }
             Text(
                 "Android draws its own clock and notifications at the top; Daybook fills the rest. " +
                     "On the next screen tap \"Set wallpaper\", and choose \"Home and lock screens\" if asked. " +

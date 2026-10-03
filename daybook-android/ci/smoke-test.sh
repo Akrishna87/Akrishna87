@@ -102,10 +102,10 @@ echo "PASS: tasks can be added and ticked off"
 
 echo "--- Calendar"
 tap tasks-done "Calendar" last
-wait_for calendar 'text="New event"' 10 "the Calendar tab has no New event button"
+wait_for calendar '"New event"' 10 "the Calendar tab has no New event button"
 shot 3-calendar
 tap calendar "New event"
-wait_for event-sheet 'text="Save"' 10 "the event editor didn't open"
+wait_for event-sheet '"Save"' 10 "the event editor didn't open"
 tap event-sheet "Title"
 sleep 1
 adb shell input text "Team%ssync"
@@ -145,7 +145,7 @@ echo "PASS: Today shows the event and the task"
 
 echo "--- Lock screen"
 tap today-after "Lock screen and settings"
-wait_for lock-settings 'text="Set as lock screen"' 10 "the lock screen settings didn't open"
+wait_for lock-settings '"Set as lock screen"' 10 "the lock screen settings didn't open"
 shot 7-lock-settings
 tap lock-settings "Set as lock screen"
 sleep 5

@@ -31,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -210,6 +212,8 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
 private fun Fab(label: String, onClick: () -> Unit) {
     ExtendedFloatingActionButton(
         onClick = onClick,
+        // Label the button itself, so the label reaches accessibility services and UI tests.
+        modifier = Modifier.semantics { contentDescription = label },
         icon = { Icon(Icons.Rounded.Add, null) },
         text = { Text(label) },
         containerColor = Color.White,

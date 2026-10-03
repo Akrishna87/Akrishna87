@@ -23,6 +23,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,7 +71,9 @@ fun TodayScreen(
                 style = MaterialTheme.typography.titleMedium,
                 color = Palette.SubText,
             )
-            IconButton(onClick = onOpenSettings) { Icon(Icons.Rounded.Lock, "Lock screen and settings") }
+            IconButton(onClick = onOpenSettings, Modifier.semantics { contentDescription = "Lock screen and settings" }) {
+                Icon(Icons.Rounded.Lock, null)
+            }
         }
         Text(
             DateTimeFormatter.ofPattern(if (is24Hour) "HH:mm" else "h:mm").format(now),
