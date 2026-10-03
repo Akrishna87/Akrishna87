@@ -73,6 +73,17 @@ texts() { # texts <dump name>: what was on screen, for the log
   echo
 }
 sources_log() { adb logcat -d -s Vaanilai:I | grep -v "^---" || true; }
+open_until() { # open_until <dump name> <text to tap> <text expected after>: retries when a system popup eats the tap
+  local i
+  for i in 1 2 3 4; do
+    dump "$1"
+    on_screen "$1" "$3" && return 0
+    on_screen "$1" "$2" && tap "$1" "$2"
+    sleep 3
+  done
+  dump "$1"
+  on_screen "$1" "$3" || fail "tapping '$2' didn't show '$3'"
+}
 crashed() {
   adb logcat -d > "$OUT/logcat.txt"
   grep -A3 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "$PKG"
@@ -90,9 +101,7 @@ on_screen welcome "Search for a place" || fail "the app didn't open on the welco
 shot 1-welcome
 
 echo "--- Choosing a place by searching"
-tap welcome "Search for a place"
-sleep 2
-dump search
+open_until search "Search for a place" "Town or city"
 tap search "Town or city"
 sleep 1
 adb shell input text "London"
