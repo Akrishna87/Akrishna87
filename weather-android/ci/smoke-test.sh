@@ -51,15 +51,9 @@ tap() { # tap <dump name> <text> [first|last|exact]
   adb shell input tap $xy
 }
 tab() { # tab <dump name> <label>: taps the bottom-most exact match, i.e. the navigation bar entry
-  local xy W H i
-  if [ ! -s "$OUT/$1.xml" ]; then
-    # uiautomator often can't capture the animated wind map; tap the tab by its place in the bar.
-    case "$2" in "Weather") i=1 ;; "Wind map") i=3 ;; "Storms") i=5 ;; *) i=7 ;; esac
-    read -r W H < <(adb shell wm size | grep -o "[0-9]*x[0-9]*" | tail -1 | tr x ' ')
-    adb shell input tap $((W * i / 8)) $((H - 120))
-    return 0
-  fi
-  xy=$(python3 - "$OUT/$1.xml" "$2" <<'PY'
+  local xy="" W H i
+  if [ -s "$OUT/$1.xml" ]; then
+    xy=$(python3 - "$OUT/$1.xml" "$2" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
 path, label = sys.argv[1], sys.argv[2].lower()
 best = None
@@ -72,7 +66,16 @@ if best is None:
     sys.exit(1)
 print(best[0], best[1])
 PY
-) || fail "couldn't find the '$2' tab"
+) || xy=""
+  fi
+  if [ -z "$xy" ]; then
+    # uiautomator often can't capture the animated wind map (no dump, or an empty one); tap the
+    # tab by its place in the bar instead.
+    case "$2" in "Weather") i=1 ;; "Wind map") i=3 ;; "Storms") i=5 ;; *) i=7 ;; esac
+    read -r W H < <(adb shell wm size | grep -o "[0-9]*x[0-9]*" | tail -1 | tr x ' ')
+    xy="$((W * i / 8)) $((H - 120))"
+    echo "(tapping the '$2' tab by position)"
+  fi
   adb shell input tap $xy
 }
 texts() { # texts <dump name>: what was on screen, for the log
@@ -135,6 +138,8 @@ else
   done
   if on_screen weather "Feels like"; then
     shot 3-weather
+    on_screen weather "umbrella" || fail "the umbrella advice isn't on the Weather screen"
+    echo "Umbrella advice: $(grep -o 'text="[^"]*mbrella[^"]*"' "$OUT/weather.xml" | head -2 | tr '\n' ' ')"
     adb shell input swipe 540 1700 540 500 600
     sleep 1
     adb shell input swipe 540 1700 540 500 600
