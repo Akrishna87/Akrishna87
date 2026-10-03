@@ -99,23 +99,52 @@ object OpenMeteo {
         }
     }
 
+    private const val HOUR_VARS = "temperature_2m,relative_humidity_2m,precipitation,weather_code,pressure_msl," +
+        "wind_speed_10m,wind_direction_10m,wind_gusts_10m"
+
     /**
-     * What every global model says right now, in one request: with several models, Open-Meteo
-     * names each value after its model ("temperature_2m_ecmwf_ifs025"). One request instead of
-     * nine keeps clear of the free tier's limit on simultaneous requests. A model with no data
-     * for the place comes back with nulls (and [Reading.hasData] false).
+     * What every global model says for this hour, in one request. With several models, Open-Meteo
+     * names each hourly series after its model ("temperature_2m_ecmwf_ifs025"); its "current"
+     * block doesn't do that, so the hourly values are used. One request instead of nine keeps
+     * clear of the free tier's limit on simultaneous requests. A model with no data for the place
+     * comes back with nulls (and [Reading.hasData] false).
      */
     suspend fun modelReadings(place: Place): List<Reading> {
         val text = Http.get(
-            "https://api.open-meteo.com/v1/forecast?${at(place)}&timezone=auto&forecast_days=1" +
-                "&models=${MODELS.joinToString(",") { it.id }}&current=$NOW",
+            "https://api.open-meteo.com/v1/forecast?${at(place)}&timezone=auto&forecast_hours=1" +
+                "&models=${MODELS.joinToString(",") { it.id }}&hourly=$HOUR_VARS",
         )
-        val c = JSONObject(text).getJSONObject("current")
-        val all = MODELS.map { m -> reading(c, m.id, m.name, m.agency, suffix = "_${m.id}") }
+        val h = JSONObject(text).optJSONObject("hourly")
+        val all = if (h == null) emptyList() else MODELS.map { m -> hourReading(h, m) }
         if (all.any { it.hasData }) return all
         // Not in the shape expected: ask each model on its own, one at a time.
-        android.util.Log.i("Vaanilai", "Combined model reply had keys ${c.keys().asSequence().toList()}; asking one by one")
-        return MODELS.map { m -> modelReading(place, m) }
+        android.util.Log.i("Vaanilai", "Combined model reply had keys ${h?.keys()?.asSequence()?.toList()}; asking one by one")
+        return MODELS.map { m ->
+            try {
+                modelReading(place, m)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Reading(m.id, m.name, m.agency, tempC = null, code = null, windKmh = null, windFromDeg = null)
+            }
+        }
+    }
+
+    private fun hourReading(h: JSONObject, m: Model): Reading {
+        fun v(name: String) = h.optJSONArray("${name}_${m.id}").dblAt(0)
+        return Reading(
+            sourceId = m.id,
+            sourceName = m.name,
+            agency = m.agency,
+            tempC = v("temperature_2m"),
+            code = v("weather_code")?.toInt(),
+            windKmh = v("wind_speed_10m"),
+            windFromDeg = v("wind_direction_10m"),
+            gustKmh = v("wind_gusts_10m"),
+            humidity = v("relative_humidity_2m"),
+            pressureHpa = v("pressure_msl"),
+            precipMm = v("precipitation"),
+        )
     }
 
     /** What one particular model says right now. Regional models answer with nulls outside their area. */
@@ -127,18 +156,18 @@ object OpenMeteo {
         return reading(JSONObject(text).getJSONObject("current"), model.id, model.name, model.agency)
     }
 
-    private fun reading(c: JSONObject, id: String, name: String, agency: String, suffix: String = "") = Reading(
+    private fun reading(c: JSONObject, id: String, name: String, agency: String) = Reading(
         sourceId = id,
         sourceName = name,
         agency = agency,
-        tempC = c.dbl("temperature_2m$suffix"),
-        code = c.dbl("weather_code$suffix")?.toInt(),
-        windKmh = c.dbl("wind_speed_10m$suffix"),
-        windFromDeg = c.dbl("wind_direction_10m$suffix"),
-        gustKmh = c.dbl("wind_gusts_10m$suffix"),
-        humidity = c.dbl("relative_humidity_2m$suffix"),
-        pressureHpa = c.dbl("pressure_msl$suffix"),
-        precipMm = c.dbl("precipitation$suffix"),
+        tempC = c.dbl("temperature_2m"),
+        code = c.dbl("weather_code")?.toInt(),
+        windKmh = c.dbl("wind_speed_10m"),
+        windFromDeg = c.dbl("wind_direction_10m"),
+        gustKmh = c.dbl("wind_gusts_10m"),
+        humidity = c.dbl("relative_humidity_2m"),
+        pressureHpa = c.dbl("pressure_msl"),
+        precipMm = c.dbl("precipitation"),
     )
 
     suspend fun airQuality(place: Place): AirQuality {
