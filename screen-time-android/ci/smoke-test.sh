@@ -60,6 +60,11 @@ adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActi
 cat "$OUT/top.txt"
 grep -qi "settings" "$OUT/top.txt" || fail "the Usage access settings page didn't open"
 shot 2-usage-access-settings
+# Back from Settings returns to the app, still asking (access is only turned on below).
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+dump access2
+on_screen access2 "Allow usage access" exact || fail "Back from Settings didn't return to the app"
 adb shell input keyevent KEYCODE_HOME
 sleep 1
 
