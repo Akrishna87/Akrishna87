@@ -6,11 +6,13 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,11 +29,11 @@ import androidx.compose.material.icons.outlined.Cyclone
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -121,6 +125,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
             cam.lon = p?.lon ?: 80.0
             cam.lat = p?.lat ?: 15.0
             cam.ppd = size.width / 60f
+            cam.lat = clampLat(cam.lat, cam.ppd, size)
         }
     }
 
@@ -132,6 +137,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
         cam.lon = f.lon
         cam.lat = f.lat
         cam.ppd = (size.width / f.spanDeg).toFloat()
+        cam.lat = clampLat(f.lat, cam.ppd, size)
         selected = f.stormKey
         particles.clear()
     }
@@ -165,7 +171,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
     val field = wind.field
     val storms = if (cam.showStorms) stormsState.storms else emptyList()
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF0B1A2A))) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF07101C))) {
         Canvas(
             Modifier
                 .fillMaxSize()
@@ -181,7 +187,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
                         val newPpd = (cam.ppd * zoom).coerceIn(w / 360f, w / 3f)
                         cam.ppd = newPpd
                         cam.lon = lonAt - (centroid.x - w / 2) / newPpd - pan.x / newPpd
-                        cam.lat = (latAt + (centroid.y - h / 2) / newPpd + pan.y / newPpd).coerceIn(-80.0, 80.0)
+                        cam.lat = clampLat(latAt + (centroid.y - h / 2) / newPpd + pan.y / newPpd, newPpd, size)
                         if (abs(zoom - 1f) > 0.002f) particles.clear()
                     }
                 }
@@ -213,16 +219,19 @@ fun WindMapScreen(vm: WeatherViewModel) {
         }
 
         // ---- Controls ----
-        Column(Modifier.fillMaxWidth().padding(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = !cam.gusts, onClick = { cam.gusts = false }, label = { Text("Wind") })
-                FilterChip(selected = cam.gusts, onClick = { cam.gusts = true }, label = { Text("Gusts") })
-                FilterChip(
-                    selected = cam.showStorms,
-                    onClick = { cam.showStorms = !cam.showStorms },
-                    label = { Text("Storms") },
-                    leadingIcon = { Icon(Icons.Outlined.Cyclone, null, Modifier.size(18.dp)) },
-                )
+        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(shape = RoundedCornerShape(50), color = GLASS) {
+                    Row(Modifier.padding(3.dp)) {
+                        MapChip("Wind", selected = !cam.gusts) { cam.gusts = false }
+                        MapChip("Gusts", selected = cam.gusts) { cam.gusts = true }
+                    }
+                }
+                Surface(shape = RoundedCornerShape(50), color = GLASS) {
+                    Row(Modifier.padding(3.dp)) {
+                        MapChip("Storms", selected = cam.showStorms, icon = Icons.Outlined.Cyclone) { cam.showStorms = !cam.showStorms }
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 if (place != null) {
                     MapButton(onClick = { vm.showPlaceOnMap() }) { Icon(Icons.Outlined.MyLocation, "Go to my place") }
@@ -233,12 +242,12 @@ fun WindMapScreen(vm: WeatherViewModel) {
                 }) { Icon(Icons.Outlined.Refresh, "Reload wind and storms") }
             }
             if (wind.loading || stormsState.loading) {
-                Pill { CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp); Text("  Loading ${if (wind.loading) "wind" else "storms"}…") }
+                MapPill { CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White); Text("  Loading ${if (wind.loading) "wind" else "storms"}…") }
             }
-            wind.error?.let { Pill { Text("Wind: $it") } }
-            if (field == null && !wind.loading && wind.error == null) Pill { Text("Waiting for wind data…") }
+            wind.error?.let { MapPill { Text("Wind: $it") } }
+            if (field == null && !wind.loading && wind.error == null) MapPill { Text("Waiting for wind data…") }
             probe?.let { (ll, w) ->
-                Pill {
+                MapPill {
                     Text(
                         "%.1f°%s %.1f°%s · ".format(abs(ll.lat), if (ll.lat >= 0) "N" else "S", abs(normLonDisplay(ll.lon)), if (normLonDisplay(ll.lon) >= 0) "E" else "W") +
                             if (w == null) "no wind data here" else {
@@ -250,11 +259,11 @@ fun WindMapScreen(vm: WeatherViewModel) {
                 }
             }
             if (cam.showStorms && !stormsState.loading && stormsState.error == null && stormsState.storms.isEmpty()) {
-                Pill { Text("No named storms are active anywhere right now") }
+                MapPill { Text("No named storms are active anywhere right now") }
             }
         }
 
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp)) {
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)) {
             val s = storms.firstOrNull { it.key == selected }
             if (s != null) StormSheet(s, units, place?.let { LatLon(it.lat, it.lon) }) { selected = null }
             if (field != null && field.times.size > 1) TimeSlider(cam, field)
@@ -269,36 +278,41 @@ private val TIME = DateTimeFormatter.ofPattern("EEE HH:mm")
 private fun TimeSlider(cam: MapCamera, field: WindField) {
     val now = field.nowIndex()
     val idx = hourIndex(cam, field)
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+    Surface(shape = RoundedCornerShape(20.dp), color = GLASS, contentColor = Color.White) {
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val t = Instant.ofEpochMilli(field.times[idx]).atZone(ZoneId.systemDefault())
                 val rel = idx - now
                 Text(
                     if (rel == 0) "Now · ${t.format(TIME)}" else "${if (rel > 0) "+" else ""}$rel h · ${t.format(TIME)}",
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                if (rel != 0) TextButton(onClick = { cam.hour = -1 }) { Text("Now") }
+                if (rel != 0) TextButton(onClick = { cam.hour = -1 }) { Text("Back to now", color = Color(0xFF7DD3FC)) }
             }
             Slider(
                 value = idx.toFloat(),
                 onValueChange = { cam.hour = it.roundToInt() },
                 valueRange = 0f..(field.times.size - 1).toFloat(),
-                steps = (field.times.size - 2).coerceAtLeast(0),
-                modifier = Modifier.height(32.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color(0xFF7DD3FC),
+                    inactiveTrackColor = Color.White.copy(alpha = 0.2f),
+                ),
+                modifier = Modifier.height(32.dp).padding(end = 8.dp),
             )
         }
     }
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
 private fun Legend(units: Units, gusts: Boolean) {
-    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+    Surface(shape = RoundedCornerShape(20.dp), color = GLASS, contentColor = Color.White) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             Box(
-                Modifier.fillMaxWidth().height(8.dp).background(
+                Modifier.fillMaxWidth().height(6.dp).background(
                     Brush.horizontalGradient(WIND_COLORS.map { Color(it) }),
                     RoundedCornerShape(4.dp),
                 ),
@@ -311,7 +325,8 @@ private fun Legend(units: Units, gusts: Boolean) {
             Text(
                 "${if (gusts) "Gusts" else "Wind at 10 m"} (${units.wind.label}) · tap the map for the wind at a spot",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
@@ -320,41 +335,59 @@ private fun Legend(units: Units, gusts: Boolean) {
 @Composable
 private fun StormSheet(s: Storm, units: Units, you: LatLon?, onClose: () -> Unit) {
     val ctx = LocalContext.current
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Cyclone, null, tint = Color(stormColor(s.category)), modifier = Modifier.size(32.dp))
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(s.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(s.kind, style = MaterialTheme.typography.bodyMedium, color = Color(stormColor(s.category)))
-                }
-                IconButton(onClick = onClose) { Icon(Icons.Outlined.Close, "Close") }
-            }
-            StormFacts(s, units, you)
+            StormHeader(s) { IconButton(onClick = onClose) { Icon(Icons.Outlined.Close, "Close") } }
+            StormMetrics(s, units, you, Modifier.padding(top = 12.dp))
+            StormFacts(s, units)
             s.link?.let { url ->
-                TextButton(onClick = { openLink(ctx, url) }) { Text("Official advisory (${s.sources.joinToString(" + ")}) →") }
+                TextButton(onClick = { openLink(ctx, url) }, contentPadding = PaddingValues(0.dp)) {
+                    Text("Official advisory (${s.sources.joinToString(" + ")}) →")
+                }
             }
         }
     }
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(8.dp))
+}
+
+/** Dark frosted glass for the controls over the map, the same in light and dark themes. */
+private val GLASS = Color(0xD90B1220)
+
+@Composable
+private fun MapChip(text: String, selected: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) Color.White else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val c = if (selected) Color(0xFF0B1220) else Color.White
+        if (icon != null) {
+            Icon(icon, null, Modifier.size(16.dp), tint = c)
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(text, color = c, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 @Composable
 private fun MapButton(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)) {
+    Surface(shape = RoundedCornerShape(50), color = GLASS, contentColor = Color.White) {
         IconButton(onClick = onClick) { content() }
     }
 }
 
 @Composable
-private fun Pill(content: @Composable () -> Unit) {
+private fun MapPill(content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-        modifier = Modifier.padding(top = 6.dp),
+        color = GLASS,
+        contentColor = Color.White,
+        modifier = Modifier.padding(top = 8.dp),
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
             androidx.compose.material3.ProvideTextStyle(MaterialTheme.typography.labelMedium) { content() }
         }
     }
@@ -366,6 +399,12 @@ private fun viewBox(cam: MapCamera, size: IntSize): GeoBox {
     val halfW = size.width / 2.0 / cam.ppd
     val halfH = size.height / 2.0 / cam.ppd
     return GeoBox(cam.lon - halfW, (cam.lat - halfH).coerceAtLeast(-85.0), cam.lon + halfW, (cam.lat + halfH).coerceAtMost(85.0))
+}
+
+/** Keeps the view between 85°S and 85°N, so there's no empty space past the poles. */
+private fun clampLat(lat: Double, ppd: Float, size: IntSize): Double {
+    val halfH = size.height / 2.0 / ppd
+    return if (halfH >= 85) 0.0 else lat.coerceIn(-85 + halfH, 85 - halfH)
 }
 
 private fun toLatLon(p: Offset, cam: MapCamera, size: IntSize) =
@@ -406,10 +445,10 @@ private class Particles(private val density: Float) {
     private val segN = IntArray(bands * ageBands)
     private val paints = Array(bands * ageBands) { k ->
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            strokeWidth = 1.6f * density
+            strokeWidth = 1.5f * density
             strokeCap = Paint.Cap.ROUND
             color = WIND_COLORS[k / ageBands]
-            alpha = intArrayOf(235, 140, 60)[k % ageBands]
+            alpha = intArrayOf(255, 165, 70)[k % ageBands]
         }
     }
 
@@ -484,14 +523,14 @@ private class Particles(private val density: Float) {
 
 /** Draws everything on the map except the particles. */
 private class MapPainter(private val density: Float) {
-    private val ocean = Paint().apply { color = 0xFF0B1A2A.toInt() }
-    private val landFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1C2B3B.toInt(); style = Paint.Style.FILL }
+    private val ocean = Paint().apply { color = 0xFF07101C.toInt() }
+    private val landFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF152335.toInt(); style = Paint.Style.FILL }
     private val coast = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCC9FB3C8.toInt(); style = Paint.Style.STROKE }
     private val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x669FB3C8; style = Paint.Style.STROKE }
-    private val heatPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = 110 }
+    private val heatPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = 72 }
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f * density; color = 0xEEFFFFFF.toInt() }
-    private val areaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = 0x22FFFFFF }
-    private val areaEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1f * density; color = 0x55FFFFFF }
+    private val areaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = 0x12FFFFFF }
+    private val areaEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1f * density; color = 0x2EFFFFFF }
     private val dot = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stormStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f * density; strokeCap = Paint.Cap.ROUND }
     private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
