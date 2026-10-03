@@ -183,6 +183,7 @@ fun WeatherScreen(vm: WeatherViewModel) {
 
                 if (f != null) {
                     item { Hero(f, state.readings.values.toList(), units) }
+                    item { UmbrellaCard(umbrellaAdvice(f.now, f.hours, units)) }
                 } else if (state.loading) {
                     item { Box(Modifier.fillMaxWidth().padding(64.dp), Alignment.Center) { CircularProgressIndicator(color = OnSky) } }
                 }
