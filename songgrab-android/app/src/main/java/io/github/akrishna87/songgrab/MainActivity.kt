@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
     private val model: SongGrabViewModel by viewModels()
 
     /** A save that waits on the permission prompt. */
-    private var pendingSave: Pair<String, Format>? = null
+    private var pendingSave: Triple<String, Format, Quality>? = null
 
     private val askPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         val save = pendingSave ?: return@registerForActivityResult
@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
             return@registerForActivityResult
         }
         // Without the notification permission the download still runs; it just isn't shown.
-        DownloadService.add(this, save.first, save.second)
+        DownloadService.add(this, save.first, save.second, save.third)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,10 +78,10 @@ class MainActivity : ComponentActivity() {
             return
         }
         model.shared()
-        save(url, model.format.value)
+        save(url, model.format.value, model.quality.value)
     }
 
-    private fun save(url: String, format: Format) {
+    private fun save(url: String, format: Format, quality: Quality) {
         val needed = buildList {
             val notifications = Manifest.permission.POST_NOTIFICATIONS
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted(notifications) && model.firstAsk(notifications)) add(notifications)
@@ -89,10 +89,10 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && !granted(storage)) add(storage)
         }
         if (needed.isEmpty()) {
-            DownloadService.add(this, url, format)
+            DownloadService.add(this, url, format, quality)
             return
         }
-        pendingSave = url to format
+        pendingSave = Triple(url, format, quality)
         askPermissions.launch(needed.toTypedArray())
     }
 

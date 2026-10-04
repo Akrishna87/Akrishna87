@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Repeat
@@ -50,6 +51,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,6 +93,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import io.github.akrishna87.songgrab.DownloadService
@@ -100,10 +103,12 @@ import io.github.akrishna87.songgrab.Job
 import io.github.akrishna87.songgrab.Jobs
 import io.github.akrishna87.songgrab.Links
 import io.github.akrishna87.songgrab.PlayerConnection
+import io.github.akrishna87.songgrab.Quality
 import io.github.akrishna87.songgrab.Saver
 import io.github.akrishna87.songgrab.Song
 import io.github.akrishna87.songgrab.SongGrabViewModel
 import io.github.akrishna87.songgrab.Stage
+import io.github.akrishna87.songgrab.VideoActivity
 import io.github.akrishna87.songgrab.statusText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -111,10 +116,19 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-fun SongGrabApp(model: SongGrabViewModel, onSave: (String, Format) -> Unit) {
+fun SongGrabApp(model: SongGrabViewModel, onSave: (String, Format, Quality) -> Unit) {
     val songs by model.songs.collectAsStateWithLifecycle()
     val jobs by model.jobs.collectAsStateWithLifecycle()
     val format by model.format.collectAsStateWithLifecycle()
+    val quality by model.quality.collectAsStateWithLifecycle()
+    var filter by rememberSaveable { mutableStateOf(LibraryFilter.All) }
+    val videoCount = songs.count { it.isVideo }
+    val songCount = songs.size - videoCount
+    val shown = when (filter) {
+        LibraryFilter.All -> songs
+        LibraryFilter.Songs -> songs.filterNot { it.isVideo }
+        LibraryFilter.Videos -> songs.filter { it.isVideo }
+    }
     val now by model.player.state.collectAsStateWithLifecycle()
     val engine by model.engine.collectAsStateWithLifecycle()
     var showPlayer by rememberSaveable { mutableStateOf(false) }
@@ -143,7 +157,7 @@ fun SongGrabApp(model: SongGrabViewModel, onSave: (String, Format) -> Unit) {
             ),
         ) {
             item { Header(onInfo = { showAbout = true }) }
-            item { SaveCard(format, onFormat = model::setFormat, onSave = onSave) }
+            item { SaveCard(format, quality, onFormat = model::setFormat, onQuality = model::setQuality, onSave = onSave) }
             if (jobs.isNotEmpty()) {
                 item {
                     SectionTitle(
@@ -156,15 +170,22 @@ fun SongGrabApp(model: SongGrabViewModel, onSave: (String, Format) -> Unit) {
             }
             item {
                 SectionTitle(
-                    if (songs.isEmpty()) "Your songs" else "Your songs · ${songs.size}",
-                    action = if (songs.size > 1) "Shuffle" else null,
+                    when {
+                        songs.isEmpty() -> "Your songs"
+                        videoCount == 0 -> "Your songs · ${songs.size}"
+                        else -> "Your library · ${songs.size}"
+                    },
+                    action = if (songCount > 1 && filter != LibraryFilter.Videos) "Shuffle songs" else null,
                     onAction = model::shuffleAll,
                 )
+            }
+            if (videoCount > 0) {
+                item { FilterRow(filter, songCount, videoCount, onFilter = { filter = it }) }
             }
             if (songs.isEmpty()) {
                 item { EmptySongs() }
             }
-            items(songs, key = { it.uri }) { song ->
+            items(shown, key = { it.uri }) { song ->
                 SongRow(song, playing = now.uri == song.uri, isPlaying = now.isPlaying, model = model)
             }
         }
@@ -183,7 +204,7 @@ private fun Header(onInfo: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("SongGrab", style = MaterialTheme.typography.headlineMedium)
-            Text("A YouTube link in, a song on your phone out", style = MaterialTheme.typography.bodyMedium, color = Palette.SubText)
+            Text("A YouTube link in, a song or video on your phone out", style = MaterialTheme.typography.bodyMedium, color = Palette.SubText)
         }
         IconButton(onClick = onInfo) {
             Icon(Icons.Rounded.Info, contentDescription = "About and updates", tint = Palette.SubText)
@@ -192,14 +213,20 @@ private fun Header(onInfo: () -> Unit) {
 }
 
 @Composable
-private fun SaveCard(format: Format, onFormat: (Format) -> Unit, onSave: (String, Format) -> Unit) {
+private fun SaveCard(
+    format: Format,
+    quality: Quality,
+    onFormat: (Format) -> Unit,
+    onQuality: (Quality) -> Unit,
+    onSave: (String, Format, Quality) -> Unit,
+) {
     var text by rememberSaveable { mutableStateOf("") }
     val clipboard = LocalClipboardManager.current
     val focus = LocalFocusManager.current
     val url = Links.find(text)
     val save = {
         if (url != null) {
-            onSave(url, format)
+            onSave(url, format, quality)
             text = ""
             focus.clearFocus()
         }
@@ -248,9 +275,38 @@ private fun SaveCard(format: Format, onFormat: (Format) -> Unit, onSave: (String
                         label = {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(option.label, fontWeight = FontWeight.Bold)
-                                Text(option.hint, style = MaterialTheme.typography.labelSmall, color = Palette.SubText, maxLines = 1)
+                                Text(
+                                    option.hint,
+                                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+                                    color = Palette.SubText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         },
+                    )
+                }
+            }
+            AnimatedVisibility(visible = format.isVideo) {
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    Text("Video quality", style = MaterialTheme.typography.labelLarge, color = Palette.SubText)
+                    Spacer(Modifier.height(6.dp))
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        Quality.entries.forEachIndexed { index, option ->
+                            SegmentedButton(
+                                selected = option == quality,
+                                onClick = { onQuality(option) },
+                                shape = SegmentedButtonDefaults.itemShape(index, Quality.entries.size),
+                                label = { Text(option.label) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Higher is sharper but bigger: a 4-minute video is about 15 MB at 480p, 30 MB at 720p, 60 MB at 1080p.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Palette.Faint,
                     )
                 }
             }
@@ -258,7 +314,7 @@ private fun SaveCard(format: Format, onFormat: (Format) -> Unit, onSave: (String
             Button(onClick = save, enabled = url != null, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
                 Icon(Icons.Rounded.Download, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Save as ${format.label}", style = MaterialTheme.typography.titleMedium)
+                Text(if (format.isVideo) "Save video · ${quality.label}" else "Save as ${format.label}", style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(10.dp))
             Text(
@@ -325,7 +381,7 @@ private fun EmptySongs() {
         Text("No songs yet", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Paste a link above, or share a video from the YouTube app to SongGrab. Songs are saved in Music/${Saver.FOLDER}, so your other music apps can play them too.",
+            "Paste a link above, or share a video from the YouTube app to SongGrab. Songs are saved in Music/${Saver.FOLDER} and videos in Movies/${Saver.FOLDER}, so your other apps can play them too.",
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.SubText,
             textAlign = TextAlign.Center,
@@ -342,13 +398,27 @@ private fun SongRow(song: Song, playing: Boolean, isPlaying: Boolean, model: Son
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { if (playing) model.player.toggle() else model.play(song) }
+            .clickable {
+                when {
+                    song.isVideo -> VideoActivity.open(context, song)
+                    playing -> model.player.toggle()
+                    else -> model.play(song)
+                }
+            }
             .background(if (playing) Palette.Elevated else Color.Transparent)
             .padding(start = 20.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Artwork(song.art, 52.dp)
+            if (song.isVideo && !playing) {
+                Icon(
+                    Icons.Rounded.PlayCircle,
+                    contentDescription = "Video",
+                    tint = Color.White,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp).size(18.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                )
+            }
             if (playing) {
                 Box(Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) {
                     Icon(if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.Pause, contentDescription = null, tint = Palette.Coral)
@@ -367,18 +437,32 @@ private fun SongRow(song: Song, playing: Boolean, isPlaying: Boolean, model: Son
             val details = listOfNotNull(
                 song.artist.ifBlank { null },
                 song.durationSec.takeIf { it > 0 }?.let { formatDuration(it.toLong()) },
-                song.format,
+                if (song.isVideo) listOfNotNull("MP4", song.height.takeIf { it > 0 }?.let { "${it}p" }).joinToString(" ") else song.format,
             ).joinToString(" · ")
             Text(details, style = MaterialTheme.typography.bodySmall, color = Palette.SubText, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = Palette.SubText) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Play") }, onClick = { menu = false; model.play(song) })
-                DropdownMenuItem(text = { Text("Share song file") }, onClick = {
+                if (song.isVideo) {
+                    DropdownMenuItem(text = { Text("Watch") }, onClick = { menu = false; VideoActivity.open(context, song) })
+                    DropdownMenuItem(text = { Text("Listen (sound only)") }, onClick = { menu = false; model.play(song) })
+                    DropdownMenuItem(text = { Text("Open in another app") }, onClick = {
+                        menu = false
+                        val view = Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(Uri.parse(song.uri), Format.MP4.mime)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        if (runCatching { context.startActivity(view) }.isFailure) {
+                            Toast.makeText(context, "No other app on this phone plays videos.", Toast.LENGTH_LONG).show()
+                        }
+                    })
+                } else {
+                    DropdownMenuItem(text = { Text("Play") }, onClick = { menu = false; model.play(song) })
+                }
+                DropdownMenuItem(text = { Text(if (song.isVideo) "Share video file" else "Share song file") }, onClick = {
                     menu = false
                     val send = Intent(Intent.ACTION_SEND)
-                        .setType(if (song.format == Format.M4A.name) Format.M4A.mime else Format.MP3.mime)
+                        .setType(Format.of(song.format).mime)
                         .putExtra(Intent.EXTRA_STREAM, Uri.parse(song.uri))
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     runCatching { context.startActivity(Intent.createChooser(send, song.title)) }
@@ -403,8 +487,8 @@ private fun SongRow(song: Song, playing: Boolean, isPlaying: Boolean, model: Son
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete this song?") },
-            text = { Text("“${song.title}” will be deleted from Music/${Saver.FOLDER} on your phone.") },
+            title = { Text(if (song.isVideo) "Delete this video?" else "Delete this song?") },
+            text = { Text("“${song.title}” will be deleted from ${Saver.folder(Format.of(song.format))} on your phone.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -535,7 +619,7 @@ private fun AboutDialog(engine: SongGrabViewModel.EngineState, onUpdate: () -> U
         text = {
             Column {
                 Text(
-                    "Saves the audio of a YouTube video as a song in Music/${Saver.FOLDER}, using yt-dlp and ffmpeg.",
+                    "Saves a YouTube video's sound as a song in Music/${Saver.FOLDER}, or the whole video in Movies/${Saver.FOLDER}, using yt-dlp and ffmpeg.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -575,4 +659,19 @@ private fun AboutDialog(engine: SongGrabViewModel.EngineState, onUpdate: () -> U
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
     )
+}
+
+enum class LibraryFilter { All, Songs, Videos }
+
+@Composable
+private fun FilterRow(filter: LibraryFilter, songs: Int, videos: Int, onFilter: (LibraryFilter) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(
+            LibraryFilter.All to "All",
+            LibraryFilter.Songs to "Songs · $songs",
+            LibraryFilter.Videos to "Videos · $videos",
+        ).forEach { (option, label) ->
+            FilterChip(selected = filter == option, onClick = { onFilter(option) }, label = { Text(label) })
+        }
+    }
 }

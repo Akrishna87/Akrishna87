@@ -1,9 +1,10 @@
 # 🎵 SongGrab for Android
 
 SongGrab saves the audio of a YouTube video as a song on your phone, as an **MP3** or an
-**M4A**, with the title, artist and cover art filled in. Songs go into your phone's
-**Music/SongGrab** folder, so SongGrab's own player, your other music apps (including
-Isaialai) and the Files app can all play them, offline.
+**M4A**, with the title, artist and cover art filled in, or saves the **whole video** as an
+MP4. Songs go into your phone's **Music/SongGrab** folder, so SongGrab's own player, your
+other music apps (including Isaialai) and the Files app can all play them, offline. Videos go
+into **Movies/SongGrab**, so they also show up in your Gallery or Photos app.
 
 It's for your own phone and is installed straight from GitHub (sideloaded). It isn't on the
 Play Store, because Google doesn't allow YouTube downloaders there.
@@ -35,13 +36,21 @@ your songs.
   saving straight away.
 - **With a link:** copy a YouTube link, open SongGrab, tap the 📋 paste button and then
   **Save as MP3**.
-- Choose **MP3** (plays everywhere) or **M4A** (faster, because YouTube's audio is kept as it
-  is, without converting). SongGrab remembers your choice.
+- Choose **MP3** (plays everywhere), **M4A** (faster, because YouTube's audio is kept as it
+  is, without converting) or **Video**. For a video, pick **480p**, **720p** or **1080p**:
+  higher is sharper but bigger (a 4-minute video is roughly 15, 30 or 60 MB). SongGrab
+  remembers your choices. Videos are saved as H.264 MP4 with AAC sound, which every phone
+  plays; if a video isn't available at the size you chose, the closest smaller one is used.
 - Downloads keep going if you leave the app, with progress in the notification. You can queue
   several; they're saved one after another.
 - Tap a song to play it. You get a mini player, a full player (tap the mini player) with
   shuffle and repeat, lock-screen and notification controls, and headphone/Bluetooth buttons.
-- Each song's ⋮ menu can share the file, open the original video, take it off the list, or
+- Tap a video to watch it full screen in SongGrab's video player (turn the phone for
+  landscape). Its ⋮ menu can also play just its sound in the music player (which keeps going
+  with the screen off), or open it in another app.
+- When you have videos, **All / Songs / Videos** filters appear above the list. *Shuffle songs*
+  only shuffles songs.
+- Each item's ⋮ menu can share the file, open the original video, take it off the list, or
   delete it from the phone.
 
 Any link to one YouTube video works: normal watch links, `youtu.be` share links, Shorts,
@@ -70,14 +79,17 @@ way an update might fix. To update by hand, tap ⓘ at the top and **Update down
 - [youtubedl-android](https://github.com/yausername/youtubedl-android) bundles
   [yt-dlp](https://github.com/yt-dlp/yt-dlp), a small Python and
   [ffmpeg](https://ffmpeg.org). yt-dlp fetches the best audio, ffmpeg converts it to MP3
-  (best-quality VBR) or keeps the M4A, and adds the tags and cover.
+  (best-quality VBR) or keeps the M4A, and adds the tags and cover. For a video, yt-dlp
+  fetches the picture and sound separately and ffmpeg merges them into one MP4.
   ([Grabber.kt](app/src/main/java/io/github/akrishna87/songgrab/Grabber.kt) has the exact options.)
 - A foreground service runs the download queue
   ([DownloadService.kt](app/src/main/java/io/github/akrishna87/songgrab/DownloadService.kt)),
   then the song is saved through Android's MediaStore
   ([Saver.kt](app/src/main/java/io/github/akrishna87/songgrab/Saver.kt)), so it needs no
   storage permission on Android 10 and newer.
-- Media3 (ExoPlayer and a media session) plays the songs.
+- Media3 (ExoPlayer and a media session) plays the songs; a Media3 `PlayerView` screen
+  ([VideoActivity.kt](app/src/main/java/io/github/akrishna87/songgrab/VideoActivity.kt))
+  plays videos.
 - Because Python and ffmpeg are bundled for each processor type, CI builds a separate APK per
   type. `SongGrab.apk` is for 64-bit ARM phones, which covers nearly all phones from the last
   ten years.
@@ -86,6 +98,8 @@ CI ([songgrab-apk.yml](../.github/workflows/songgrab-apk.yml)) runs the unit tes
 APKs and runs [ci/smoke-test.sh](ci/smoke-test.sh) on an Android 14 emulator. The test shares
 a link to SongGrab (a tone the test serves itself), waits for the MP3 to land in
 Music/SongGrab with a tidied title, plays it, and checks it keeps playing in the background.
+Then it switches to Video, saves a generated 720p clip to Movies/SongGrab, and opens it in the
+video player.
 It also tries a real YouTube video (Blender's CC-licensed *Sintel* trailer), but only warns
 if that fails, because YouTube often blocks cloud servers. Then the APK is published as the
 `songgrab-latest` release.

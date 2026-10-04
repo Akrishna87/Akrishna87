@@ -38,9 +38,9 @@ class DownloadService : Service() {
         private const val CHANNEL_DONE = "saved"
         private const val PROGRESS_ID = 1
 
-        /** Queues [url] to be saved as [format]. */
-        fun add(context: Context, url: String, format: Format) {
-            val job = Job(url = url, format = format)
+        /** Queues [url] to be saved as [format] (a video at [quality]). */
+        fun add(context: Context, url: String, format: Format, quality: Quality = Quality.P720) {
+            val job = Job(url = url, format = format, quality = quality)
             Jobs.add(job)
             ContextCompat.startForegroundService(
                 context,
@@ -51,7 +51,7 @@ class DownloadService : Service() {
         /** Tries a failed download again. */
         fun retry(context: Context, job: Job) {
             Jobs.remove(job.id)
-            add(context, job.url, job.format)
+            add(context, job.url, job.format, job.quality)
         }
     }
 
@@ -151,10 +151,11 @@ class DownloadService : Service() {
                     sourceUrl = job.url,
                     savedAt = System.currentTimeMillis(),
                     art = art,
+                    height = if (job.format.isVideo) info.height.takeIf { it > 0 } ?: job.quality.height else 0,
                 ),
             )
             change(job.id) { it.copy(stage = Stage.Done, progress = 100f) }
-            notifySaved(info)
+            notifySaved(info, job.format)
         } catch (e: YoutubeDL.CanceledException) {
             Jobs.update(job.id) { it.copy(stage = Stage.Cancelled) }
         } catch (e: Exception) {
@@ -167,11 +168,12 @@ class DownloadService : Service() {
     }
 
     private fun grab(job: Job, dir: File): Grabber.Result = Engine.use(this) {
-        Grabber.grab(job.url, job.format, dir, job.id) { event ->
+        Grabber.grab(job.url, job.format, job.quality, dir, job.id) { event ->
             when (event) {
                 is Grabber.Event.Found -> change(job.id) { it.copy(title = event.info.title, artist = event.info.artist) }
                 is Grabber.Event.Progress -> change(job.id) { it.copy(stage = Stage.Downloading, progress = event.percent) }
                 Grabber.Event.Converting -> change(job.id) { if (it.stage == Stage.Converting) it else it.copy(stage = Stage.Converting, progress = -1f) }
+                is Grabber.Event.Part -> change(job.id) { it.copy(part = event.number, progress = 0f) }
             }
         }
     }
@@ -206,7 +208,7 @@ class DownloadService : Service() {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
         if (current == null) return builder.setContentTitle("SongGrab").setContentText("Getting ready…").build()
         val waiting = active.size - 1
-        builder.setContentTitle(current.title ?: "Saving a song")
+        builder.setContentTitle(current.title ?: if (current.format.isVideo) "Saving a video" else "Saving a song")
             .setContentText(statusText(current) + if (waiting > 0) " · $waiting more waiting" else "")
         if (current.stage == Stage.Downloading && current.progress >= 0) {
             builder.setProgress(100, current.progress.toInt(), false)
@@ -232,11 +234,11 @@ class DownloadService : Service() {
         runCatching { NotificationManagerCompat.from(this).notify(PROGRESS_ID, progressNotification()) }
     }
 
-    private fun notifySaved(info: Grabber.Info) {
+    private fun notifySaved(info: Grabber.Info, format: Format) {
         val notification = NotificationCompat.Builder(this, CHANNEL_DONE)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setContentTitle("Saved: ${info.title}")
-            .setContentText(listOf(info.artist, "Music/${Saver.FOLDER}").filter { it.isNotBlank() }.joinToString(" · "))
+            .setContentText(listOf(info.artist, Saver.folder(format)).filter { it.isNotBlank() }.joinToString(" · "))
             .setContentIntent(openApp())
             .setAutoCancel(true)
             .build()
@@ -248,9 +250,21 @@ class DownloadService : Service() {
 fun statusText(job: Job): String = when (job.stage) {
     Stage.Waiting -> "Waiting"
     Stage.Starting -> if (job.retried) "Downloader updated, trying again…" else "Finding the audio…"
-    Stage.Downloading -> if (job.progress >= 0) "Downloading · ${job.progress.toInt()}%" else "Downloading…"
-    Stage.Converting -> if (job.format == Format.MP3) "Converting to MP3…" else "Adding the cover and tags…"
-    Stage.Saving -> "Saving to Music/${Saver.FOLDER}…"
+    Stage.Downloading -> {
+        // A video comes as two downloads: the picture, then the sound.
+        val what = when {
+            !job.format.isVideo -> "Downloading"
+            job.part >= 2 -> "Downloading the sound"
+            else -> "Downloading the video"
+        }
+        if (job.progress >= 0) "$what · ${job.progress.toInt()}%" else "$what…"
+    }
+    Stage.Converting -> when (job.format) {
+        Format.MP3 -> "Converting to MP3…"
+        Format.MP4 -> "Putting the video together…"
+        Format.M4A -> "Adding the cover and tags…"
+    }
+    Stage.Saving -> "Saving to ${Saver.folder(job.format)}…"
     Stage.Done -> "Saved"
     Stage.Failed -> job.error ?: "Couldn't save it"
     Stage.Cancelled -> "Cancelled"

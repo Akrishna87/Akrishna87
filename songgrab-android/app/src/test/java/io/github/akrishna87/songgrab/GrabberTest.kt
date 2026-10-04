@@ -56,6 +56,21 @@ class GrabberTest {
     }
 
     @Test
+    fun asksForAVideoAtTheChosenQuality() {
+        val video = Grabber.options(Format.MP4, File("/tmp/job"), Quality.P1080)
+        assertEquals("bv*+ba/b", video[video.indexOf("-f") + 1])
+        assertEquals("res:1080,vcodec:h264,acodec:m4a", video[video.indexOf("-S") + 1])
+        assertEquals("mp4", video[video.indexOf("--merge-output-format") + 1])
+        assertFalse("-x" in video) // keeps the picture
+        assertEquals("res:480,vcodec:h264,acodec:m4a", Grabber.options(Format.MP4, File("/tmp/job"), Quality.P480).let { it[it.indexOf("-S") + 1] })
+    }
+
+    @Test
+    fun readsAVideosHeight() {
+        assertEquals(720, Grabber.parseInfo("""{"id": "v", "title": "Clip", "height": 720}""")!!.height)
+    }
+
+    @Test
     fun explainsCommonFailures() {
         val bot = Exception("WARNING: something\nERROR: [youtube] dQw4w9WgXcQ: Sign in to confirm you’re not a bot. Use --cookies-from-browser")
         assertTrue(Grabber.explain(bot).startsWith("YouTube wants a sign-in"))

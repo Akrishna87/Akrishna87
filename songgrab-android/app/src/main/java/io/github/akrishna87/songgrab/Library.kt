@@ -9,7 +9,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** A saved song. [uri] is the audio file in Music/SongGrab; [art] a copy of its cover in app storage. */
+/**
+ * A saved song or video. [uri] is the file in Music/SongGrab (or Movies/SongGrab); [art] a copy
+ * of its cover in app storage; [height] a video's picture height, e.g. 720.
+ */
 data class Song(
     val id: String,
     val title: String,
@@ -20,9 +23,12 @@ data class Song(
     val sourceUrl: String,
     val savedAt: Long,
     val art: String?,
-)
+    val height: Int = 0,
+) {
+    val isVideo: Boolean get() = Format.of(format).isVideo
+}
 
-/** The songs SongGrab has saved, newest first, kept in a small JSON file. */
+/** The songs and videos SongGrab has saved, newest first, kept in a small JSON file. */
 object Library {
     private const val FILE = "songs.json"
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
@@ -74,7 +80,7 @@ object Library {
                 JSONObject()
                     .put("id", s.id).put("title", s.title).put("artist", s.artist).put("uri", s.uri)
                     .put("duration", s.durationSec).put("format", s.format).put("source", s.sourceUrl)
-                    .put("savedAt", s.savedAt).put("art", s.art ?: JSONObject.NULL),
+                    .put("savedAt", s.savedAt).put("art", s.art ?: JSONObject.NULL).put("height", s.height),
             )
         }
     }.toString()
@@ -94,6 +100,7 @@ object Library {
                 sourceUrl = o.optString("source"),
                 savedAt = o.optLong("savedAt"),
                 art = if (o.isNull("art")) null else o.optString("art").takeIf { it.isNotEmpty() },
+                height = o.optInt("height"),
             )
         }
     }

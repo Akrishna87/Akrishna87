@@ -23,6 +23,9 @@ class SongGrabViewModel(app: Application) : AndroidViewModel(app) {
     private val _format = MutableStateFlow(Format.of(prefs.getString("format", null)))
     val format: StateFlow<Format> = _format.asStateFlow()
 
+    private val _quality = MutableStateFlow(Quality.of(prefs.getString("quality", null)))
+    val quality: StateFlow<Quality> = _quality.asStateFlow()
+
     /** The engine's version, and whether an update is running or what it found. */
     data class EngineState(val version: String = "…", val updating: Boolean = false, val message: String? = null)
 
@@ -56,6 +59,11 @@ class SongGrabViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putString("format", format.name).apply()
     }
 
+    fun setQuality(quality: Quality) {
+        _quality.value = quality
+        prefs.edit().putString("quality", quality.name).apply()
+    }
+
     /** True the first time it's called for [permission]: ask once, then carry on without it. */
     fun firstAsk(permission: String): Boolean {
         val key = "asked:$permission"
@@ -78,12 +86,17 @@ class SongGrabViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Plays a song with the other songs queued after it. Videos play on their own, as sound only. */
     fun play(song: Song) {
-        val list = songs.value
+        if (song.isVideo) {
+            player.play(listOf(song), 0)
+            return
+        }
+        val list = songs.value.filterNot { it.isVideo }
         player.play(list, list.indexOfFirst { it.uri == song.uri }.coerceAtLeast(0))
     }
 
-    fun shuffleAll() = player.shuffle(songs.value)
+    fun shuffleAll() = player.shuffle(songs.value.filterNot { it.isVideo })
 
     /** Removes the song from the list, and deletes its file too if [deleteFile]. False if the file couldn't be deleted. */
     suspend fun remove(song: Song, deleteFile: Boolean): Boolean = withContext(Dispatchers.IO) {

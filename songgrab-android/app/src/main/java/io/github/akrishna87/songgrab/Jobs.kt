@@ -11,17 +11,19 @@ enum class Stage(val active: Boolean) {
     Done(false), Failed(false), Cancelled(false),
 }
 
-/** One link being saved. [progress] is 0–100, or negative when unknown. */
+/** One link being saved. [progress] is 0–100, or negative when unknown; [part] counts the streams a video comes in. */
 data class Job(
     val id: String = UUID.randomUUID().toString(),
     val url: String,
     val format: Format,
+    val quality: Quality = Quality.P720,
     val stage: Stage = Stage.Waiting,
     val title: String? = null,
     val artist: String? = null,
     val progress: Float = -1f,
     val error: String? = null,
     val retried: Boolean = false,
+    val part: Int = 0,
 )
 
 /** The download queue, shared by the download service and the screen. */

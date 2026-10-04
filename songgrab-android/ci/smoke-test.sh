@@ -2,8 +2,9 @@
 # Runs inside the Android emulator job: installs the APK, shares a link to SongGrab (as the
 # YouTube app's Share button does), waits for the song to be converted to MP3 and saved in
 # Music/SongGrab, then plays it from the app and checks it keeps playing in the background.
-# The song is a tone this script makes and serves from the host, so the test doesn't depend on
-# any website. A YouTube download is tried at the end too, but only warns if it fails, because
+# Then it switches to Video, saves a clip to Movies/SongGrab and opens it in the video player.
+# The song and clip are made by this script and served from the host, so the test doesn't
+# depend on any website. A YouTube download is tried at the end too, but only warns if it fails, because
 # YouTube often asks cloud machines to sign in.
 # Usage: smoke-test.sh <apk> <output dir>
 set -euo pipefail
@@ -67,6 +68,10 @@ python3 -m http.server 8765 --bind 0.0.0.0 --directory "$SONGS" > "$OUT/http.log
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true' EXIT
 TONE_URL="http://10.0.2.2:8765/Test%20Artist%20-%20Test%20Tone%20%28Official%20Video%29.ogg"
+# A 6-second 720p clip with sound.
+ffmpeg -nostdin -loglevel error -f lavfi -i "testsrc=size=1280x720:rate=25:duration=6" -f lavfi -i "sine=frequency=660:duration=6" \
+  -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$SONGS/Test Artist - Test Clip (Official Video).mp4"
+CLIP_URL="http://10.0.2.2:8765/Test%20Artist%20-%20Test%20Clip%20%28Official%20Video%29.mp4"
 
 adb wait-for-device
 adb install -r "$APK"
@@ -155,6 +160,49 @@ if [ "$YT_RESULT" = saved ]; then
 else
   echo "::warning::The YouTube download $YT_RESULT on the CI machine (YouTube often blocks cloud servers). On a phone it normally works; see the screenshot 7-youtube.png."
 fi
+
+echo "--- Saving a video"
+dump before-video
+tap before-video "Video"
+sleep 1
+dump video-choice
+shot 8-video-choice
+grep -q 'text="Video quality"' "$OUT/video-choice.xml" || fail "choosing Video doesn't show the quality choice"
+grep -q 'text="Save video · 720p"' "$OUT/video-choice.xml" || fail "the save button doesn't say 'Save video · 720p'"
+echo "PASS: Video shows the quality choice"
+share "Watch $CLIP_URL"
+VIDEOS=""
+for _ in $(seq 1 80); do
+  VIDEOS=$(adb shell ls /sdcard/Movies/SongGrab/ 2>/dev/null | tr -d '\r' || true)
+  echo "$VIDEOS" | grep -q "Test Artist - Test Clip.mp4" && break
+  sleep 3
+done
+echo "  Movies/SongGrab: $VIDEOS"
+echo "$VIDEOS" | grep -q "Test Artist - Test Clip.mp4" || { dump video-failed; show video-failed; fail "Movies/SongGrab doesn't have 'Test Artist - Test Clip.mp4'"; }
+echo "PASS: the video is in the phone's Movies/SongGrab folder"
+sleep 2
+# Clear the finished downloads and scroll down, so the library rows are on screen.
+dump video-done
+tap video-done "Clear"
+sleep 1
+SIZE=$(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1); SW=${SIZE%x*}; SH=${SIZE#*x}
+adb shell input swipe $((SW / 2)) $((SH * 3 / 4)) $((SW / 2)) $((SH / 4)) 400
+sleep 2
+dump video-saved
+shot 9-video-saved
+show video-saved
+grep -q 'text="Test Clip"' "$OUT/video-saved.xml" || fail "the video isn't in the list as 'Test Clip'"
+grep -q 'MP4 720p' "$OUT/video-saved.xml" || fail "the video's row doesn't say 'MP4 720p'"
+grep -q 'text="Videos · 1"' "$OUT/video-saved.xml" || fail "there's no 'Videos · 1' filter"
+echo "PASS: the video is in the library"
+tap video-saved "Test Clip" last # the library row, not the finished download above it
+sleep 4
+shot 10-video-player
+adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" | grep -q VideoActivity \
+  || fail "tapping the video didn't open the video player"
+echo "PASS: the video opens in the video player"
+adb shell input keyevent KEYCODE_BACK
+sleep 2
 
 if adb logcat -d | grep -q "FATAL EXCEPTION"; then
   adb logcat -d > "$OUT/logcat.txt"
