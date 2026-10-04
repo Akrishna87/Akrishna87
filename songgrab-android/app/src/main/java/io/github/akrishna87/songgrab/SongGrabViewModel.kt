@@ -43,6 +43,14 @@ class SongGrabViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Counts links shared to the app, so the screen can show the download list for each one. */
+    private val _shares = MutableStateFlow(0)
+    val shares: StateFlow<Int> = _shares.asStateFlow()
+
+    fun shared() {
+        _shares.value++
+    }
+
     fun setFormat(format: Format) {
         _format.value = format
         prefs.edit().putString("format", format.name).apply()

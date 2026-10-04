@@ -128,8 +128,18 @@ shot 6-notification
 adb shell cmd statusbar collapse
 adb shell cmd media_session dispatch pause || adb shell input keyevent KEYCODE_MEDIA_PAUSE
 
+echo "--- Sharing another link while the full player is open shows the download"
+adb shell am start -W -n "$PKG/.MainActivity" > /dev/null
+sleep 2
+dump before-youtube
+grep -q 'NOW PLAYING' "$OUT/before-youtube.xml" || echo "(the full player had closed already)"
 echo "--- Trying a YouTube video (Sintel trailer, CC BY 3.0 Blender Foundation); this only warns if it fails"
 share "https://youtu.be/eRsGyueVLvQ?si=smoke"
+sleep 3
+dump youtube-start
+grep -q 'NOW PLAYING' "$OUT/youtube-start.xml" && fail "sharing a link left the full player covering the download"
+grep -q 'text="Downloads"' "$OUT/youtube-start.xml" || fail "the shared YouTube link isn't in the download list"
+echo "PASS: a shared link brings the download list into view"
 YT_END=$((SECONDS + 300))
 YT_RESULT="timed out"
 while [ $SECONDS -lt $YT_END ]; do

@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "There's no link in what was shared.", Toast.LENGTH_LONG).show()
             return
         }
+        model.shared()
         save(url, model.format.value)
     }
 

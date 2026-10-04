@@ -119,6 +119,14 @@ fun SongGrabApp(model: SongGrabViewModel, onSave: (String, Format) -> Unit) {
     val engine by model.engine.collectAsStateWithLifecycle()
     var showPlayer by rememberSaveable { mutableStateOf(false) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
+    val shares by model.shares.collectAsStateWithLifecycle()
+    // A newly shared link closes the full player and dialogs, so its download is in view.
+    LaunchedEffect(shares) {
+        if (shares > 0) {
+            showPlayer = false
+            showAbout = false
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
