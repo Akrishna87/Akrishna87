@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<meta name="description" content="Android apps by Aravind, free and without ads. Always the latest build, ready to install.">
+<title>Aravind's Android Apps</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%2334c27a'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle'%3E%F0%9F%93%B2%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#apps">Skip to the apps</a>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Android · free · no ads · no accounts</p>
+    <h1>Aravind's apps</h1>
+    <p class="lede">Tap <strong>Install</strong> on your phone. When a new build is ready, come back here and tap <strong>Update</strong>. It installs over the old one and keeps your data.</p>
+    <p class="status" id="status" role="status" aria-live="polite">Checking for the latest builds…</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <aside class="notice" id="desktop-notice" hidden>
+    <strong>Using a computer?</strong> These are Android apps. Open an app's <em>Details</em> and scan the QR code with your phone, or open this page on your phone.
+  </aside>
+
+  <aside class="notice warn" id="error-notice" hidden></aside>
+
+  <section id="apps" class="grid" aria-label="Apps" aria-busy="true"></section>
+
+  <section class="howto" aria-labelledby="howto-h">
+    <h2 id="howto-h">How to install</h2>
+    <ol class="steps">
+      <li><span class="n">1</span><div><strong>Tap Install</strong> on this page, on your Android phone. The file downloads (it ends in <code>.apk</code>).</div></li>
+      <li><span class="n">2</span><div><strong>Open the file.</strong> The first time, Android asks you to allow installs from your browser. Turn that on, go back, and tap <strong>Install</strong>.</div></li>
+      <li><span class="n">3</span><div><strong>If Play Protect warns you</strong> that it doesn't know the app, tap <strong>More details → Install anyway</strong>. That's because the app isn't on the Play Store.</div></li>
+    </ol>
+    <details class="faq">
+      <summary>Will an update delete my data?</summary>
+      <p>No. A new build installs over the old one and keeps your playlists, shelf, favourites and settings. If Android says <em>"App not installed"</em>, the old copy was signed with a different key. Uninstall it once, then install again.</p>
+    </details>
+    <details class="faq">
+      <summary>Can I update without coming back to this page?</summary>
+      <p>Yes, once an app has the in-app updater. It checks for a new build when you open it and offers an <strong>Update</strong> button. Android still asks you to confirm the install. Apps can't update themselves silently outside the Play Store.</p>
+    </details>
+    <details class="faq">
+      <summary>Is it safe?</summary>
+      <p>Every download comes straight from the app's GitHub releases, and the page shows each file's SHA-256 fingerprint so you can check it. The source code is public on GitHub.</p>
+    </details>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <p>Builds come live from <a href="https://github.com/Akrishna87" rel="noopener">GitHub</a>. This page checks them every time you open it.</p>
+</footer>
+
+<dialog id="sheet" aria-labelledby="sheet-title">
+  <button class="sheet-close" type="button" id="sheet-close" aria-label="Close">×</button>
+  <div class="sheet-body" id="sheet-body"></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="vendor/qrcode.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
