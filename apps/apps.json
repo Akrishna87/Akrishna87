@@ -1,0 +1,72 @@
+{
+  "owner": "Akrishna87",
+  "apps": [
+    {
+      "repo": "isaialai",
+      "tag": "music-player-latest",
+      "apk": "Isaialai.apk",
+      "name": "Isaialai",
+      "nameLocal": "இசையலை",
+      "tagline": "A music player for the songs already on your phone. No imports, no ads.",
+      "emoji": "🎧",
+      "hue": 265
+    },
+    {
+      "repo": "folio",
+      "tag": "books-latest",
+      "apk": "Folio.apk",
+      "name": "Folio",
+      "tagline": "Free audiobooks and ebooks from LibriVox and Project Gutenberg.",
+      "emoji": "📚",
+      "hue": 28
+    },
+    {
+      "repo": "kural",
+      "tag": "podcasts-latest",
+      "apk": "Kural.apk",
+      "name": "Kural",
+      "nameLocal": "குரல்",
+      "tagline": "A podcast player that opens on your shows, with a queue you control.",
+      "emoji": "🎙️",
+      "hue": 340
+    },
+    {
+      "repo": "vaanalai",
+      "tag": "radio-latest",
+      "apk": "Vaanalai.apk",
+      "name": "Vaanalai",
+      "nameLocal": "வானலை",
+      "tagline": "Live internet radio from around the world, including your own country.",
+      "emoji": "📻",
+      "hue": 195
+    },
+    {
+      "repo": "alaimaani",
+      "tag": "signal-latest",
+      "apk": "Alaimaani.apk",
+      "name": "Alaimaani",
+      "nameLocal": "அலைமானி",
+      "tagline": "The real numbers behind your signal bars, in plain words.",
+      "emoji": "📶",
+      "hue": 152
+    },
+    {
+      "repo": "budget-tracker-android",
+      "tag": "latest-debug",
+      "name": "Budget Tracker",
+      "tagline": "Expenses, income, recurring costs and budgets. All on your phone.",
+      "emoji": "💰",
+      "hue": 45,
+      "channel": "debug"
+    },
+    {
+      "repo": "tomorrows-bag-android",
+      "tag": "latest-debug",
+      "name": "Tomorrow's Bag",
+      "tagline": "Pick the notebooks your child needs to pack for school tomorrow.",
+      "emoji": "🎒",
+      "hue": 8,
+      "channel": "debug"
+    }
+  ]
+}
