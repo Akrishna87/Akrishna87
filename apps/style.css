@@ -127,6 +127,10 @@ h1 { margin: 0; font-size: clamp(2.1rem, 6vw, 3.4rem); line-height: 1.05; letter
 .btn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+.group { grid-column: 1 / -1; margin: 18px 0 -2px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.group:first-child { margin-top: 0; }
+.note { margin: 14px 0 0; padding: 10px 14px; background: var(--warn-soft); border-radius: 12px; font-size: 0.9rem; }
+
 /* Loading skeleton + error card */
 .card.skeleton .tile, .card.skeleton .line { background: var(--surface-2); box-shadow: none; animation: pulse 1.4s ease-in-out infinite; }
 .card.skeleton .line { height: 14px; border-radius: 7px; }

@@ -317,6 +317,7 @@
         h('h2', { id: 'sheet-title' }, nameEl(app)),
         h('p', { class: 'tagline' }, app.tagline))),
       chipsFor(app, info, entry.stale),
+      app.note ? h('p', { class: 'note' }, app.note) : null,
       h('div', { class: 'actions', style: 'margin-top:16px' }, installButton(app, info, 'block')),
 
       section('This build',
@@ -336,7 +337,7 @@
           info.shots.map(src => h('img', { src: safeUrl(src), alt: '', loading: 'lazy', decoding: 'async' }))),
         h('p', { class: 'shots-note' }, 'Taken by the automatic test that runs on every build.')) : null,
 
-      info.older.length ? section('Other builds',
+      info.older.length ? section('Other downloads',
         h('ul', { class: 'older' }, info.older.map(o =>
           h('li', {}, h('a', { href: safeUrl(o.url), rel: 'noopener' },
             h('span', {}, o.build ? 'Build ' + o.build : o.name), h('small', {}, ago(o.updated) + ' · ' + fmtSize(o.size))))))) : null,
@@ -373,7 +374,14 @@
     }
     state.owner = config.owner;
     state.apps = config.apps;
-    grid.replaceChildren(...state.apps.map(buildCard));
+    const cards = [];
+    let lastGroup = null;
+    for (const app of state.apps) {
+      if (app.group && app.group !== lastGroup) cards.push(h('h2', { class: 'group' }, app.group));
+      lastGroup = app.group;
+      cards.push(buildCard(app));
+    }
+    grid.replaceChildren(...cards);
 
     await Promise.all(state.apps.map(async app => {
       try { state.data.set(app.repo, await loadApp(app, state.owner)); }

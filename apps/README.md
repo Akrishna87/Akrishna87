@@ -46,6 +46,8 @@ Edit [`apps.json`](apps.json) and add an entry:
 | `apk` | Preferred file name. If it isn't there, the highest `…-vNN.apk` is used. |
 | `emoji`, `hue` | The icon tile (0–360 is the colour). |
 | `channel` | `"debug"` shows a "Test build" label. Leave it out for normal builds. |
+| `group` | Heading the card is listed under. Apps are shown in file order. |
+| `note` | Optional line shown at the top of the app's Details, for example which of two APKs to use. |
 
 The page needs the repo's release to contain an `.apk` file. Everything else (version, size, date,
 fingerprint, screenshots) is read from the release itself.
@@ -126,8 +128,9 @@ Friends can also be offered the update inside the app, without coming back here:
 - **Same signing key every time.** Build 31 can only update build 30 if both are signed with the same key. Each app's
   CI signs with a fixed key for this reason (the debug apps commit a `debug.keystore`).
 - **`versionCode` must go up** with every build.
-- **GitHub's rate limit.** The page makes one request per app, and GitHub allows 60 per hour per
-  network without signing in. The browser keeps each answer for 10 minutes, and shows the saved
+- **GitHub's rate limit.** The page makes one request per app (14 today), and GitHub allows 60 per
+  hour per network without signing in. The browser keeps each answer for 10 minutes, repeat checks
+  that find nothing new don't count against the limit, and the page shows the saved
   copy if GitHub says no, so a couple of friends will never notice. If it ever matters, a scheduled
   workflow could write a `builds.json` into this repo instead.
 - **Public repos only.** The page reads releases without logging in, and anyone with the link can
