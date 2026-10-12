@@ -61,10 +61,11 @@ fun PanelsSheet(vm: AppViewModel, vs: ViewerState, onDismiss: () -> Unit, onDele
     val session = vs.session
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val outline by produceState<List<OutlineItem>?>(null, session.version) { value = session.doc.outline() }
-    var tab by rememberSaveable { mutableIntStateOf(-1) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var picked by remember { mutableStateOf(false) }
     // Open on the table of contents when the document has one, otherwise on the pages.
     LaunchedEffect(outline) {
-        if (tab == -1 && outline != null) tab = if (outline!!.isNotEmpty()) 0 else 1
+        if (!picked && outline?.isEmpty() == true) tab = 1
     }
     fun go(page: Int) {
         vs.goTo(page)
@@ -73,13 +74,20 @@ fun PanelsSheet(vm: AppViewModel, vs: ViewerState, onDismiss: () -> Unit, onDele
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f)) {
             val tabs = listOf("Contents", "Pages", "Bookmarks", "Comments")
-            PrimaryTabRow(selectedTabIndex = tab.coerceAtLeast(0)) {
-                tabs.forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
+            PrimaryTabRow(selectedTabIndex = tab) {
+                tabs.forEachIndexed { i, t ->
+                    Tab(selected = tab == i, onClick = {
+                        picked = true
+                        tab = i
+                    }, text = { Text(t) })
+                }
             }
             when (tab) {
                 0 -> {
                     val items = outline.orEmpty()
-                    if (items.isEmpty()) {
+                    if (outline == null) {
+                        Empty("Reading the table of contents…")
+                    } else if (items.isEmpty()) {
                         Empty("This document has no table of contents.")
                     } else {
                         LazyColumn {

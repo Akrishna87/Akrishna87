@@ -229,13 +229,11 @@ echo "PASS: organize"
 
 echo "--- Comments list"
 tap organized "Contents and pages"
-sleep 2
-dump panel2
+wait_for panel2 'text="Comments"' 15 "the side panel didn't open"
+sleep 1
 tap panel2 "Comments"
-sleep 2
-dump comments
+wait_for comments 'Page 1 · Highlight' 20 "the Comments list doesn't show the highlight"
 shot 10-comments
-grep -q 'Highlight' "$OUT/comments.xml" || fail "the Comments list doesn't show the highlight"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 
