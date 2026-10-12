@@ -59,7 +59,7 @@ object Files {
 
     /** Whether the edited file can be saved back over the original. Doesn't change the original. */
     fun canWrite(context: Context, uri: Uri): Boolean {
-        if (uri.scheme == "file") return uri.path?.let { File(it).canWrite() } ?: false
+        if (uri.scheme == "file") return uri.path?.let { File(it).canWrite() || File(it).parentFile?.canWrite() == true } ?: false
         return try {
             context.contentResolver.openFileDescriptor(uri, "rw")?.close()
             true
@@ -70,7 +70,10 @@ object Files {
 
     fun writeTo(context: Context, file: File, uri: Uri) {
         if (uri.scheme == "file") {
-            file.copyTo(File(uri.path ?: throw IOException("Bad file link")), overwrite = true)
+            val target = File(uri.path ?: throw IOException("Bad file link"))
+            // A file someone else put in a folder we own may be read-only to us; replace it instead.
+            if (target.exists() && !target.canWrite()) target.delete()
+            file.copyTo(target, overwrite = true)
             return
         }
         val out = try {
