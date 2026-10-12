@@ -97,6 +97,36 @@
       "hue": 95
     },
     {
+      "repo": "doable",
+      "tag": "doable-latest",
+      "apk": "Doable.apk",
+      "group": "Everyday",
+      "name": "Doable",
+      "tagline": "A to-do app: type tasks in plain words, with projects, labels and reminders.",
+      "emoji": "✅",
+      "hue": 245
+    },
+    {
+      "repo": "dayline",
+      "tag": "dayline-latest",
+      "apk": "Dayline.apk",
+      "group": "Everyday",
+      "name": "Dayline",
+      "tagline": "A calendar with a month view, an agenda, repeating events and reminders.",
+      "emoji": "📅",
+      "hue": 212
+    },
+    {
+      "repo": "jotter",
+      "tag": "jotter-latest",
+      "apk": "Jotter.apk",
+      "group": "Everyday",
+      "name": "Jotter",
+      "tagline": "Notes in notebooks, with tags, checklists and simple formatting.",
+      "emoji": "📝",
+      "hue": 38
+    },
+    {
       "repo": "budget-tracker-android",
       "tag": "latest-debug",
       "group": "Everyday",
