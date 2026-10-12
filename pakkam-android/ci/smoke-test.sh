@@ -198,7 +198,7 @@ tap tick "Place it"
 sleep 1
 dump ticked
 tap ticked "Done"
-wait_for signed 'text="Fill & Sign"' 30 "Done didn't go back to reading after Fill & Sign"
+wait_for signed 'text="Fill &amp; Sign"' 30 "Done didn't go back to reading after Fill & Sign"
 shot 07-signed
 echo "PASS: Fill & Sign"
 
