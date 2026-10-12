@@ -169,7 +169,7 @@ class ViewerState(
         }
     }
 
-    fun setPaper(p: PaperTheme) {
+    fun choosePaper(p: PaperTheme) {
         settings.paperTheme = p
         paper = p
     }

@@ -538,7 +538,7 @@ private fun ReadTopBar(vm: AppViewModel, vs: ViewerState, onBack: () -> Unit, on
                         DropdownMenuItem(
                             text = { Text("${p.label} mode") },
                             trailingIcon = { if (vs.paper == p) Icon(Icons.Filled.Check, null) },
-                            onClick = { menu = false; vs.setPaper(p) },
+                            onClick = { menu = false; vs.choosePaper(p) },
                         )
                     }
                     DropdownMenuItem(
