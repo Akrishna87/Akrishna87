@@ -282,7 +282,6 @@ private fun PageView(vs: ViewerState, index: Int, actions: PageActions) {
                 val layout = vs.layouts[index] ?: return@awaitEachGesture
                 val p0 = toPage(down.position)
                 val start = layout.charAt(p0.x, p0.y, 10f)
-                android.util.Log.i("Pakkam", "Text touch on page ${index + 1} at ${p0.x},${p0.y} (${down.position} of $size): char $start of ${layout.length}")
                 if (start < 0) {
                     // Not on text: let the finger scroll, and clear a selection on a plain tap.
                     if (tool == Tool.SELECT) vs.selection = null

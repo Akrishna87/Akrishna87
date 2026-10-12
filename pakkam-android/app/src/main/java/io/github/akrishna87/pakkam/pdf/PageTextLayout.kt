@@ -77,8 +77,9 @@ class PageTextLayout(val text: String, private val boxes: FloatArray) {
         val out = ArrayList<PdfRect>()
         var cur: PdfRect? = null
         for (i in max(0, start) until min(end, length)) {
+            // Spaces often have boxes of a different height, which would split a line into words.
+            if (text[i].isWhitespace()) continue
             val b = box(i) ?: continue
-            if (text[i] == '\r' || text[i] == '\n') continue
             val c = cur
             cur = if (c == null) {
                 b

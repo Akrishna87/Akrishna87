@@ -58,6 +58,8 @@ class LogicTest {
         assertEquals(2, rects.size)
         assertEquals(72f + 6 * 6f, rects[0].left, 0.01f)
         assertEquals(72f, rects[1].left, 0.01f)
+        // One rectangle for a whole line, not one per word.
+        assertEquals(1, l.rectsFor(0, 11).size)
     }
 
     @Test

@@ -350,7 +350,6 @@ class ViewerState(
     // ---- Edits ----
 
     fun addEdit(e: Edit) {
-        android.util.Log.i("Pakkam", "Added ${e::class.simpleName} on page ${e.page + 1}")
         session.edits.add(e)
         session.redo.clear()
     }
