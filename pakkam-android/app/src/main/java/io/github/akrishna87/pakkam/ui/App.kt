@@ -158,6 +158,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 launch { s.refreshAnnotations() }
             } catch (e: Exception) {
                 work?.delete()
+                android.util.Log.w("Pakkam", "Couldn't open $uri", e)
                 say(e.message ?: "This file couldn't be opened")
             } finally {
                 busy = null
@@ -196,6 +197,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: OutOfMemoryError) {
                 say("Not enough memory for this file")
             } catch (e: Exception) {
+                android.util.Log.w("Pakkam", "$label failed", e)
                 say(e.message?.takeIf { it.isNotBlank() } ?: "Something went wrong")
             } finally {
                 busy = null

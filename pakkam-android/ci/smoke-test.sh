@@ -22,6 +22,7 @@ fail() {
   adb logcat -d > "$OUT/logcat.txt" || true
   echo "Crashes and errors from the app:"
   grep -A 40 "FATAL EXCEPTION" "$OUT/logcat.txt" | head -80 || true
+  grep -A 12 " W Pakkam" "$OUT/logcat.txt" | head -60 || true
   exit 1
 }
 dump() {
@@ -82,7 +83,7 @@ echo "PASS: Home"
 
 echo "--- Opening a PDF"
 python3 "$HERE/make_test_pdf.py" "$OUT/smoke.pdf"
-adb shell mkdir -p "$DOC_DIR"
+adb shell ls -ld "$DOC_DIR" || adb shell mkdir -p "$DOC_DIR"
 adb push "$OUT/smoke.pdf" "$DOC" > /dev/null
 open_doc
 wait_for reader 'text="1 / 5"' 30 "the PDF didn't open on page 1 of 5"
