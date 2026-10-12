@@ -61,7 +61,11 @@ page_xy() { # page_xy <dump name> <x pt> <y pt from the bottom>
 import sys
 x1, y1, x2, y2 = map(int, sys.argv[1].split())
 x, y = float(sys.argv[2]), float(sys.argv[3])
-print(int(x1 + (x2 - x1) * x / 612), int(y1 + (y2 - y1) * (792 - y) / 792))
+# The reported top is cut off where the page runs under the status bar, so measure from the
+# bottom edge and the (never cut) width instead.
+h = (x2 - x1) * 792 / 612
+top = y2 - h
+print(int(x1 + (x2 - x1) * x / 612), int(top + h * (792 - y) / 792))
 PY
 }
 open_doc() {
