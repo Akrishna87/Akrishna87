@@ -30,7 +30,15 @@ jobs:
       - name: Unit tests and the APK
         env:
           VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew --no-daemon --stacktrace testReleaseUnitTest assembleRelease
+        run: |
+          set +e
+          ./gradlew --no-daemon testReleaseUnitTest assembleRelease 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" != 0 ]; then
+            echo "=== Errors ==="
+            grep -E '^e: |error:|FAILED|What went wrong' -A2 build.log | sed 's|file:///home/runner/work/Akrishna87/Akrishna87/pakkam-android/app/src/main/java/io/github/akrishna87/pakkam/||' | tail -120
+          fi
+          exit $status
       - name: Name the APK
         run: cp app/build/outputs/apk/release/app-release.apk Pakkam.apk
       - uses: actions/upload-artifact@v4
