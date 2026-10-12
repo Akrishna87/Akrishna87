@@ -74,7 +74,7 @@ adb logcat -c
 
 echo "--- Home"
 adb shell am start -W -n "$PKG/.MainActivity" > /dev/null
-wait_for home 'text="Open a PDF"' 30 "Home doesn't show 'Open a PDF'"
+wait_for home 'text="Combine files"' 30 "Home doesn't show the tools"
 shot 01-home
 show home
 grep -q 'text="Combine files"' "$OUT/home.xml" || fail "Home doesn't list the tools"
@@ -235,7 +235,7 @@ sleep 1
 dump leave
 grep -q 'Save your changes?' "$OUT/leave.xml" || fail "leaving with unsaved changes didn't ask"
 tap leave "Save"
-wait_for home-again 'text="Open a PDF"' 30 "saving on the way out didn't return Home"
+wait_for home-again 'text="Combine files"' 30 "saving on the way out didn't return Home"
 shot 11-home-recent
 grep -q 'smoke.pdf' "$OUT/home-again.xml" || fail "the file isn't in Recent"
 echo "PASS: save on leaving, Recent list"
