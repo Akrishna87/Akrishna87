@@ -22,7 +22,7 @@ fail() {
   adb logcat -d > "$OUT/logcat.txt" || true
   echo "Crashes and errors from the app:"
   grep -A 40 "FATAL EXCEPTION" "$OUT/logcat.txt" | head -80 || true
-  grep -A 12 " W Pakkam" "$OUT/logcat.txt" | head -60 || true
+  grep -A 12 " [WI] Pakkam" "$OUT/logcat.txt" | head -60 || true
   exit 1
 }
 dump() {
@@ -161,13 +161,18 @@ dump hl
 # "Highlight this sentence please." is at y=400, 20 pt high, from x=72.
 read -r ax ay < <(page_xy hl 75 406)
 read -r bx by < <(page_xy hl 330 406)
+echo "  swiping from $ax,$ay to $bx,$by"
 adb shell input swipe "$ax" "$ay" "$bx" "$by" 800
 sleep 1
-tap hl "Draw"
+dump hl-done
+show hl-done
+grep -q 'Highlight · 1 change' "$OUT/hl-done.xml" || fail "dragging over the text didn't highlight it"
+tap hl-done "Draw"
 sleep 1
 dump draw
 read -r cx cy < <(page_xy draw 100 200)
 read -r dx dy < <(page_xy draw 400 150)
+echo "  drawing from $cx,$cy to $dx,$dy"
 adb shell input swipe "$cx" "$cy" "$dx" "$dy" 600
 sleep 1
 shot 06-comment
