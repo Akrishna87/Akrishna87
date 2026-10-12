@@ -161,7 +161,7 @@ dump hl
 # "Highlight this sentence please." is at y=400, 20 pt high, from x=72.
 read -r ax ay < <(page_xy hl 75 406)
 read -r bx by < <(page_xy hl 330 406)
-echo "  swiping from $ax,$ay to $bx,$by"
+echo "  page 1 is at $(python3 "$HERE/find_text.py" "$OUT/hl.xml" "Page 1" bounds); swiping from $ax,$ay to $bx,$by"
 adb shell input swipe "$ax" "$ay" "$bx" "$by" 800
 sleep 1
 dump hl-done
