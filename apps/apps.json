@@ -147,6 +147,17 @@
       "channel": "debug"
     },
     {
+      "repo": "Akrishna87",
+      "tag": "pakkam-latest",
+      "apk": "Pakkam.apk",
+      "group": "Everyday",
+      "name": "Pakkam",
+      "nameLocal": "பக்கம்",
+      "tagline": "Read, highlight, sign and edit PDFs. Combine, split, compress and protect them. No internet needed.",
+      "emoji": "📄",
+      "hue": 4
+    },
+    {
       "repo": "vaanilai",
       "tag": "weather-latest",
       "apk": "Vaanilai.apk",
