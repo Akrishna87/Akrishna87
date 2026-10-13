@@ -42,6 +42,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -57,6 +59,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -477,8 +480,30 @@ private fun ReadingContents(vm: AppViewModel, session: DocSession, book: ReadBoo
 
 @Composable
 private fun ReadingStyleSheet(style: ReadStyle, onDismiss: () -> Unit, onChange: (ReadStyle) -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            SectionTitle("Page colour")
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                for (t in ReadTheme.entries) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            Modifier
+                                .size(48.dp)
+                                .background(Color(t.background), CircleShape)
+                                .border(if (style.theme == t) 3.dp else 1.dp, if (style.theme == t) MaterialTheme.colorScheme.primary else Color(0x33000000), CircleShape)
+                                .clickable { onChange(style.copy(theme = t)) }
+                                .semantics { contentDescription = "${t.label} pages" },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (style.theme == t) Icon(Icons.Filled.Check, null, tint = Color(t.text)) else Text("Aa", color = Color(t.text), fontWeight = FontWeight.SemiBold)
+                        }
+                        Text(t.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedIconButton(onClick = { onChange(style.copy(sizeSp = (style.sizeSp - 1f).coerceAtLeast(12f))) }) {
                     Text("A", fontSize = 14.sp, fontFamily = FontFamily.Serif)
@@ -509,25 +534,6 @@ private fun ReadingStyleSheet(style: ReadStyle, onDismiss: () -> Unit, onChange:
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for ((v, l) in listOf(0 to "Narrow", 1 to "Normal", 2 to "Wide")) {
                     FilterChip(selected = style.margin == v, onClick = { onChange(style.copy(margin = v)) }, label = { Text(l) })
-                }
-            }
-            SectionTitle("Page colour")
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                for (t in ReadTheme.entries) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            Modifier
-                                .size(48.dp)
-                                .background(Color(t.background), CircleShape)
-                                .border(if (style.theme == t) 3.dp else 1.dp, if (style.theme == t) MaterialTheme.colorScheme.primary else Color(0x33000000), CircleShape)
-                                .clickable { onChange(style.copy(theme = t)) }
-                                .semantics { contentDescription = "${t.label} pages" },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (style.theme == t) Icon(Icons.Filled.Check, null, tint = Color(t.text)) else Text("Aa", color = Color(t.text), fontWeight = FontWeight.SemiBold)
-                        }
-                        Text(t.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
-                    }
                 }
             }
             SwitchRow("Justify text (even right edge)", style.justify) { onChange(style.copy(justify = it)) }
