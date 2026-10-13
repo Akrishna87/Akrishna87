@@ -128,7 +128,7 @@ Friends can also be offered the update inside the app, without coming back here:
 - **Same signing key every time.** Build 31 can only update build 30 if both are signed with the same key. Each app's
   CI signs with a fixed key for this reason (the debug apps commit a `debug.keystore`).
 - **`versionCode` must go up** with every build.
-- **GitHub's rate limit.** The page makes one request per app (14 today), and GitHub allows 60 per
+- **GitHub's rate limit.** The page makes one request per app (17 today), and GitHub allows 60 per
   hour per network without signing in. The browser keeps each answer for 10 minutes, repeat checks
   that find nothing new don't count against the limit, and the page shows the saved
   copy if GitHub says no, so a couple of friends will never notice. If it ever matters, a scheduled
