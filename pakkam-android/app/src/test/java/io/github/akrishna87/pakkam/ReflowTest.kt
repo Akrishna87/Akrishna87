@@ -60,6 +60,21 @@ class ReflowTest {
     }
 
     @Test
+    fun bigSentencesAreNotHeadings() {
+        val lines = listOf(
+            SourceLine(0, "Introduction", 20f),
+            SourceLine(0, "Highlight this sentence please.", 20f),
+            SourceLine(0, full, 11f),
+            SourceLine(0, "ends here.", 11f),
+            SourceLine(0, full, 11f),
+            SourceLine(0, "and another.", 11f),
+        )
+        val blocks = Reflow.buildBlocks(lines, 1)
+        assertEquals(Block.Kind.HEADING, blocks[0].kind)
+        assertEquals(Block(Block.Kind.PARAGRAPH, "Highlight this sentence please.", 0), blocks[1])
+    }
+
+    @Test
     fun emptyPdfGivesNoBlocks() {
         assertTrue(Reflow.buildBlocks(emptyList(), 3).isEmpty())
     }

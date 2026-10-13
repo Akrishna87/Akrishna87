@@ -187,7 +187,8 @@ class ReadBook(
                         sb.setSpan(StyleSpan(Typeface.BOLD), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     } else if (i > 0 && blocks[i - 1].kind == Block.Kind.PARAGRAPH) {
                         // Indent the first line of a paragraph that follows another, as books do.
-                        sb.setSpan(LeadingMarginSpan.Standard(indent, 0), start, sb.length, Spanned.SPAN_PARAGRAPH)
+                        // Fixed ends: a paragraph span would otherwise stretch over everything appended after it.
+                        sb.setSpan(LeadingMarginSpan.Standard(indent, 0), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     }
                     i++
                 }

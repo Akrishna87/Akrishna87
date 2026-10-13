@@ -108,7 +108,7 @@ object Reflow {
         }
 
         for (l in lines) {
-            val heading = body > 0f && l.size >= body * 1.18f && l.text.length <= 120
+            val heading = body > 0f && l.size >= body * 1.18f && looksLikeHeading(l.text)
             val prev = lastLine
             val newBlock = when {
                 prev == null -> true
@@ -135,6 +135,12 @@ object Reflow {
         }
         flush()
         return out
+    }
+
+    /** Headings are short and don't end like a sentence; big text that reads as a sentence stays a paragraph. */
+    private fun looksLikeHeading(text: String): Boolean {
+        val t = text.trim()
+        return t.length <= 80 && !(t.endsWith(".") && !t.endsWith("..")) && !t.endsWith(",") && !t.endsWith(";")
     }
 
     /** A line ends its paragraph when it stops well short of the margin after finishing a sentence, or is clearly short. */
