@@ -16,15 +16,17 @@ enum class ReadTheme(val label: String, val background: Long, val text: Long, va
 
 /** How Reading mode sets the text. */
 data class ReadStyle(
-    val sizeSp: Float = 19f,
+    val sizeSp: Float = 16f,
     val serif: Boolean = true,
-    val spacing: Float = 1.45f,
+    val spacing: Float = 1.3f,
     /** 0 narrow, 1 normal, 2 wide. */
     val margin: Int = 1,
     val theme: ReadTheme = ReadTheme.WHITE,
     val justify: Boolean = true,
+    /** Scroll through the book in one column instead of turning pages. */
+    val scroll: Boolean = false,
 ) {
-    val marginDp get() = when (margin) { 0 -> 14; 2 -> 44; else -> 26 }
+    val marginDp get() = when (margin) { 0 -> 10; 2 -> 36; else -> 20 }
 }
 
 /** Reading preferences, remembered between documents. */
@@ -64,14 +66,21 @@ class Settings(context: Context) {
         set(v) = prefs.edit().putFloat("speechRate", v).apply()
 
     var readStyle: ReadStyle
-        get() = ReadStyle(
-            sizeSp = prefs.getFloat("readSize", 19f),
-            serif = prefs.getBoolean("readSerif", true),
-            spacing = prefs.getFloat("readSpacing", 1.45f),
-            margin = prefs.getInt("readMargin", 1),
-            theme = enumValueOrNull<ReadTheme>(prefs.getString("readTheme", null)) ?: ReadTheme.WHITE,
-            justify = prefs.getBoolean("readJustify", true),
-        )
+        get() {
+            // Version 2 set more lines on a page; earlier saved sizes and spacing start over once.
+            if (prefs.getInt("readStyleVersion", 1) < 2) {
+                prefs.edit().remove("readSize").remove("readSpacing").remove("readMargin").putInt("readStyleVersion", 2).apply()
+            }
+            return ReadStyle(
+                sizeSp = prefs.getFloat("readSize", 16f),
+                serif = prefs.getBoolean("readSerif", true),
+                spacing = prefs.getFloat("readSpacing", 1.3f),
+                margin = prefs.getInt("readMargin", 1),
+                theme = enumValueOrNull<ReadTheme>(prefs.getString("readTheme", null)) ?: ReadTheme.WHITE,
+                justify = prefs.getBoolean("readJustify", true),
+                scroll = prefs.getBoolean("readScroll", false),
+            )
+        }
         set(v) = prefs.edit()
             .putFloat("readSize", v.sizeSp)
             .putBoolean("readSerif", v.serif)
@@ -79,6 +88,7 @@ class Settings(context: Context) {
             .putInt("readMargin", v.margin)
             .putString("readTheme", v.theme.name)
             .putBoolean("readJustify", v.justify)
+            .putBoolean("readScroll", v.scroll)
             .apply()
 
     /** Where Reading mode stopped in a document, as a position in its running text. */

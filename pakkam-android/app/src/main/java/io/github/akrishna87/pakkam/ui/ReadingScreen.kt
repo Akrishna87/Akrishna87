@@ -38,6 +38,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -154,9 +157,9 @@ class ReadBook(
         private const val CHUNK_SOFT = 12_000
         private const val CHUNK_HARD = 40_000
 
-        fun build(blocks: List<Block>, style: ReadStyle, widthPx: Int, heightPx: Int, density: Float, fontScale: Float): ReadBook {
+        fun build(blocks: List<Block>, style: ReadStyle, widthPx: Int, heightPx: Int, density: Float): ReadBook {
             val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
-                textSize = style.sizeSp * density * fontScale
+                textSize = style.sizeSp * density
                 typeface = if (style.serif) Typeface.SERIF else Typeface.SANS_SERIF
                 color = style.theme.text.toInt()
             }
@@ -280,16 +283,16 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
         val topInset = WindowInsets.statusBars.getTop(density)
         val bottomInset = WindowInsets.navigationBars.getBottom(density)
         val marginPx = with(density) { style.marginDp.dp.toPx() }.roundToInt()
-        val topPad = topInset + with(density) { 28.dp.toPx() }.roundToInt()
-        val bottomPad = bottomInset + with(density) { 40.dp.toPx() }.roundToInt()
+        val topPad = topInset + with(density) { 14.dp.toPx() }.roundToInt()
+        val bottomPad = bottomInset + with(density) { 30.dp.toPx() }.roundToInt()
         val textW = constraints.maxWidth - 2 * marginPx
         val textH = constraints.maxHeight - topPad - bottomPad
 
         val list = blocks
-        val book by produceState<ReadBook?>(null, list, style.copy(theme = ReadTheme.WHITE), textW, textH) {
+        val book by produceState<ReadBook?>(null, list, style.copy(theme = ReadTheme.WHITE, scroll = false), textW, textH) {
             value = null
             if (list != null && list.isNotEmpty()) {
-                value = withContext(Dispatchers.Default) { ReadBook.build(list, style, textW, textH, density.density, density.fontScale) }
+                value = withContext(Dispatchers.Default) { ReadBook.build(list, style, textW, textH, density.density) }
             }
         }
 
@@ -309,54 +312,92 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
             }
             else -> {
                 val b = book!!
-                key(b) {
+                key(b, style.scroll) {
                     val pager = rememberPagerState(initialPage = b.pageAt(offset)) { b.pages.size }
-                    LaunchedEffect(pager.settledPage) {
-                        val p = pager.settledPage
-                        offset = b.pages.getOrNull(p)?.startOffset ?: 0
-                        pdfPage = b.pdfPageOf(p)
+                    val scroller = rememberLazyListState(initialFirstVisibleItemIndex = b.pageAt(offset))
+                    val current = (if (style.scroll) scroller.firstVisibleItemIndex else pager.currentPage).coerceIn(0, b.pages.lastIndex)
+                    val settled = if (style.scroll) (if (scroller.isScrollInProgress) -1 else scroller.firstVisibleItemIndex) else pager.settledPage
+                    LaunchedEffect(settled) {
+                        if (settled < 0) return@LaunchedEffect
+                        offset = b.pages.getOrNull(settled)?.startOffset ?: 0
+                        pdfPage = b.pdfPageOf(settled)
                         vm.settings.setReadPosition(uriKey, offset)
+                    }
+                    fun goTo(page: Int) {
+                        scope.launch { if (style.scroll) scroller.scrollToItem(page) else pager.scrollToPage(page) }
+                    }
+                    /** Draws reading page [i] with its first line [y] pixels from the top of the canvas. */
+                    fun androidx.compose.ui.graphics.drawscope.DrawScope.drawReadPage(i: Int, y: Float) {
+                        val p = b.pages[i]
+                        val layout = b.layouts[p.chunk]
+                        val top = layout.getLineTop(p.startLine)
+                        val bottom = layout.getLineBottom(p.endLine - 1)
+                        layout.paint.color = theme.text.toInt()
+                        drawIntoCanvas { c ->
+                            val nc = c.nativeCanvas
+                            nc.save()
+                            nc.translate(marginPx.toFloat(), y - top)
+                            nc.clipRect(0, top, layout.width, bottom)
+                            layout.draw(nc)
+                            nc.restore()
+                        }
                     }
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .pointerInput(b) {
+                            .pointerInput(b, style.scroll) {
                                 detectTapGestures { o ->
                                     val w = size.width
+                                    val h = size.height
                                     when {
-                                        o.x < w * 0.28f -> scope.launch { if (pager.currentPage > 0) pager.animateScrollToPage(pager.currentPage - 1) }
-                                        o.x > w * 0.72f -> scope.launch { if (pager.currentPage < b.pages.lastIndex) pager.animateScrollToPage(pager.currentPage + 1) }
+                                        o.x < w * 0.28f -> scope.launch {
+                                            if (style.scroll) scroller.animateScrollBy(-h * 0.85f) else if (pager.currentPage > 0) pager.animateScrollToPage(pager.currentPage - 1)
+                                        }
+                                        o.x > w * 0.72f -> scope.launch {
+                                            if (style.scroll) scroller.animateScrollBy(h * 0.85f) else if (pager.currentPage < b.pages.lastIndex) pager.animateScrollToPage(pager.currentPage + 1)
+                                        }
                                         else -> chrome = !chrome
                                     }
                                 }
                             },
                     ) {
-                        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { i ->
-                            val pageText = remember(b, i) { b.textOf(i).take(3000) }
-                            Canvas(
-                                Modifier
-                                    .fillMaxSize()
-                                    .semantics { contentDescription = pageText },
+                        if (style.scroll) {
+                            // One long column, like an ebook's continuous scrolling.
+                            LazyColumn(
+                                state = scroller,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    top = with(density) { topPad.toDp() },
+                                    bottom = with(density) { bottomPad.toDp() },
+                                ),
                             ) {
-                                val p = b.pages[i]
-                                val layout = b.layouts[p.chunk]
-                                val top = layout.getLineTop(p.startLine)
-                                val bottom = layout.getLineBottom(p.endLine - 1)
-                                layout.paint.color = theme.text.toInt()
-                                drawIntoCanvas { c ->
-                                    val nc = c.nativeCanvas
-                                    nc.save()
-                                    nc.translate(marginPx.toFloat(), (topPad - top).toFloat())
-                                    nc.clipRect(0, top, layout.width, bottom)
-                                    layout.draw(nc)
-                                    nc.restore()
+                                items(b.pages.size) { i ->
+                                    val pageText = remember(b, i) { b.textOf(i).take(3000) }
+                                    val p = b.pages[i]
+                                    val l = b.layouts[p.chunk]
+                                    val hPx = l.getLineBottom(p.endLine - 1) - l.getLineTop(p.startLine)
+                                    Canvas(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(with(density) { hPx.toDp() })
+                                            .semantics { contentDescription = pageText },
+                                    ) { drawReadPage(i, 0f) }
                                 }
+                            }
+                        } else {
+                            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { i ->
+                                val pageText = remember(b, i) { b.textOf(i).take(3000) }
+                                Canvas(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .semantics { contentDescription = pageText },
+                                ) { drawReadPage(i, topPad.toFloat()) }
                             }
                         }
                         // The page line at the bottom, like an ebook's.
-                        val pct = if (b.totalChars > 0) (b.pages[pager.currentPage.coerceIn(0, b.pages.lastIndex)].startOffset * 100L / b.totalChars).toInt() else 0
+                        val pct = if (b.totalChars > 0) (b.pages[current].startOffset * 100L / b.totalChars).toInt() else 0
                         Text(
-                            "Page ${pager.currentPage + 1} of ${b.pages.size} · $pct%",
+                            "Page ${current + 1} of ${b.pages.size} · $pct%",
                             color = fg.copy(alpha = 0.6f),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp),
@@ -364,15 +405,15 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                         ReadingChrome(
                             visible = chrome,
                             title = session.name,
-                            page = pager.currentPage,
+                            page = current,
                             pageCount = b.pages.size,
-                            chapter = b.blocks.subList(0, b.blockAt(b.pages[pager.currentPage.coerceIn(0, b.pages.lastIndex)].startOffset) + 1)
+                            chapter = b.blocks.subList(0, b.blockAt(b.pages[current].startOffset) + 1)
                                 .lastOrNull { it.kind == Block.Kind.HEADING }?.text,
-                            pdfPage = b.pdfPageOf(pager.currentPage),
+                            pdfPage = b.pdfPageOf(current),
                             onBack = { leave() },
                             onStyle = { sheet = ReadSheet.Style },
                             onContents = { sheet = ReadSheet.Contents },
-                            onSeek = { scope.launch { pager.scrollToPage(it) } },
+                            onSeek = { goTo(it) },
                         )
                         when (sheet) {
                             ReadSheet.Contents -> ReadingContents(
@@ -381,7 +422,7 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                                 onGo = { target ->
                                     sheet = null
                                     chrome = false
-                                    scope.launch { pager.scrollToPage(b.pageAt(target)) }
+                                    goTo(b.pageAt(target))
                                 },
                             )
                             else -> Unit
@@ -506,13 +547,13 @@ private fun ReadingStyleSheet(style: ReadStyle, onDismiss: () -> Unit, onChange:
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedIconButton(onClick = { onChange(style.copy(sizeSp = (style.sizeSp - 1f).coerceAtLeast(12f))) }) {
+                OutlinedIconButton(onClick = { onChange(style.copy(sizeSp = (style.sizeSp - 1f).coerceAtLeast(10f))) }) {
                     Text("A", fontSize = 14.sp, fontFamily = FontFamily.Serif)
                 }
                 Slider(
                     value = style.sizeSp,
                     onValueChange = { onChange(style.copy(sizeSp = it.roundToInt().toFloat())) },
-                    valueRange = 12f..34f,
+                    valueRange = 10f..34f,
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                 )
                 OutlinedIconButton(onClick = { onChange(style.copy(sizeSp = (style.sizeSp + 1f).coerceAtMost(34f))) }) {
@@ -527,7 +568,7 @@ private fun ReadingStyleSheet(style: ReadStyle, onDismiss: () -> Unit, onChange:
             }
             SectionTitle("Line spacing")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((v, l) in listOf(1.2f to "Compact", 1.45f to "Normal", 1.8f to "Relaxed")) {
+                for ((v, l) in listOf(1.15f to "Compact", 1.3f to "Normal", 1.6f to "Relaxed")) {
                     FilterChip(selected = style.spacing == v, onClick = { onChange(style.copy(spacing = v)) }, label = { Text(l) })
                 }
             }
@@ -536,6 +577,11 @@ private fun ReadingStyleSheet(style: ReadStyle, onDismiss: () -> Unit, onChange:
                 for ((v, l) in listOf(0 to "Narrow", 1 to "Normal", 2 to "Wide")) {
                     FilterChip(selected = style.margin == v, onClick = { onChange(style.copy(margin = v)) }, label = { Text(l) })
                 }
+            }
+            SectionTitle("Moving through the book")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !style.scroll, onClick = { onChange(style.copy(scroll = false)) }, label = { Text("Turn pages") })
+                FilterChip(selected = style.scroll, onClick = { onChange(style.copy(scroll = true)) }, label = { Text("Scroll") })
             }
             SwitchRow("Justify text (even right edge)", style.justify) { onChange(style.copy(justify = it)) }
         }
