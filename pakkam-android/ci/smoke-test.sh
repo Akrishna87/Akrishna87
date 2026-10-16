@@ -150,6 +150,13 @@ tap to-reading "Read mode"
 wait_for reading 'Page 1 of [0-9]+' 30 "Reading mode didn't lay out the text"
 shot 06-reading
 grep -q 'Highlight this sentence please' "$OUT/reading.xml" || fail "Reading mode doesn't show the PDF's text"
+# Long-press "test" in the title line for its meaning (found from the emulator's 1080×2400 layout).
+adb shell input swipe 516 196 516 196 900
+wait_for reading-define 'trying something to find out about it' 20 "long-pressing a word in Reading mode didn't show its meaning"
+shot 06b-reading-define
+grep -q 'Open English WordNet' "$OUT/reading-define.xml" || fail "the dictionary credit is missing"
+adb shell input keyevent KEYCODE_BACK
+sleep 2
 # Tap the middle for the controls, then pick sepia pages.
 read -r rw rh < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
 adb shell input tap $((rw / 2)) $((rh / 2))
@@ -167,7 +174,24 @@ dump reading-sepia
 grep -Eq 'Page 1 of [0-9]+' "$OUT/reading-sepia.xml" || fail "Reading mode lost its place after changing colours"
 tap reading-sepia "Page view"
 wait_for back-to-pages 'text="[0-9] / 5"' 20 "Page view didn't go back to the PDF"
-echo "PASS: reading mode"
+echo "PASS: reading mode and its dictionary"
+
+echo "--- Define a word in page view"
+dump define-page
+read -r qx qy < <(page_xy define-page 100 406)
+adb shell input swipe "$qx" "$qy" "$qx" "$qy" 900
+sleep 2
+dump define-sel
+tap define-sel "Define"
+wait_for define-sheet 'the most interesting or memorable part' 20 "Define didn't show the meaning of 'Highlight'"
+shot 07b-define
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+# Copying ends the selection without leaving the document.
+dump define-done
+tap define-done "Copy"
+sleep 1
+echo "PASS: define in page view"
 
 echo "--- Highlight and draw on page 1"
 dump goto

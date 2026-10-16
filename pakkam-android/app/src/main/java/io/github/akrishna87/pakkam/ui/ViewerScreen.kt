@@ -154,6 +154,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
     val vs = remember(session) { ViewerState(session, scope, vm.settings, startPage) }
     var dialog by remember { mutableStateOf<ViewerDialog?>(null) }
     var afterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var defineWord by remember { mutableStateOf<String?>(null) }
     val links = remember(session) { HashMap<Int, List<PageLink>>() }
     LaunchedEffect(session.version) { links.clear() }
 
@@ -368,6 +369,8 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                         vs.selection = null
                     },
                     onMark = { vs.markSelection(it) },
+                    // A single word can be looked up in the dictionary.
+                    onDefine = sel.text.trim().takeIf { t -> t.isNotEmpty() && t.length <= 40 && t.none { it.isWhitespace() } }?.let { t -> { defineWord = t } },
                 )
             }
         }
@@ -421,6 +424,8 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
             }
         }
     }
+
+    defineWord?.let { w -> DefinitionSheet(vm, w) { defineWord = null } }
 
     when (val d = dialog) {
         null -> Unit
@@ -643,7 +648,7 @@ private fun SearchBar(vs: ViewerState) {
 }
 
 @Composable
-private fun SelectionBar(text: String, onCopy: () -> Unit, onMark: (MarkupKind) -> Unit) {
+private fun SelectionBar(text: String, onCopy: () -> Unit, onMark: (MarkupKind) -> Unit, onDefine: (() -> Unit)? = null) {
     Surface(
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
@@ -651,6 +656,9 @@ private fun SelectionBar(text: String, onCopy: () -> Unit, onMark: (MarkupKind) 
         shadowElevation = 6.dp,
     ) {
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (onDefine != null) {
+                TextButton(onClick = onDefine) { Icon(Icons.Filled.MenuBook, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Define") }
+            }
             TextButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Copy") }
             TextButton(onClick = { onMark(MarkupKind.HIGHLIGHT) }) { Icon(Icons.Filled.BorderColor, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Highlight") }
             TextButton(onClick = { onMark(MarkupKind.UNDERLINE) }) { Icon(Icons.Filled.FormatUnderlined, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Underline") }

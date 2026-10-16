@@ -27,6 +27,13 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Offline dictionary (Open English WordNet 2025, CC BY 4.0)
+        run: |
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/oewn.xml.gz" \
+            https://github.com/globalwordnet/english-wordnet/releases/download/2025-edition/english-wordnet-2025.xml.gz
+          echo "9ca6d1dcb75f822fdd66617f7d9da48142ace38dd544d6ad5e2feca1674ad3fe  $RUNNER_TEMP/oewn.xml.gz" | sha256sum -c -
+          mkdir -p app/src/main/assets
+          python3 ci/build_dictionary.py "$RUNNER_TEMP/oewn.xml.gz" app/src/main/assets/dictionary.db
       - name: Unit tests and the APK
         env:
           VERSION_CODE: ${{ github.run_number }}

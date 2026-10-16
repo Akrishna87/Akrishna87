@@ -84,6 +84,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val recentsStore = Recents(app)
     val settings = Settings(app)
     val signatures = Signatures(app)
+    val dictionary by lazy { io.github.akrishna87.pakkam.data.Dictionary(app) }
 
     val stack = mutableStateListOf<Screen>(Screen.Home)
     var recents by mutableStateOf(recentsStore.all())
