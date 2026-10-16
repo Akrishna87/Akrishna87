@@ -58,6 +58,17 @@ class DocSession(
 
     val bitmaps = PageBitmaps()
 
+    private var reflowCache: Pair<Int, List<io.github.akrishna87.pakkam.pdf.Block>>? = null
+
+    /** The document as running text for Reading mode, worked out once per version. */
+    suspend fun reflowBlocks(): List<io.github.akrishna87.pakkam.pdf.Block> {
+        reflowCache?.takeIf { it.first == version }?.let { return it.second }
+        val v = version
+        val blocks = withContext(Dispatchers.IO) { io.github.akrishna87.pakkam.pdf.Reflow.extract(workFile, password) }
+        reflowCache = v to blocks
+        return blocks
+    }
+
     suspend fun refreshAnnotations() {
         annotations = try {
             withContext(Dispatchers.IO) { PdfEditor.listAnnotations(workFile, password) }

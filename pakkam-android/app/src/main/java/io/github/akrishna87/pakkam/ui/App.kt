@@ -57,6 +57,7 @@ import java.io.File
 sealed interface Screen {
     data object Home : Screen
     data object Viewer : Screen
+    data object Reading : Screen
     data class Tool(val tool: ToolKind) : Screen
     data object Merge : Screen
     data class Images(val camera: Boolean) : Screen
@@ -223,6 +224,7 @@ fun PakkamRoot(vm: AppViewModel) {
         when (screen) {
             Screen.Home -> HomeScreen(vm)
             Screen.Viewer -> if (session != null) ViewerScreen(vm, session) else LaunchedEffect(Unit) { vm.back() }
+            Screen.Reading -> if (session != null) ReadingScreen(vm, session) else LaunchedEffect(Unit) { vm.back() }
             is Screen.Tool -> if (session != null) ToolScreen(vm, session, screen.tool) else LaunchedEffect(Unit) { vm.back() }
             Screen.Merge -> MergeScreen(vm)
             is Screen.Images -> ImagesToPdfScreen(vm, screen.camera)

@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -261,6 +262,10 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
             context.startActivity(Intent.createChooser(send, "Share ${session.name}"))
         }
     }
+    fun openReading() {
+        vm.rememberPage(vs.currentPage)
+        vm.go(Screen.Reading)
+    }
     fun leave() {
         if (session.dirty || session.edits.isNotEmpty()) dialog = ViewerDialog.Unsaved else vm.back()
     }
@@ -340,6 +345,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                             when (action) {
                                 MenuAction.PANELS -> dialog = ViewerDialog.Panels
                                 MenuAction.GOTO -> dialog = ViewerDialog.GoTo
+                                MenuAction.READING -> openReading()
                                 MenuAction.READ_ALOUD -> startReading()
                                 MenuAction.SHARE -> share()
                                 MenuAction.PRINT -> vm.task("Preparing…", { session.applyEdits() }) { printPdf(context, session.workFile, session.name) }
@@ -385,6 +391,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                     Column(Modifier.navigationBarsPadding()) {
                         when (vs.mode) {
                             ViewerMode.READ -> ModeBar(
+                                onReading = { openReading() },
                                 onMode = { m ->
                                     vs.selection = null
                                     vs.mode = m
@@ -500,7 +507,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
     }
 }
 
-enum class MenuAction { PANELS, GOTO, READ_ALOUD, SHARE, PRINT, SAVE_COPY, INFO, OPEN_WITH }
+enum class MenuAction { PANELS, GOTO, READING, READ_ALOUD, SHARE, PRINT, SAVE_COPY, INFO, OPEN_WITH }
 
 @Composable
 private fun ReadTopBar(vm: AppViewModel, vs: ViewerState, onBack: () -> Unit, onSave: () -> Unit, onMenu: (MenuAction) -> Unit, onTool: (ToolKind) -> Unit) {
@@ -546,6 +553,7 @@ private fun ReadTopBar(vm: AppViewModel, vs: ViewerState, onBack: () -> Unit, on
                         trailingIcon = { Checkbox(checked = vs.keepScreenOn, onCheckedChange = null) },
                         onClick = { vs.setScreenOn(!vs.keepScreenOn) },
                     )
+                    DropdownMenuItem(text = { Text("Reading mode (like an ebook)") }, onClick = { menu = false; onMenu(MenuAction.READING) })
                     DropdownMenuItem(text = { Text("Read aloud") }, onClick = { menu = false; onMenu(MenuAction.READ_ALOUD) })
                     HorizontalDivider()
                     DropdownMenuItem(text = { Text("Share") }, onClick = { menu = false; onMenu(MenuAction.SHARE) })
@@ -657,8 +665,8 @@ private fun BarButton(label: String, icon: ImageVector, selected: Boolean = fals
     Column(
         Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .width(64.dp),
+            .padding(horizontal = 6.dp, vertical = 8.dp)
+            .width(66.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
@@ -672,8 +680,9 @@ private fun BarButton(label: String, icon: ImageVector, selected: Boolean = fals
 }
 
 @Composable
-private fun ModeBar(onMode: (ViewerMode) -> Unit, onOrganize: () -> Unit) {
+private fun ModeBar(onReading: () -> Unit, onMode: (ViewerMode) -> Unit, onOrganize: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        BarButton("Read mode", Icons.Filled.MenuBook) { onReading() }
         BarButton("Comment", Icons.Filled.Comment) { onMode(ViewerMode.COMMENT) }
         BarButton("Fill & Sign", Icons.Filled.Draw) { onMode(ViewerMode.FILL_SIGN) }
         BarButton("Edit", Icons.Filled.Edit) { onMode(ViewerMode.EDIT) }

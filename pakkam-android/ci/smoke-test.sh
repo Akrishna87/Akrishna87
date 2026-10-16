@@ -144,9 +144,34 @@ tap menu2 "Day mode"
 sleep 1
 echo "PASS: night mode"
 
+echo "--- Reading mode"
+dump to-reading
+tap to-reading "Read mode"
+wait_for reading 'Page 1 of [0-9]+' 30 "Reading mode didn't lay out the text"
+shot 06-reading
+grep -q 'Highlight this sentence please' "$OUT/reading.xml" || fail "Reading mode doesn't show the PDF's text"
+# Tap the middle for the controls, then pick sepia pages.
+read -r rw rh < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+adb shell input tap $((rw / 2)) $((rh / 2))
+sleep 2
+dump reading-chrome
+tap reading-chrome "Text and colours"
+sleep 2
+dump reading-style
+tap reading-style "Sepia pages"
+sleep 1
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+shot 07-reading-sepia
+dump reading-sepia
+grep -Eq 'Page 1 of [0-9]+' "$OUT/reading-sepia.xml" || fail "Reading mode lost its place after changing colours"
+tap reading-sepia "Page view"
+wait_for back-to-pages 'text="[0-9] / 5"' 20 "Page view didn't go back to the PDF"
+echo "PASS: reading mode"
+
 echo "--- Highlight and draw on page 1"
 dump goto
-tap goto "2 / 5"
+tap goto "/ 5"
 sleep 1
 dump goto-dialog
 tap goto-dialog "Page (1–5)"
@@ -179,7 +204,7 @@ read -r dx dy < <(page_xy draw 400 150)
 echo "  drawing from $cx,$cy to $dx,$dy"
 adb shell input swipe "$cx" "$cy" "$dx" "$dy" 600
 sleep 1
-shot 06-comment
+shot 08-comment
 dump drawn
 grep -Eq 'Draw · 2 changes' "$OUT/drawn.xml" || fail "the highlight and the drawing weren't both recorded"
 tap drawn "Done"
@@ -199,7 +224,7 @@ sleep 1
 dump ticked
 tap ticked "Done"
 wait_for signed 'text="Fill &amp; Sign"' 30 "Done didn't go back to reading after Fill & Sign"
-shot 07-signed
+shot 09-signed
 echo "PASS: Fill & Sign"
 
 echo "--- Saving"
@@ -221,10 +246,10 @@ sleep 1
 dump org-sel
 tap org-sel "Turn right"
 sleep 1
-shot 08-organize
+shot 10-organize
 tap org-sel "Apply changes"
 wait_for organized 'Not saved yet' 30 "applying the page turn didn't come back to the document"
-shot 09-turned
+shot 11-turned
 echo "PASS: organize"
 
 echo "--- Comments list"
@@ -233,7 +258,7 @@ wait_for panel2 'text="Comments"' 15 "the side panel didn't open"
 sleep 1
 tap panel2 "Comments"
 wait_for comments 'Page 1 · Highlight' 20 "the Comments list doesn't show the highlight"
-shot 10-comments
+shot 12-comments
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 
@@ -244,7 +269,7 @@ dump leave
 grep -q 'Save your changes?' "$OUT/leave.xml" || fail "leaving with unsaved changes didn't ask"
 tap leave "Save"
 wait_for home-again 'text="Combine files"' 30 "saving on the way out didn't return Home"
-shot 11-home-recent
+shot 13-home-recent
 grep -q 'smoke.pdf' "$OUT/home-again.xml" || fail "the file isn't in Recent"
 echo "PASS: save on leaving, Recent list"
 
