@@ -131,7 +131,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.content.FileProvider
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.ui.layout.onSizeChanged
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import java.text.DateFormat
 import java.util.Date
 
@@ -336,7 +339,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
         PageList(vs, actions)
 
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
-            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut()) {
+            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { if (it.height > 0 && vs.mode == ViewerMode.READ && !vs.searchOpen) vs.barTop = it.height }) {
                 when {
                     vs.searchOpen -> SearchBar(vs)
                     vs.mode != ViewerMode.READ -> EditTopBar(vs, onDone = { finishEditing() })
@@ -388,10 +391,21 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                     ) {
                         Text("${vs.currentPage + 1} / ${session.doc.pageCount}", Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge)
                     }
+                    // How far zoomed in or out; tapping it goes back to the normal size.
+                    if (abs(vs.zoom - 1f) > 0.02f) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.85f),
+                            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                            modifier = Modifier.padding(start = 8.dp).clickable { vs.zoomTo(1f) },
+                        ) {
+                            Text("${(vs.zoom * 100).roundToInt()}%", Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
             }
             readAloud?.takeIf { it.speaking }?.let { ra -> ReadAloudBar(ra.page, onStop = { ra.stop() }) }
-            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut()) {
+            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { if (it.height > 0 && vs.mode == ViewerMode.READ) vs.barBottom = it.height }) {
                 Surface(tonalElevation = 3.dp, shadowElevation = 6.dp) {
                     Column(Modifier.navigationBarsPadding()) {
                         when (vs.mode) {
@@ -551,6 +565,8 @@ private fun ReadTopBar(vm: AppViewModel, vs: ViewerState, onBack: () -> Unit, on
                             vs.setViewMode(if (vs.paged) ViewMode.CONTINUOUS else ViewMode.SINGLE)
                         },
                     )
+                    DropdownMenuItem(text = { Text("Fit page to screen") }, onClick = { menu = false; vs.fitPage() })
+                    DropdownMenuItem(text = { Text("Fit to width") }, onClick = { menu = false; vs.fitWidth() })
                     for (p in PaperTheme.entries) {
                         DropdownMenuItem(
                             text = { Text("${p.label} mode") },

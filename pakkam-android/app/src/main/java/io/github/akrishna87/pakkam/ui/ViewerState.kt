@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -201,9 +202,57 @@ class ViewerState(
         crossScroll.dispatchRawDelta(-cross)
     }
 
+    /**
+     * The smallest zoom: in continuous scroll the pages can shrink below the screen's width, to
+     * see a whole page or several at once; page by page already starts with the whole page.
+     */
+    val minZoom: Float get() = if (paged) 1f else MIN_ZOOM
+
+    /**
+     * Heights of the reading toolbars over the pages. The pages are padded by them, so the first
+     * and last pages, and a page fitted to the screen, can sit wholly between the bars.
+     */
+    var barTop by mutableIntStateOf(0)
+    var barBottom by mutableIntStateOf(0)
+
+    /** The zoom at which the whole of the page being read fits on the screen, between the toolbars. */
+    fun fitPageZoom(): Float {
+        if (paged) return 1f
+        val s = session.doc.pageSizes.getOrNull(currentPage) ?: return 1f
+        val vw = (viewport.width - 2 * MARGIN_PX).coerceAtLeast(1f)
+        val vh = (viewport.height - barTop - barBottom - 2 * MARGIN_PX).coerceAtLeast(1f)
+        // At zoom 1 the page is as wide as the screen; shrink it until its height fits too.
+        return (vh * 0.96f / (vw / s.aspect)).coerceIn(minZoom, 1f)
+    }
+
+    /** The zoom at which the page being read fills the screen's width. */
+    fun fitWidthZoom(): Float {
+        if (!paged) return 1f
+        val s = session.doc.pageSizes.getOrNull(currentPage) ?: return 1f
+        val vw = (viewport.width - 2 * MARGIN_PX).coerceAtLeast(1f)
+        val vh = (viewport.height - 2 * MARGIN_PX).coerceAtLeast(1f)
+        val fit = minOf(vw / s.width, vh / s.height)
+        return (vw / s.width / fit).coerceIn(1f, MAX_ZOOM)
+    }
+
+    /** Zooms to [z] with the page being read at the top left of the screen. */
+    fun zoomTo(z: Float) {
+        val page = currentPage
+        zoom = z.coerceIn(minZoom, MAX_ZOOM)
+        scope.launch {
+            withFrameNanos { }
+            listState.scrollToItem(page)
+            crossScroll.scrollTo(0)
+        }
+    }
+
+    fun fitPage() = zoomTo(fitPageZoom())
+
+    fun fitWidth() = zoomTo(fitWidthZoom())
+
     /** Sets a new zoom, keeping the point [focus] (in the viewport) where it is. */
     fun commitZoom(target: Float, focus: Offset) {
-        val z = target.coerceIn(1f, MAX_ZOOM)
+        val z = target.coerceIn(minZoom, MAX_ZOOM)
         val ratio = z / zoom
         if (abs(ratio - 1f) < 0.01f) return
         val mainFocus = if (paged) focus.x else focus.y
@@ -224,7 +273,8 @@ class ViewerState(
         }
     }
 
-    fun toggleZoom(focus: Offset) = commitZoom(if (zoom > 1.2f) 1f else 2.5f, focus)
+    /** Double tap: zoom in for a closer look, or back to the normal size from any other zoom. */
+    fun toggleZoom(focus: Offset) = commitZoom(if (abs(zoom - 1f) > 0.05f) 1f else 2.5f, focus)
 
     // ---- Search ----
 
@@ -419,6 +469,7 @@ class ViewerState(
 
     companion object {
         const val MAX_ZOOM = 5f
+        const val MIN_ZOOM = 0.3f
         const val MARGIN_PX = 16f
 
         fun boundsOf(e: Edit): PdfRect? = when (e) {

@@ -148,6 +148,35 @@ tap menu2 "Day mode"
 sleep 1
 echo "PASS: night mode"
 
+echo "--- Fit the page to the screen"
+# Page 5 is twice as tall as the others: at the screen's width it runs off the bottom.
+dump fit-goto
+tap fit-goto "/ 5"
+sleep 1
+dump fit-goto-dialog
+tap fit-goto-dialog "Page (1–5)"
+sleep 1
+adb shell input text "5"
+adb shell input keyevent KEYCODE_ENTER
+sleep 2
+dump fit0
+grep -q 'text="5 / 5"' "$OUT/fit0.xml" || fail "Go to page didn't go to page 5"
+tap fit0 "More options"
+sleep 1
+dump fit-menu
+tap fit-menu "Fit page to screen"
+wait_for fitted 'text="[0-9]+%"' 15 "Fit page to screen didn't zoom out"
+shot 05b-fit-page
+zoomed=$(grep -o 'text="[0-9]*%"' "$OUT/fitted.xml" | head -1 | sed 's/text="//; s/"$//')
+echo "  zoomed out to $zoomed"
+[ "${zoomed%\%}" -lt 100 ] || fail "Fit page to screen should make the page smaller than the screen's width, not $zoomed"
+# The zoom badge takes it back to the normal size.
+tap fitted "$zoomed"
+sleep 2
+dump unfitted
+grep -Eq 'text="[0-9]+%"' "$OUT/unfitted.xml" && fail "tapping the zoom badge didn't go back to the normal size"
+echo "PASS: fit page and back"
+
 echo "--- Reading mode"
 dump to-reading
 tap to-reading "Read mode"

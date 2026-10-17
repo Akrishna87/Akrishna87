@@ -12,14 +12,16 @@ documents never leave the phone.
 
 **Reading**
 - Fast, sharp pages drawn by PDFium (the PDF engine in Chrome), including annotations and form fields made in other apps
-- Continuous scroll or page by page; pinch or double-tap to zoom; two fingers move the page while a tool is active
+- Continuous scroll or page by page; pinch or double-tap to zoom, in to 500% or out until whole pages fit on the
+  screen; *Fit page to screen* and *Fit to width* in the menu, and a zoom badge that taps back to normal; two fingers
+  move the page while a tool is active
 - Search with every match highlighted, and next/previous
 - Table of contents, page thumbnails, your own bookmarks, and a list of all comments
 - Select and copy text (long-press a word)
 - Day, Night and Sepia modes; keep the screen on; go to page; remembers where you stopped
 - **Reading mode**, like a Kindle: the text is lifted out of the page layout and set as a book you turn page by page,
   in your choice of font, size, line spacing, margins and page colour (white, sepia, green, black), with a chapter list,
-  a page slider and your place remembered. **Long-press any word** to see its meaning, offline, from the built-in
+  a page slider and your place remembered. Pinch to change the text size. A PDF last read this way opens this way again. **Long-press any word** to see its meaning, offline, from the built-in
   English dictionary (also **Define** on a selected word in page view), with buttons for your translate apps and the web.
   **Highlight and add notes** as you read: hold a word and slide to choose more, then pick a colour or write a note;
   tap a highlight to change or remove it, and see them all under *Notes and highlights*. They are saved as ordinary

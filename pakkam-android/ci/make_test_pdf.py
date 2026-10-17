@@ -1,5 +1,6 @@
 """Writes a small 5-page PDF for the smoke test: plain text in Helvetica, a table of contents,
-and the word "elephant" on pages 2 and 4 so search has something to find.
+the word "elephant" on pages 2 and 4 so search has something to find, and a last page twice as
+tall as the others (like a long receipt) so fitting a page to the screen has to zoom out.
 Usage: make_test_pdf.py <out.pdf>
 """
 import sys
@@ -32,7 +33,8 @@ def main(path):
         pid = page_ids[i]
         cid = pid + 1
         body = "".join("BT /F1 %d Tf %d %d Td (%s) Tj ET\n" % (size, x, y, esc(t)) for x, y, size, t in lines).encode()
-        objs[pid] = ("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>" % cid).encode()
+        height = 1584 if i == n_pages - 1 else 792
+        objs[pid] = ("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 %d] /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>" % (height, cid)).encode()
         objs[cid] = b"<< /Length %d >>\nstream\n" % len(body) + body + b"endstream"
     for k, oid in enumerate(outline_ids):
         target = page_ids[k + 1]
