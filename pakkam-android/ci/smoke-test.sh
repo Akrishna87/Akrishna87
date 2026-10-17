@@ -86,6 +86,10 @@ grep -q 'text="Combine files"' "$OUT/home.xml" || fail "Home doesn't list the to
 echo "PASS: Home"
 
 echo "--- Opening a PDF"
+# A photo of a signature on paper, for Fill & Sign later; the phone's photo library picks it up meanwhile.
+adb push "$HERE/signature-photo.jpg" /sdcard/Pictures/signature-photo.jpg > /dev/null
+adb shell content call --method scan_volume --uri content://media --arg external_primary > /dev/null 2>&1 || true
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/signature-photo.jpg > /dev/null 2>&1 || true
 python3 "$HERE/make_test_pdf.py" "$OUT/smoke.pdf"
 adb shell ls -ld "$DOC_DIR" || adb shell mkdir -p "$DOC_DIR"
 adb push "$OUT/smoke.pdf" "$DOC" > /dev/null
@@ -157,6 +161,30 @@ shot 06b-reading-define
 grep -q 'Search the web' "$OUT/reading-define.xml" || fail "the ways to look a word up further are missing"
 adb shell input keyevent KEYCODE_BACK
 sleep 2
+# Hold on "Highlight" in the first line, slide to "sentence", and pick yellow to highlight the words between.
+adb shell input motionevent DOWN 110 270
+sleep 1.5
+adb shell input motionevent MOVE 250 272
+adb shell input motionevent MOVE 400 272
+sleep 0.5
+adb shell input motionevent UP 400 272
+wait_for reading-sel 'content-desc="Yellow"' 15 "choosing several words didn't show the highlight colours"
+shot 06c-reading-select
+tap reading-sel "Yellow"
+sleep 1
+# Hold on "elephant" and add a note to it from the dictionary card.
+adb shell input swipe 240 398 240 398 900
+wait_for reading-word 'Add note' 20 "the dictionary card doesn't offer a note"
+tap reading-word "Add note"
+wait_for note-dialog 'Your note' 15 "the note box didn't open"
+tap note-dialog "Your note"
+sleep 1
+adb shell input text "Remember%sthis"
+sleep 1
+dump note-typed
+tap note-typed "Save note"
+sleep 2
+shot 06d-reading-marked
 # Tap the middle for the controls, then pick sepia pages.
 read -r rw rh < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
 adb shell input tap $((rw / 2)) $((rh / 2))
@@ -172,6 +200,15 @@ sleep 2
 shot 07-reading-sepia
 dump reading-sepia
 grep -Eq 'Page 1 of [0-9]+' "$OUT/reading-sepia.xml" || fail "Reading mode lost its place after changing colours"
+# Both show in the list of notes and highlights.
+tap reading-sepia "Notes and highlights"
+wait_for reading-notes 'Remember this' 15 "the note isn't in Notes and highlights"
+grep -q 'Highlight this sentence' "$OUT/reading-notes.xml" || fail "the highlight isn't in Notes and highlights"
+grep -q 'elephant' "$OUT/reading-notes.xml" || fail "the noted word isn't in Notes and highlights"
+shot 07a-reading-notes
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+dump reading-sepia
 tap reading-sepia "Page view"
 wait_for back-to-pages 'text="[0-9] / 5"' 20 "Page view didn't go back to the PDF"
 echo "PASS: reading mode and its dictionary"
@@ -220,7 +257,8 @@ adb shell input swipe "$ax" "$ay" "$bx" "$by" 800
 sleep 1
 dump hl-done
 show hl-done
-grep -q 'Highlight · 1 change' "$OUT/hl-done.xml" || fail "dragging over the text didn't highlight it"
+# Two marks from Reading mode wait to be saved too.
+grep -q 'Highlight · 3 changes' "$OUT/hl-done.xml" || fail "dragging over the text didn't highlight it"
 tap hl-done "Draw"
 sleep 1
 dump draw
@@ -231,7 +269,7 @@ adb shell input swipe "$cx" "$cy" "$dx" "$dy" 600
 sleep 1
 shot 08-comment
 dump drawn
-grep -Eq 'Draw · 2 changes' "$OUT/drawn.xml" || fail "the highlight and the drawing weren't both recorded"
+grep -Eq 'Draw · 4 changes' "$OUT/drawn.xml" || fail "the highlight and the drawing weren't both recorded"
 tap drawn "Done"
 wait_for applied 'text="Comment"' 30 "Done didn't go back to reading"
 grep -q 'Not saved yet' "$OUT/applied.xml" || fail "the document isn't marked as changed"
@@ -247,6 +285,21 @@ dump tick
 tap tick "Place it"
 sleep 1
 dump ticked
+echo "--- Fill & Sign: a signature from a photo of paper"
+tap ticked "Sign"
+wait_for sign-sheet 'Choose a photo of it on paper' 15 "the signature sheet doesn't offer a photo"
+tap sign-sheet "Choose a photo of it on paper"
+wait_for picker 'content-desc="[^"]*(Photo|photo|Image|image) taken' 30 "the photo picker didn't show the signature photo"
+shot 09a-photo-picker
+tap picker "taken"
+wait_for sig-photo 'Signature preview' 40 "the signature wasn't lifted off the photo"
+shot 09b-signature-photo
+tap sig-photo "Use it"
+sleep 2
+dump sig-place
+tap sig-place "Place it"
+sleep 1
+dump ticked
 tap ticked "Done"
 wait_for signed 'text="Fill &amp; Sign"' 30 "Done didn't go back to reading after Fill & Sign"
 shot 09-signed
@@ -258,9 +311,10 @@ sleep 4
 dump saved
 grep -q 'Not saved yet' "$OUT/saved.xml" && fail "the document still says it isn't saved"
 adb pull "$DOC" "$OUT/saved.pdf" > /dev/null
-for kind in Highlight Ink; do
+for kind in Highlight Ink Stamp; do
   grep -aq "/$kind" "$OUT/saved.pdf" || fail "the saved PDF has no $kind annotation"
 done
+grep -aq "Remember this" "$OUT/saved.pdf" || fail "the note from Reading mode isn't in the saved PDF"
 echo "PASS: annotations saved into the file"
 
 echo "--- Organize: turn page 1"

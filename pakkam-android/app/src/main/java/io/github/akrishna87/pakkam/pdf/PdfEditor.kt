@@ -118,6 +118,7 @@ object PdfEditor {
                     } catch (e: Exception) {
                         null
                     },
+                    quads = quadsOf(a),
                 )
             }
         }
@@ -125,6 +126,17 @@ object PdfEditor {
     }
 
     private val SKIPPED_SUBTYPES = setOf("Link", "Popup", "Widget")
+
+    /** The boxes a text markup covers, one per group of four corners in its /QuadPoints. */
+    private fun quadsOf(a: PDAnnotation): List<PdfRect> {
+        val arr = a.cosObject.getDictionaryObject(COSName.getPDFName("QuadPoints")) as? COSArray ?: return emptyList()
+        val v = (0 until arr.size()).map { (arr.getObject(it) as? com.tom_roush.pdfbox.cos.COSNumber)?.floatValue() ?: return emptyList() }
+        return v.chunked(8).filter { it.size == 8 }.map { q ->
+            val xs = listOf(q[0], q[2], q[4], q[6])
+            val ys = listOf(q[1], q[3], q[5], q[7])
+            PdfRect(xs.min(), ys.min(), xs.max(), ys.max())
+        }
+    }
 
     private fun deleteAnnotation(doc: PDDocument, info: AnnotInfo) {
         if (info.page !in 0 until doc.numberOfPages) return
@@ -170,7 +182,8 @@ object PdfEditor {
         a.quadPoints = e.rects.flatMap { r ->
             listOf(r.left, r.top, r.right, r.top, r.left, r.bottom, r.right, r.bottom)
         }.toFloatArray()
-        if (e.text.isNotBlank()) a.contents = e.text
+        val comment = e.note.ifBlank { e.text }
+        if (comment.isNotBlank()) a.contents = comment
         a.constructAppearances(doc)
         addAnnotation(page, a)
     }

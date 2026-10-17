@@ -106,6 +106,33 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.text.font.FontStyle
+import io.github.akrishna87.pakkam.pdf.DeleteAnnotEdit
+import io.github.akrishna87.pakkam.pdf.MarkOrigin
+import io.github.akrishna87.pakkam.pdf.MarkupEdit
+import io.github.akrishna87.pakkam.pdf.MarkupKind
+import io.github.akrishna87.pakkam.pdf.ReadMark
+import io.github.akrishna87.pakkam.pdf.ReadingText
+import kotlin.math.max
+import kotlin.math.min
 
 /** One screenful of the reflowed text: lines [startLine, endLine) of one chunk's layout. */
 data class ReadPage(val chunk: Int, val startLine: Int, val endLine: Int, val startOffset: Int)
@@ -226,6 +253,13 @@ class ReadBook(
 private sealed interface ReadSheet {
     data object Style : ReadSheet
     data object Contents : ReadSheet
+    data object Notes : ReadSheet
+}
+
+/** What the note being written is for: newly chosen text, or a highlight already made. */
+private sealed interface NoteFor {
+    data class New(val start: Int, val end: Int) : NoteFor
+    data class Edit(val mark: ReadMark) : NoteFor
 }
 
 /**
@@ -238,16 +272,23 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
     var style by remember { mutableStateOf(vm.settings.readStyle) }
     var chrome by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<ReadSheet?>(null) }
-    // The long-pressed word: (chunk, start, end) to shade, and the word to look up.
+    // The chosen text: (chunk, start, end) to shade, where on the screen it was pressed, and the word to look up.
     var picked by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+    var pickedY by remember { mutableStateOf(0f) }
+    var selecting by remember { mutableStateOf(false) }
     var lookup by remember { mutableStateOf<String?>(null) }
+    // The highlight being looked at (by where it starts), and the note being written.
+    var openMark by remember { mutableStateOf<Int?>(null) }
+    var noteFor by remember { mutableStateOf<NoteFor?>(null) }
+    var highlightColor by remember { mutableIntStateOf(vm.settings.highlightColor) }
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var offset by remember { mutableIntStateOf(vm.settings.readPosition(uriKey)) }
     var pdfPage by remember { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
     val theme = style.theme
 
-    val blocks by produceState<List<Block>?>(null, session.version) {
+    val blocks by produceState<List<Block>?>(null, session.textVersion) {
         value = try {
             session.reflowBlocks()
         } catch (e: Exception) {
@@ -262,9 +303,11 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
     BackHandler {
         when {
             sheet != null -> sheet = null
+            picked != null -> picked = null
             else -> leave()
         }
     }
+    val saver = rememberDocSaver(vm, session) { pdfPage.coerceAtLeast(0) }
 
     // Light or dark status-bar icons to suit the page colour.
     val view = LocalView.current
@@ -332,6 +375,55 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                     fun goTo(page: Int) {
                         scope.launch { if (style.scroll) scroller.scrollToItem(page) else pager.scrollToPage(page) }
                     }
+
+                    // Highlights and notes: kept as highlight annotations in the PDF itself.
+                    val reading = remember(b) { ReadingText(b.blocks, b.blockStarts) }
+                    val edits = session.edits.toList()
+                    val marks = remember(reading, session.annotations, edits) { reading.marks(session.annotations, edits) }
+                    val marksNow = rememberUpdatedState(marks)
+                    fun quote(start: Int, end: Int) = reading.textOf(start, end).replace('\n', ' ').trim()
+                    fun addHighlight(start: Int, end: Int, color: Int, note: String = ""): Boolean {
+                        val parts = reading.boxes(start, end)
+                        if (parts.isEmpty()) {
+                            vm.say("This text can't be marked: the PDF doesn't say where it sits on the page")
+                            return false
+                        }
+                        val text = quote(start, end)
+                        for ((i, part) in parts.withIndex()) {
+                            session.edits.add(MarkupEdit(part.first, MarkupKind.HIGHLIGHT, part.second, color, text, if (i == 0) note else ""))
+                        }
+                        session.redo.clear()
+                        return true
+                    }
+                    fun removeMark(m: ReadMark) {
+                        for (o in m.origins) when (o) {
+                            is MarkOrigin.Pending -> session.edits.remove(o.edit)
+                            is MarkOrigin.Saved -> session.edits.add(DeleteAnnotEdit(o.annot.page, o.annot))
+                        }
+                        session.redo.clear()
+                    }
+                    fun restyle(m: ReadMark, color: Int, note: String) {
+                        val text = quote(m.start, m.end)
+                        for ((i, o) in m.origins.withIndex()) {
+                            val n = if (i == 0) note else ""
+                            when (o) {
+                                is MarkOrigin.Pending -> {
+                                    val at = session.edits.indexOf(o.edit)
+                                    if (at >= 0) session.edits[at] = o.edit.copy(color = color, note = n)
+                                }
+                                is MarkOrigin.Saved -> {
+                                    // A changed annotation is written as a new one in place of the old.
+                                    session.edits.add(DeleteAnnotEdit(o.annot.page, o.annot))
+                                    session.edits.add(MarkupEdit(o.annot.page, MarkupKind.HIGHLIGHT, o.annot.quads.ifEmpty { listOf(o.annot.rect) }, color, text, n))
+                                }
+                            }
+                        }
+                        session.redo.clear()
+                    }
+
+                    val markPaint = remember { android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG) }
+                    val markPath = remember { android.graphics.Path() }
+                    val dotRadius = with(density) { 4.dp.toPx() }
                     /** Draws reading page [i] with its first line [y] pixels from the top of the canvas. */
                     fun androidx.compose.ui.graphics.drawscope.DrawScope.drawReadPage(i: Int, y: Float) {
                         val p = b.pages[i]
@@ -344,22 +436,51 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             nc.save()
                             nc.translate(marginPx.toFloat(), y - top)
                             nc.clipRect(0, top, layout.width, bottom)
+                            val cb = b.bases[p.chunk]
+                            val ce = cb + layout.text.length
+                            val pageStart = cb + layout.getLineStart(p.startLine)
+                            val pageEnd = cb + layout.getLineEnd(p.endLine - 1)
+                            for (m in marksNow.value) {
+                                if (m.end <= pageStart || m.start >= pageEnd) continue
+                                val s0 = max(m.start, cb) - cb
+                                val e0 = min(m.end, ce) - cb
+                                markPath.reset()
+                                layout.getSelectionPath(s0, e0, markPath)
+                                markPaint.style = android.graphics.Paint.Style.FILL
+                                markPaint.color = (m.color and 0xFFFFFF) or (if (theme.dark) 0x5C000000 else 0x73000000)
+                                nc.drawPath(markPath, markPaint)
+                                if (m.note.isNotBlank() && m.end <= ce) {
+                                    // A small dot after the highlight says it has a note.
+                                    val line = layout.getLineForOffset((e0 - 1).coerceAtLeast(0))
+                                    val x = if (layout.getLineForOffset(e0) != line) layout.getLineRight(line) else layout.getPrimaryHorizontal(e0)
+                                    val cy = layout.getLineTop(line) + dotRadius * 1.2f
+                                    markPaint.color = m.color or (0xFF shl 24)
+                                    nc.drawCircle(x + dotRadius * 0.8f, cy, dotRadius, markPaint)
+                                    markPaint.style = android.graphics.Paint.Style.STROKE
+                                    markPaint.strokeWidth = dotRadius * 0.35f
+                                    markPaint.color = (theme.text.toInt() and 0xFFFFFF) or 0x99000000.toInt()
+                                    nc.drawCircle(x + dotRadius * 0.8f, cy, dotRadius, markPaint)
+                                }
+                            }
                             picked?.takeIf { it.first == p.chunk }?.let { (_, s0, e0) ->
-                                val path = android.graphics.Path()
-                                layout.getSelectionPath(s0, e0, path)
-                                nc.drawPath(path, android.graphics.Paint().apply { color = if (theme.dark) 0x664F8DFF else 0x553D7BFF })
+                                markPath.reset()
+                                layout.getSelectionPath(s0, e0, markPath)
+                                markPaint.style = android.graphics.Paint.Style.FILL
+                                markPaint.color = if (theme.dark) 0x664F8DFF else 0x553D7BFF
+                                nc.drawPath(markPath, markPaint)
                             }
                             layout.draw(nc)
                             nc.restore()
                         }
                     }
-                    /** The word under a touch: what to shade and the word itself. */
-                    fun wordAt(o: androidx.compose.ui.geometry.Offset): Pair<Triple<Int, Int, Int>, String>? {
+                    /** The character under a touch, as (chunk, offset in the chunk's text); null off the text. */
+                    fun charAt(o: androidx.compose.ui.geometry.Offset): Pair<Int, Int>? {
                         val (i, pageTop) = if (style.scroll) {
                             val item = scroller.layoutInfo.visibleItemsInfo.firstOrNull { o.y >= it.offset && o.y < it.offset + it.size } ?: return null
                             item.index to item.offset.toFloat()
                         } else {
-                            current to topPad.toFloat()
+                            // Read now, not when the gesture handler was set up, so it's the page on screen.
+                            pager.currentPage to topPad.toFloat()
                         }
                         val p = b.pages.getOrNull(i) ?: return null
                         val layout = b.layouts[p.chunk]
@@ -369,9 +490,14 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                         val line = layout.getLineForVertical(y)
                         val x = o.x - marginPx
                         if (x < layout.getLineLeft(line) - 12 || x > layout.getLineRight(line) + 12) return null
-                        val text = layout.text
+                        return p.chunk to layout.getOffsetForHorizontal(line, x).coerceIn(0, layout.text.length)
+                    }
+                    /** The word under a touch: what to shade and the word itself. */
+                    fun wordAt(o: androidx.compose.ui.geometry.Offset): Pair<Triple<Int, Int, Int>, String>? {
+                        val (chunk, at) = charAt(o) ?: return null
+                        val text = b.layouts[chunk].text
                         fun isWord(c: Char) = c.isLetterOrDigit() || c == '\'' || c == '’' || c == '-'
-                        var s0 = layout.getOffsetForHorizontal(line, x).coerceIn(0, text.length)
+                        var s0 = at
                         if ((s0 >= text.length || !isWord(text[s0])) && s0 > 0 && isWord(text[s0 - 1])) s0--
                         if (s0 >= text.length || !isWord(text[s0])) return null
                         var e0 = s0
@@ -380,30 +506,65 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                         while (s0 < e0 && !text[s0].isLetterOrDigit()) s0++
                         while (e0 > s0 && !text[e0 - 1].isLetterOrDigit()) e0--
                         if (e0 <= s0) return null
-                        return Triple(p.chunk, s0, e0) to text.substring(s0, e0)
+                        return Triple(chunk, s0, e0) to text.substring(s0, e0)
+                    }
+                    fun onTap(o: androidx.compose.ui.geometry.Offset, w: Int, h: Int) {
+                        if (picked != null) {
+                            picked = null
+                            return
+                        }
+                        val hit = charAt(o)?.let { (chunk, at) -> b.bases[chunk] + at }
+                        val mark = hit?.let { g -> marksNow.value.firstOrNull { g >= it.start && g <= it.end } }
+                        when {
+                            mark != null -> openMark = mark.start
+                            o.x < w * 0.28f -> scope.launch {
+                                if (style.scroll) scroller.animateScrollBy(-h * 0.85f) else if (pager.currentPage > 0) pager.animateScrollToPage(pager.currentPage - 1)
+                            }
+                            o.x > w * 0.72f -> scope.launch {
+                                if (style.scroll) scroller.animateScrollBy(h * 0.85f) else if (pager.currentPage < b.pages.lastIndex) pager.animateScrollToPage(pager.currentPage + 1)
+                            }
+                            else -> chrome = !chrome
+                        }
                     }
                     Box(
                         Modifier
                             .fillMaxSize()
                             .pointerInput(b, style.scroll) {
-                                detectTapGestures(onLongPress = { o ->
-                                    wordAt(o)?.let { (range, word) ->
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        picked = range
-                                        lookup = word
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    var cancelled = false
+                                    val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                        waitForUpOrCancellation().also { if (it == null) cancelled = true }
                                     }
-                                }) { o ->
-                                    val w = size.width
-                                    val h = size.height
-                                    when {
-                                        o.x < w * 0.28f -> scope.launch {
-                                            if (style.scroll) scroller.animateScrollBy(-h * 0.85f) else if (pager.currentPage > 0) pager.animateScrollToPage(pager.currentPage - 1)
-                                        }
-                                        o.x > w * 0.72f -> scope.launch {
-                                            if (style.scroll) scroller.animateScrollBy(h * 0.85f) else if (pager.currentPage < b.pages.lastIndex) pager.animateScrollToPage(pager.currentPage + 1)
-                                        }
-                                        else -> chrome = !chrome
+                                    if (up != null) {
+                                        onTap(up.position, size.width, size.height)
+                                        return@awaitEachGesture
                                     }
+                                    if (cancelled) return@awaitEachGesture
+                                    // A long press picks the word; moving on before lifting stretches the choice word by word.
+                                    val (first, word) = wordAt(down.position) ?: return@awaitEachGesture
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    lookup = null
+                                    picked = first
+                                    pickedY = down.position.y / size.height
+                                    selecting = true
+                                    var moved = false
+                                    while (true) {
+                                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                        change.consume()
+                                        if (!change.pressed) break
+                                        val w = wordAt(change.position)?.first ?: continue
+                                        if (w.first != first.first) continue
+                                        val next = Triple(first.first, min(first.second, w.second), max(first.third, w.third))
+                                        if (next != picked) {
+                                            picked = next
+                                            moved = true
+                                        }
+                                    }
+                                    selecting = false
+                                    // A single word opens the dictionary, as before; a longer stretch shows the highlight bar.
+                                    if (!moved) lookup = word
                                 }
                             },
                     ) {
@@ -448,6 +609,7 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp),
                         )
+                        val unsaved = session.dirty || session.edits.isNotEmpty()
                         ReadingChrome(
                             visible = chrome,
                             title = session.name,
@@ -456,11 +618,44 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             chapter = b.blocks.subList(0, b.blockAt(b.pages[current].startOffset) + 1)
                                 .lastOrNull { it.kind == Block.Kind.HEADING }?.text,
                             pdfPage = b.pdfPageOf(current),
+                            unsaved = unsaved,
                             onBack = { leave() },
+                            onNotes = { sheet = ReadSheet.Notes },
+                            onSave = { saver.save(null) },
                             onStyle = { sheet = ReadSheet.Style },
                             onContents = { sheet = ReadSheet.Contents },
                             onSeek = { goTo(it) },
                         )
+
+                        // The bar for a chosen stretch of text, away from the words it is about.
+                        val sel = picked
+                        if (sel != null && !selecting && lookup == null && noteFor == null) {
+                            val (chunk, s0, e0) = sel
+                            val start = b.bases[chunk] + s0
+                            val end = b.bases[chunk] + e0
+                            val chosen = b.layouts[chunk].text.substring(s0, e0)
+                            ReadSelectionBar(
+                                modifier = Modifier
+                                    .align(if (pickedY > 0.5f) Alignment.TopCenter else Alignment.BottomCenter)
+                                    .then(if (pickedY > 0.5f) Modifier.statusBarsPadding() else Modifier.navigationBarsPadding())
+                                    .padding(horizontal = 12.dp, vertical = 36.dp),
+                                color = highlightColor,
+                                canDefine = chosen.length <= 40 && chosen.none { it.isWhitespace() },
+                                onColor = { col ->
+                                    highlightColor = col
+                                    vm.settings.highlightColor = col
+                                    if (addHighlight(start, end, col)) picked = null
+                                },
+                                onNote = { noteFor = NoteFor.New(start, end) },
+                                onCopy = {
+                                    copyText(context, quote(start, end))
+                                    picked = null
+                                },
+                                onDefine = { lookup = chosen },
+                                onClose = { picked = null },
+                            )
+                        }
+
                         when (sheet) {
                             ReadSheet.Contents -> ReadingContents(
                                 vm, session, b,
@@ -471,16 +666,109 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                                     goTo(b.pageAt(target))
                                 },
                             )
+                            ReadSheet.Notes -> ReadingNotes(
+                                marks = marks,
+                                quote = { m -> quote(m.start, m.end) },
+                                pageOf = { m -> b.pageAt(m.start) },
+                                unsaved = unsaved,
+                                onSave = { saver.save(null) },
+                                onDismiss = { sheet = null },
+                                onGo = { target ->
+                                    sheet = null
+                                    chrome = false
+                                    goTo(b.pageAt(target))
+                                },
+                            )
                             else -> Unit
                         }
                     }
+
+                    lookup?.let { w ->
+                        val sel = picked
+                        DefinitionSheet(
+                            vm, w,
+                            actions = if (sel == null) {
+                                null
+                            } else {
+                                {
+                                    val (chunk, s0, e0) = sel
+                                    val start = b.bases[chunk] + s0
+                                    val end = b.bases[chunk] + e0
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        AssistChip(
+                                            onClick = {
+                                                if (addHighlight(start, end, highlightColor)) {
+                                                    lookup = null
+                                                    picked = null
+                                                }
+                                            },
+                                            label = { Text("Highlight") },
+                                            leadingIcon = { Box(Modifier.size(16.dp).background(Color(highlightColor), CircleShape)) },
+                                        )
+                                        AssistChip(
+                                            onClick = {
+                                                lookup = null
+                                                noteFor = NoteFor.New(start, end)
+                                            },
+                                            label = { Text("Add note") },
+                                            leadingIcon = { Icon(Icons.Filled.EditNote, null, Modifier.size(18.dp)) },
+                                        )
+                                    }
+                                }
+                            },
+                        ) {
+                            lookup = null
+                            picked = null
+                        }
+                    }
+
+                    // A highlight that was tapped, followed through changes (it is found again by where it starts).
+                    openMark?.let { at ->
+                        val m = marks.firstOrNull { at >= it.start && at < it.end }
+                        if (m == null) {
+                            LaunchedEffect(at) { openMark = null }
+                        } else {
+                            MarkSheet(
+                                mark = m,
+                                quote = quote(m.start, m.end),
+                                pending = m.origins.any { it is MarkOrigin.Pending } || session.edits.any { it is DeleteAnnotEdit },
+                                onDismiss = { openMark = null },
+                                onColor = { col -> restyle(m, col, m.note) },
+                                onNote = { noteFor = NoteFor.Edit(m) },
+                                onCopy = {
+                                    copyText(context, quote(m.start, m.end))
+                                    openMark = null
+                                },
+                                onRemove = {
+                                    removeMark(m)
+                                    openMark = null
+                                },
+                            )
+                        }
+                    }
+
+                    noteFor?.let { target ->
+                        val (start, end, initial) = when (target) {
+                            is NoteFor.New -> Triple(target.start, target.end, "")
+                            is NoteFor.Edit -> Triple(target.mark.start, target.mark.end, target.mark.note)
+                        }
+                        NoteDialog(
+                            quote = quote(start, end),
+                            initial = initial,
+                            onDismiss = {
+                                noteFor = null
+                                picked = null
+                            },
+                        ) { text ->
+                            when (target) {
+                                is NoteFor.New -> addHighlight(start, end, highlightColor, text)
+                                is NoteFor.Edit -> restyle(target.mark, target.mark.color, text)
+                            }
+                            noteFor = null
+                            picked = null
+                        }
+                    }
                 }
-            }
-        }
-        lookup?.let { w ->
-            DefinitionSheet(vm, w) {
-                lookup = null
-                picked = null
             }
         }
         if (sheet == ReadSheet.Style) {
@@ -500,7 +788,10 @@ private fun ReadingChrome(
     pageCount: Int,
     chapter: String?,
     pdfPage: Int,
+    unsaved: Boolean,
     onBack: () -> Unit,
+    onNotes: () -> Unit,
+    onSave: () -> Unit,
     onStyle: () -> Unit,
     onContents: () -> Unit,
     onSeek: (Int) -> Unit,
@@ -512,6 +803,8 @@ private fun ReadingChrome(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
+                    if (unsaved) IconButton(onClick = onSave) { Icon(Icons.Filled.Save, "Save") }
+                    IconButton(onClick = onNotes) { Icon(Icons.Filled.EditNote, "Notes and highlights") }
                     IconButton(onClick = onContents) { Icon(Icons.Filled.List, "Chapters") }
                     IconButton(onClick = onStyle) { Icon(Icons.Filled.TextFields, "Text and colours") }
                     IconButton(onClick = onBack) { Icon(Icons.Filled.PictureAsPdf, "Page view") }
@@ -636,6 +929,187 @@ private fun ReadingStyleSheet(style: ReadStyle, onDismiss: () -> Unit, onChange:
                 FilterChip(selected = style.scroll, onClick = { onChange(style.copy(scroll = true)) }, label = { Text("Scroll") })
             }
             SwitchRow("Justify text (even right edge)", style.justify) { onChange(style.copy(justify = it)) }
+        }
+    }
+}
+
+private fun copyText(context: android.content.Context, text: String) {
+    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("Text", text))
+}
+
+/** Shown for chosen text: a colour highlights it straight away, or add a note, copy or look it up. */
+@Composable
+private fun ReadSelectionBar(
+    modifier: Modifier,
+    color: Int,
+    canDefine: Boolean,
+    onColor: (Int) -> Unit,
+    onNote: () -> Unit,
+    onCopy: () -> Unit,
+    onDefine: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Surface(modifier, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), tonalElevation = 6.dp, shadowElevation = 8.dp) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Highlight", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 12.dp))
+                ColorDots(HIGHLIGHT_COLORS.take(4), color, onColor)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Close") }
+            }
+            Row {
+                TextButton(onClick = onNote) {
+                    Icon(Icons.Filled.EditNote, null, Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("Note")
+                }
+                TextButton(onClick = onCopy) {
+                    Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("Copy")
+                }
+                if (canDefine) {
+                    TextButton(onClick = onDefine) {
+                        Icon(Icons.Filled.MenuBook, null, Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("Define")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A tapped highlight: its words, its note, and ways to change or remove it. */
+@Composable
+private fun MarkSheet(
+    mark: ReadMark,
+    quote: String,
+    pending: Boolean,
+    onDismiss: () -> Unit,
+    onColor: (Int) -> Unit,
+    onNote: () -> Unit,
+    onCopy: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row {
+                Box(Modifier.size(width = 4.dp, height = 48.dp).background(Color(mark.color or (0xFF shl 24))))
+                Text(
+                    quote,
+                    Modifier.padding(start = 12.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = FontFamily.Serif,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (mark.note.isNotBlank()) {
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)) {
+                    Text(mark.note, Modifier.fillMaxWidth().padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            ColorDots(HIGHLIGHT_COLORS, mark.color or (0xFF shl 24), onColor)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onNote) {
+                    Icon(Icons.Filled.EditNote, null, Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text(if (mark.note.isBlank()) "Add note" else "Edit note")
+                }
+                TextButton(onClick = onCopy) {
+                    Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("Copy")
+                }
+                TextButton(onClick = onRemove) {
+                    Icon(Icons.Filled.Delete, null, Modifier.size(18.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("Remove highlight")
+                }
+            }
+            if (pending) {
+                Text(
+                    "Highlights are kept in the PDF itself once you save it, so they show in page view and in other PDF apps too.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** Every highlight and note in the book, in reading order; tap one to go to it. */
+@Composable
+private fun ReadingNotes(
+    marks: List<ReadMark>,
+    quote: (ReadMark) -> String,
+    pageOf: (ReadMark) -> Int,
+    unsaved: Boolean,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+    onGo: (Int) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Notes and highlights", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (unsaved) TextButton(onClick = onSave) { Text("Save to PDF") }
+        }
+        if (marks.isEmpty()) {
+            Text(
+                "Nothing marked yet. Press and hold a word, then slide your finger to choose more, and pick a colour to highlight it. Add a note to remember why.",
+                Modifier.padding(16.dp).padding(bottom = 24.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        LazyColumn(Modifier.padding(bottom = 24.dp)) {
+            items(marks) { m ->
+                ListItem(
+                    modifier = Modifier.clickable { onGo(m.start) },
+                    leadingContent = { Box(Modifier.size(width = 6.dp, height = 40.dp).background(Color(m.color or (0xFF shl 24)), CircleShape)) },
+                    headlineContent = { Text(quote(m), maxLines = 3, overflow = TextOverflow.Ellipsis, fontFamily = FontFamily.Serif) },
+                    supportingContent = if (m.note.isNotBlank()) {
+                        { Text(m.note, fontStyle = FontStyle.Italic, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+                    } else {
+                        null
+                    },
+                    trailingContent = { Text("p. ${pageOf(m) + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteDialog(quote: String, initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    val focus = remember { FocusRequester() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initial.isBlank()) "Add a note" else "Edit note") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("“$quote”", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Your note") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(text.trim()) }) { Text("Save note") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+    LaunchedEffect(Unit) {
+        try {
+            focus.requestFocus()
+        } catch (_: Exception) {
         }
     }
 }
