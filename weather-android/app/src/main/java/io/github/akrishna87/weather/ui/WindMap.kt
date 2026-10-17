@@ -622,8 +622,8 @@ private class MapPainter(private val density: Float) {
             layoutKey[0] = cam.lon.toFloat(); layoutKey[1] = cam.lat.toFloat(); layoutKey[2] = cam.ppd
             layoutKey[3] = w; layoutKey[4] = h
             layoutFor = you
-            if (byPriority.size != labels.size) byPriority = labels.sortedBy(::priority)
-            placed = layoutLabels(s, cam, byPriority, you, youName)
+            val zoom = cam.ppd / density
+            placed = layoutLabels(s, cam, labels.sortedBy { priority(it, zoom) }, you, youName)
         }
         val c = s.drawContext.canvas.nativeCanvas
         for (p in placed) {
@@ -640,16 +640,17 @@ private class MapPainter(private val density: Float) {
     }
 
     /**
-     * Which names win when they'd overlap: countries and capitals, then the biggest cities (the
-     * ones shown from furthest out), then states, then other cities, each by its zoom level.
+     * Which names win when they'd overlap: capitals and the very biggest cities, then countries,
+     * then states, then other cities, each by its zoom level. A country's own name steps back once
+     * you're zoomed well in on it, so its states can be named.
      */
-    private fun priority(l: MapLabel): Float = when (l.kind) {
-        MapLabel.Kind.Country, MapLabel.Kind.Capital -> l.minZoom
+    private fun priority(l: MapLabel, zoom: Float): Float = when (l.kind) {
+        MapLabel.Kind.Capital -> l.minZoom
+        MapLabel.Kind.Country -> if (zoom > l.minZoom * 6) 50f + l.minZoom else l.minZoom
         MapLabel.Kind.State -> 3.5f + l.minZoom / 100f
-        MapLabel.Kind.City -> if (l.minZoom <= 3.5f) l.minZoom else 3.6f + l.minZoom
+        MapLabel.Kind.City -> if (l.minZoom <= 1.5f) l.minZoom else 3.6f + l.minZoom
     }
 
-    private var byPriority: List<MapLabel> = emptyList()
     private var layoutFor: LatLon? = null
 
     private fun layoutLabels(s: DrawScope, cam: MapCamera, labels: List<MapLabel>, you: LatLon?, youName: String?): List<PlacedLabel> {
