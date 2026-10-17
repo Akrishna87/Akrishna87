@@ -8,6 +8,9 @@ data class Snapshot(
     val feeds: List<Feed> = emptyList(),
     val articles: List<Article> = emptyList(),
     val unreadOnly: Boolean = false,
+    val mute: List<String> = emptyList(),
+    val highlight: List<String> = emptyList(),
+    val collapsed: Set<String> = emptySet(),
 )
 
 /** Everything lives in one JSON file in the app's private storage. */
@@ -25,6 +28,8 @@ class Store(private val file: File) {
                     siteUrl = it.optString("siteUrl"),
                     lastFetched = it.optLong("lastFetched"),
                     error = it.optString("error").ifEmpty { null },
+                    folder = it.optString("folder"),
+                    customTitle = it.optString("customTitle"),
                 )
             }
             val articles = o.optJSONArray("articles").objects().map {
@@ -42,7 +47,12 @@ class Store(private val file: File) {
                     starred = it.optBoolean("starred"),
                 )
             }
-            Snapshot(feeds, articles, o.optBoolean("unreadOnly"))
+            Snapshot(
+                feeds, articles, o.optBoolean("unreadOnly"),
+                mute = o.optJSONArray("mute").strings(),
+                highlight = o.optJSONArray("highlight").strings(),
+                collapsed = o.optJSONArray("collapsed").strings().toSet(),
+            )
         } catch (e: Exception) {
             Snapshot()
         }
@@ -53,11 +63,15 @@ class Store(private val file: File) {
         val o = JSONObject()
         o.put("version", 1)
         o.put("unreadOnly", s.unreadOnly)
+        o.put("mute", JSONArray(s.mute))
+        o.put("highlight", JSONArray(s.highlight))
+        o.put("collapsed", JSONArray(s.collapsed.sorted()))
         o.put("feeds", JSONArray().apply {
             s.feeds.forEach { f ->
                 put(JSONObject().apply {
                     put("id", f.id); put("url", f.url); put("title", f.title); put("siteUrl", f.siteUrl)
                     put("lastFetched", f.lastFetched); put("error", f.error ?: "")
+                    put("folder", f.folder); put("customTitle", f.customTitle)
                 })
             }
         })
@@ -78,6 +92,9 @@ class Store(private val file: File) {
             tmp.renameTo(file)
         }
     }
+
+    private fun JSONArray?.strings(): List<String> =
+        if (this == null) emptyList() else (0 until length()).mapNotNull { optString(it).ifEmpty { null } }
 
     private fun JSONArray?.objects(): List<JSONObject> =
         if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }

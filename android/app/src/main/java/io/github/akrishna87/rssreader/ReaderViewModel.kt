@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.akrishna87.rssreader.data.Article
 import io.github.akrishna87.rssreader.data.Feed
+import io.github.akrishna87.rssreader.data.Filters
 import io.github.akrishna87.rssreader.data.Net
 import io.github.akrishna87.rssreader.data.NotAFeedException
 import io.github.akrishna87.rssreader.data.Opml
@@ -40,6 +41,8 @@ sealed interface ReaderView {
     data object All : ReaderView
     data object Starred : ReaderView
     data class OneFeed(val feedId: String) : ReaderView
+    data class Folder(val name: String) : ReaderView
+    data object Highlights : ReaderView
 }
 
 data class UiState(
@@ -53,6 +56,12 @@ data class UiState(
     val openArticleId: String? = null,
     val discoverOpen: Boolean = false,
     val manageOpen: Boolean = false,
+    val filtersOpen: Boolean = false,
+    val mute: List<String> = emptyList(),
+    val highlight: List<String> = emptyList(),
+    val collapsed: Set<String> = emptySet(),
+    /** Show muted articles in the list (dimmed) instead of hiding them. */
+    val showMuted: Boolean = false,
 )
 
 class ReaderViewModel(app: Application) : AndroidViewModel(app) {
@@ -74,7 +83,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val snap = withContext(Dispatchers.IO) { store.load() }
             _state.update {
-                it.copy(loaded = true, feeds = snap.feeds, articles = snap.articles.newestFirst(), unreadOnly = snap.unreadOnly)
+                it.copy(
+                    loaded = true, feeds = snap.feeds, articles = snap.articles.newestFirst(), unreadOnly = snap.unreadOnly,
+                    mute = snap.mute, highlight = snap.highlight, collapsed = snap.collapsed,
+                )
             }
             refreshIfStale()
         }
@@ -82,7 +94,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Navigation -------------------------------------------------------
 
-    fun setView(view: ReaderView) = _state.update { it.copy(view = view) }
+    fun setView(view: ReaderView) = _state.update { it.copy(view = view, showMuted = false) }
 
     fun openArticle(id: String) {
         _state.update { s -> s.copy(openArticleId = id, articles = s.articles.map { if (it.id == id) it.copy(read = true) else it }) }
@@ -96,6 +108,29 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openManage() = _state.update { it.copy(manageOpen = true) }
     fun closeManage() = _state.update { it.copy(manageOpen = false) }
+
+    fun openFilters() = _state.update { it.copy(filtersOpen = true) }
+    fun closeFilters() = _state.update { it.copy(filtersOpen = false) }
+
+    fun setShowMuted(on: Boolean) = _state.update { it.copy(showMuted = on) }
+
+    fun toggleFolder(name: String) {
+        _state.update { s -> s.copy(collapsed = if (name in s.collapsed) s.collapsed - name else s.collapsed + name) }
+        persist()
+    }
+
+    // ---- Keyword filters ----------------------------------------------------
+
+    fun addMute(input: String) { _state.update { it.copy(mute = Filters.addTerms(it.mute, input)) }; persist() }
+    fun removeMute(term: String) { _state.update { it.copy(mute = it.mute - term) }; persist() }
+    fun addHighlight(input: String) { _state.update { it.copy(highlight = Filters.addTerms(it.highlight, input)) }; persist() }
+    fun removeHighlight(term: String) {
+        _state.update { s ->
+            val list = s.highlight - term
+            s.copy(highlight = list, view = if (list.isEmpty() && s.view == ReaderView.Highlights) ReaderView.All else s.view)
+        }
+        persist()
+    }
 
     fun setUnreadOnly(on: Boolean) {
         _state.update { it.copy(unreadOnly = on) }
@@ -131,16 +166,16 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Feeds ------------------------------------------------------------
 
     /** Subscribe to [raw] (a feed URL or a website). Returns an error message, or null on success. */
-    suspend fun addFeed(raw: String, showFeed: Boolean = true): String? {
+    suspend fun addFeed(raw: String, showFeed: Boolean = true, folder: String = ""): String? {
         val normalized = normalizeUrl(raw) ?: return "That doesn't look like a web address"
         val url = rewriteKnownUrl(normalized)
         if (_state.value.feeds.any { it.url == url }) return "You're already subscribed to this feed"
         return try {
             val (finalUrl, parsed) = withContext(Dispatchers.IO) { Net.loadFeed(url) }
             val id = stableId(finalUrl)
-            _state.value.feeds.firstOrNull { it.id == id }?.let { return "You're already subscribed to ${it.title}" }
+            _state.value.feeds.firstOrNull { it.id == id }?.let { return "You're already subscribed to ${it.name}" }
             val now = System.currentTimeMillis()
-            val feed = Feed(id, finalUrl, parsed.title.ifBlank { hostOf(finalUrl) }, parsed.siteUrl, now)
+            val feed = Feed(id, finalUrl, parsed.title.ifBlank { hostOf(finalUrl) }, parsed.siteUrl, now, folder = folder.trim())
             val merged = withContext(Dispatchers.Default) { mergeArticles(_state.value.articles, id, parsed, now).first }
             _state.update { s ->
                 s.copy(
@@ -151,20 +186,35 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
             persist()
-            _messages.tryEmit("Subscribed to ${feed.title}")
+            _messages.tryEmit("Subscribed to ${feed.name}")
             null
         } catch (e: Exception) {
             friendly(e)
         }
     }
 
+    /** Rename and/or move a feed to a folder (blank folder = no folder). */
+    fun editFeed(id: String, name: String, folder: String) {
+        _state.update { s ->
+            val feeds = s.feeds.map {
+                if (it.id == id) it.copy(customTitle = name.trim().takeIf { n -> n != it.title } ?: "", folder = folder.trim()) else it
+            }
+            val view = s.view
+            s.copy(feeds = feeds, view = if (view is ReaderView.Folder && feeds.none { it.folder == view.name }) ReaderView.All else view)
+        }
+        persist()
+    }
+
     fun removeFeed(id: String) {
-        val title = _state.value.feeds.firstOrNull { it.id == id }?.title
+        val title = _state.value.feeds.firstOrNull { it.id == id }?.name
         _state.update { s ->
             s.copy(
                 feeds = s.feeds.filter { it.id != id },
                 articles = s.articles.filter { it.feedId != id },
-                view = if (s.view == ReaderView.OneFeed(id)) ReaderView.All else s.view,
+                view = s.view.let { v ->
+                    val remaining = s.feeds.filter { it.id != id }
+                    if (v == ReaderView.OneFeed(id) || (v is ReaderView.Folder && remaining.none { it.folder == v.name })) ReaderView.All else v
+                },
             )
         }
         persist()
@@ -224,7 +274,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun importOpml(text: String) {
         val entries = try { Opml.parse(text) } catch (e: Exception) { emptyList() }
         val existing = _state.value.feeds.map { it.id }.toHashSet()
-        val fresh = entries.distinctBy { it.url }.map { Feed(stableId(it.url), it.url, it.title.ifBlank { hostOf(it.url) }) }
+        val fresh = entries.distinctBy { it.url }.map { Feed(stableId(it.url), it.url, it.title.ifBlank { hostOf(it.url) }, folder = it.folder) }
             .filter { it.id !in existing }
         if (fresh.isEmpty()) {
             _messages.tryEmit(if (entries.isEmpty()) "No feeds found in that file" else "You already have all those feeds")
@@ -244,7 +294,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             saveLock.withLock {
                 val s = _state.value
-                store.save(Snapshot(s.feeds, s.articles, s.unreadOnly))
+                store.save(Snapshot(s.feeds, s.articles, s.unreadOnly, s.mute, s.highlight, s.collapsed))
             }
         }
     }

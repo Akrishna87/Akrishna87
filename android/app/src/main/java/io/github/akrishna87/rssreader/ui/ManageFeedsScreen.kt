@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -49,9 +52,12 @@ fun ManageFeedsScreen(
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     onRemove: (String) -> Unit,
+    onEdit: (id: String, name: String, folder: String) -> Unit,
     onOpen: (String) -> Unit,
 ) {
     var confirm by remember { mutableStateOf<Feed?>(null) }
+    var editing by remember { mutableStateOf<Feed?>(null) }
+    val folders = remember(feeds) { feeds.map { it.folder }.filter { it.isNotEmpty() }.distinct().sorted() }
     val counts = remember(articles) { articles.groupingBy { it.feedId }.eachCount() }
     val starred = remember(articles) { articles.filter { it.starred }.groupingBy { it.feedId }.eachCount() }
 
@@ -75,7 +81,7 @@ fun ManageFeedsScreen(
                     )
                 }
             }
-            items(feeds.sortedBy { it.title.lowercase() }, key = { it.id }) { f ->
+            items(feeds.sortedWith(compareBy<Feed>({ it.folder.isEmpty() }, { it.folder.lowercase() }, { it.name.lowercase() })), key = { it.id }) { f ->
                 Row(
                     Modifier.fillMaxWidth().clickable { onOpen(f.id) }.padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -83,9 +89,9 @@ fun ManageFeedsScreen(
                     FeedBadge(f)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(f.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(f.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            hostOf(f.url) + " · ${counts[f.id] ?: 0} articles",
+                            (if (f.folder.isNotEmpty()) "📁 ${f.folder} · " else "") + hostOf(f.url) + " · ${counts[f.id] ?: 0} articles",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -95,8 +101,11 @@ fun ManageFeedsScreen(
                             Text("⚠ ${f.error}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
                         }
                     }
+                    IconButton(onClick = { editing = f }) {
+                        Icon(Icons.Filled.Edit, "Rename or move ${f.name}")
+                    }
                     IconButton(onClick = { confirm = f }) {
-                        Icon(Icons.Filled.Delete, "Unsubscribe from ${f.title}", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Filled.Delete, "Unsubscribe from ${f.name}", tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 HorizontalDivider(Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -111,12 +120,32 @@ fun ManageFeedsScreen(
             title = { Text("Unsubscribe?") },
             text = {
                 Text(
-                    "Remove “${feed.title}” and its saved articles" +
+                    "Remove “${feed.name}” and its saved articles" +
                         (if (stars > 0) ", including $stars starred article${if (stars == 1) "" else "s"}?" else "?"),
                 )
             },
             confirmButton = { TextButton(onClick = { onRemove(feed.id); confirm = null }) { Text("Unsubscribe") } },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } },
+        )
+    }
+
+    editing?.let { feed ->
+        var name by remember(feed.id) { mutableStateOf(feed.name) }
+        var folder by remember(feed.id) { mutableStateOf(feed.folder) }
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text("Edit feed") },
+            text = {
+                Column {
+                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true)
+                    Spacer(Modifier.height(12.dp))
+                    FolderPicker(folder, folders) { folder = it }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onEdit(feed.id, name.ifBlank { feed.title }, folder); editing = null }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } },
         )
     }
 }

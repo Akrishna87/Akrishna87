@@ -100,7 +100,7 @@ fun ArticleScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
             val meta = listOfNotNull(
-                feed?.title,
+                feed?.name,
                 article.author.takeIf { it.isNotBlank() },
                 DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(article.date)),
             ).joinToString(" · ")

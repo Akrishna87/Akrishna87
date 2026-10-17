@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,12 +30,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -54,6 +59,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -69,6 +75,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -84,6 +91,7 @@ import io.github.akrishna87.rssreader.ReaderViewModel
 import io.github.akrishna87.rssreader.UiState
 import io.github.akrishna87.rssreader.data.Article
 import io.github.akrishna87.rssreader.data.Feed
+import io.github.akrishna87.rssreader.data.Filters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -106,36 +114,52 @@ fun ReaderApp(vm: ReaderViewModel) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     val open = state.openArticleId?.let { id -> state.articles.firstOrNull { it.id == id } }
-    if (open != null) {
-        BackHandler { vm.closeArticle() }
-        ArticleScreen(
-            article = open,
-            feed = state.feeds.firstOrNull { it.id == open.feedId },
-            snackbar = snackbar,
-            onBack = vm::closeArticle,
-            onToggleStar = { vm.toggleStar(open.id) },
-            onMarkUnread = { vm.setRead(open.id, false); vm.closeArticle() },
-        )
-    } else if (state.manageOpen) {
-        BackHandler { vm.closeManage() }
-        ManageFeedsScreen(
-            feeds = state.feeds,
-            articles = state.articles,
-            snackbar = snackbar,
-            onBack = vm::closeManage,
-            onRemove = vm::removeFeed,
-            onOpen = { id -> vm.setView(ReaderView.OneFeed(id)); vm.closeManage() },
-        )
-    } else if (state.discoverOpen) {
-        BackHandler { vm.closeDiscover() }
-        DiscoverScreen(
-            feeds = state.feeds,
-            snackbar = snackbar,
-            onBack = vm::closeDiscover,
-            onAdd = { url -> vm.addFeed(url, showFeed = false) },
-        )
-    } else {
-        HomeScreen(state, vm, snackbar)
+    when {
+        open != null -> {
+            BackHandler { vm.closeArticle() }
+            ArticleScreen(
+                article = open,
+                feed = state.feeds.firstOrNull { it.id == open.feedId },
+                snackbar = snackbar,
+                onBack = vm::closeArticle,
+                onToggleStar = { vm.toggleStar(open.id) },
+                onMarkUnread = { vm.setRead(open.id, false); vm.closeArticle() },
+            )
+        }
+        state.filtersOpen -> {
+            BackHandler { vm.closeFilters() }
+            FiltersScreen(
+                mute = state.mute,
+                highlight = state.highlight,
+                onBack = vm::closeFilters,
+                onAddMute = vm::addMute,
+                onRemoveMute = vm::removeMute,
+                onAddHighlight = vm::addHighlight,
+                onRemoveHighlight = vm::removeHighlight,
+            )
+        }
+        state.manageOpen -> {
+            BackHandler { vm.closeManage() }
+            ManageFeedsScreen(
+                feeds = state.feeds,
+                articles = state.articles,
+                snackbar = snackbar,
+                onBack = vm::closeManage,
+                onRemove = vm::removeFeed,
+                onEdit = vm::editFeed,
+                onOpen = { id -> vm.setView(ReaderView.OneFeed(id)); vm.closeManage() },
+            )
+        }
+        state.discoverOpen -> {
+            BackHandler { vm.closeDiscover() }
+            DiscoverScreen(
+                feeds = state.feeds,
+                snackbar = snackbar,
+                onBack = vm::closeDiscover,
+                onAdd = { url, folder -> vm.addFeed(url, showFeed = false, folder = folder) },
+            )
+        }
+        else -> HomeScreen(state, vm, snackbar)
     }
 }
 
@@ -151,22 +175,36 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
     val shared by vm.shared.collectAsStateWithLifecycle()
     LaunchedEffect(shared) { if (shared != null) showAdd = true }
 
+    val filters = remember(state.mute, state.highlight) { Filters(state.mute, state.highlight) }
     val feedsById = remember(state.feeds) { state.feeds.associateBy { it.id } }
-    val unreadByFeed = remember(state.articles) { state.articles.filter { !it.read }.groupingBy { it.feedId }.eachCount() }
-    val visible = remember(state.articles, state.view, state.unreadOnly, state.openArticleId) {
+    val unreadByFeed = remember(state.articles, filters) {
+        state.articles.filter { !it.read && filters.mutedBy(it) == null }.groupingBy { it.feedId }.eachCount()
+    }
+    // Articles in the current view, before muting; then split into shown / muted.
+    val inView = remember(state.articles, state.view, state.unreadOnly, state.feeds, filters) {
+        val folderFeeds = (state.view as? ReaderView.Folder)?.let { v -> state.feeds.filter { it.folder == v.name }.map { it.id }.toHashSet() }
         state.articles.filter { a ->
             when (val v = state.view) {
                 ReaderView.All -> true
                 ReaderView.Starred -> a.starred
+                ReaderView.Highlights -> filters.highlightedBy(a) != null
                 is ReaderView.OneFeed -> a.feedId == v.feedId
+                is ReaderView.Folder -> folderFeeds?.contains(a.feedId) == true
             } && (!state.unreadOnly || state.view == ReaderView.Starred || !a.read)
         }
     }
+    val mutedCount = remember(inView, filters) { inView.count { filters.mutedBy(it) != null } }
+    val visible = remember(inView, filters, state.showMuted) {
+        if (state.showMuted) inView else inView.filter { filters.mutedBy(it) == null }
+    }
+
     val currentFeed = (state.view as? ReaderView.OneFeed)?.let { feedsById[it.feedId] }
-    val title = when (state.view) {
+    val title = when (val v = state.view) {
         ReaderView.All -> "All articles"
         ReaderView.Starred -> "Starred"
-        is ReaderView.OneFeed -> currentFeed?.title ?: "Feed"
+        ReaderView.Highlights -> "Highlights"
+        is ReaderView.OneFeed -> currentFeed?.name ?: "Feed"
+        is ReaderView.Folder -> v.name
     }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -189,20 +227,25 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
     BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
     BackHandler(enabled = drawer.isClosed && state.view != ReaderView.All) { vm.setView(ReaderView.All) }
 
+    fun closeDrawerThen(action: () -> Unit) {
+        action()
+        scope.launch { drawer.close() }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
             ModalDrawerSheet {
-                DrawerContent(state, unreadByFeed, onDiscover = {
-                    vm.openDiscover()
-                    scope.launch { drawer.close() }
-                }, onManage = {
-                    vm.openManage()
-                    scope.launch { drawer.close() }
-                }) { view ->
-                    vm.setView(view)
-                    scope.launch { drawer.close() }
-                }
+                DrawerContent(
+                    state = state,
+                    filters = filters,
+                    unreadByFeed = unreadByFeed,
+                    onSelect = { view -> closeDrawerThen { vm.setView(view) } },
+                    onToggleFolder = vm::toggleFolder,
+                    onDiscover = { closeDrawerThen { vm.openDiscover() } },
+                    onManage = { closeDrawerThen { vm.openManage() } },
+                    onFilters = { closeDrawerThen { vm.openFilters() } },
+                )
             }
         },
     ) {
@@ -228,10 +271,8 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
                                     onClick = { vm.markAllRead(visible.map { it.id }); menuOpen = false },
                                 )
                                 HorizontalDivider()
-                                DropdownMenuItem(text = { Text("Manage feeds") }, onClick = {
-                                    menuOpen = false
-                                    vm.openManage()
-                                })
+                                DropdownMenuItem(text = { Text("Manage feeds") }, onClick = { menuOpen = false; vm.openManage() })
+                                DropdownMenuItem(text = { Text("Keyword filters") }, onClick = { menuOpen = false; vm.openFilters() })
                                 DropdownMenuItem(text = { Text("Import OPML") }, onClick = {
                                     menuOpen = false
                                     importLauncher.launch(arrayOf("*/*"))
@@ -275,6 +316,23 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
                             }
                         }
                     }
+                    if (mutedCount > 0) {
+                        item(key = "muted") {
+                            Row(
+                                Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    if (state.showMuted) "Showing $mutedCount muted" else "$mutedCount muted article${if (mutedCount == 1) "" else "s"} hidden",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(onClick = { vm.setShowMuted(!state.showMuted) }) { Text(if (state.showMuted) "Hide" else "Show") }
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        }
+                    }
                     if (visible.isEmpty() && state.loaded) {
                         item(key = "empty") {
                             EmptyState(
@@ -287,7 +345,13 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
                         }
                     }
                     items(visible, key = { it.id }) { a ->
-                        ArticleRow(a, feedsById[a.feedId]?.title.orEmpty(), showFeed = state.view !is ReaderView.OneFeed) { vm.openArticle(a.id) }
+                        ArticleRow(
+                            a = a,
+                            feedTitle = feedsById[a.feedId]?.name.orEmpty(),
+                            showFeed = state.view !is ReaderView.OneFeed,
+                            highlight = filters.highlightedBy(a),
+                            muted = filters.mutedBy(a),
+                        ) { vm.openArticle(a.id) }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                 }
@@ -298,8 +362,10 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
     if (showAdd) {
         AddFeedDialog(
             initial = shared ?: "",
+            initialFolder = (state.view as? ReaderView.Folder)?.name ?: "",
+            folders = state.feeds.map { it.folder }.filter { it.isNotEmpty() }.distinct().sorted(),
             onDismiss = { showAdd = false; vm.clearShared() },
-            onAdd = { url -> vm.addFeed(url) },
+            onAdd = { url, folder -> vm.addFeed(url, folder = folder) },
             onAdded = { showAdd = false; vm.clearShared() },
         )
     }
@@ -307,7 +373,7 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
         AlertDialog(
             onDismissRequest = { confirmRemove = null },
             title = { Text("Unsubscribe?") },
-            text = { Text("Remove “${feed.title}” and its saved articles, including starred ones?") },
+            text = { Text("Remove “${feed.name}” and its saved articles, including starred ones?") },
             confirmButton = { TextButton(onClick = { vm.removeFeed(feed.id); confirmRemove = null }) { Text("Unsubscribe") } },
             dismissButton = { TextButton(onClick = { confirmRemove = null }) { Text("Cancel") } },
         )
@@ -315,8 +381,38 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
 }
 
 @Composable
-private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onDiscover: () -> Unit, onManage: () -> Unit, onSelect: (ReaderView) -> Unit) {
+private fun DrawerContent(
+    state: UiState,
+    filters: Filters,
+    unreadByFeed: Map<String, Int>,
+    onSelect: (ReaderView) -> Unit,
+    onToggleFolder: (String) -> Unit,
+    onDiscover: () -> Unit,
+    onManage: () -> Unit,
+    onFilters: () -> Unit,
+) {
     val starred = remember(state.articles) { state.articles.count { it.starred } }
+    val highlighted = remember(state.articles, filters) {
+        state.articles.count { !it.read && filters.highlightedBy(it) != null && filters.mutedBy(it) == null }
+    }
+    val sorted = remember(state.feeds) { state.feeds.sortedBy { it.name.lowercase() } }
+    val folders = remember(state.feeds) { state.feeds.map { it.folder }.filter { it.isNotEmpty() }.distinct().sortedBy { it.lowercase() } }
+
+    @Composable
+    fun FeedItem(f: Feed, indent: Boolean) {
+        NavigationDrawerItem(
+            label = { Text(f.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            icon = { FeedBadge(f) },
+            badge = {
+                if (f.error != null) Icon(Icons.Filled.Warning, "Update failed", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                else Count(unreadByFeed[f.id] ?: 0)
+            },
+            selected = state.view == ReaderView.OneFeed(f.id),
+            onClick = { onSelect(ReaderView.OneFeed(f.id)) },
+            modifier = if (indent) Modifier.padding(start = 20.dp) else Modifier,
+        )
+    }
+
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp)) {
         Text("Reader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
         NavigationDrawerItem(
@@ -333,20 +429,21 @@ private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onDisc
             selected = state.view == ReaderView.Starred,
             onClick = { onSelect(ReaderView.Starred) },
         )
-        NavigationDrawerItem(
-            label = { Text("Discover feeds") },
-            icon = { Icon(Icons.Filled.Search, null) },
-            selected = false,
-            onClick = onDiscover,
-        )
-        if (state.feeds.isNotEmpty()) {
+        if (state.highlight.isNotEmpty()) {
             NavigationDrawerItem(
-                label = { Text("Manage feeds") },
-                icon = { Icon(Icons.Filled.Settings, null) },
-                selected = false,
-                onClick = onManage,
+                label = { Text("Highlights") },
+                icon = { Icon(Icons.Filled.ThumbUp, null) },
+                badge = { Count(highlighted) },
+                selected = state.view == ReaderView.Highlights,
+                onClick = { onSelect(ReaderView.Highlights) },
             )
         }
+        NavigationDrawerItem(label = { Text("Discover feeds") }, icon = { Icon(Icons.Filled.Search, null) }, selected = false, onClick = onDiscover)
+        if (state.feeds.isNotEmpty()) {
+            NavigationDrawerItem(label = { Text("Manage feeds") }, icon = { Icon(Icons.Filled.Settings, null) }, selected = false, onClick = onManage)
+        }
+        NavigationDrawerItem(label = { Text("Keyword filters") }, icon = { Icon(Icons.Filled.Warning, null) }, selected = false, onClick = onFilters)
+
         if (state.feeds.isNotEmpty()) {
             Text(
                 "FEEDS",
@@ -355,18 +452,27 @@ private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onDisc
                 modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
             )
         }
-        state.feeds.sortedBy { it.title.lowercase() }.forEach { f ->
-            NavigationDrawerItem(
-                label = { Text(f.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                icon = { FeedBadge(f) },
-                badge = {
-                    if (f.error != null) Icon(Icons.Filled.Warning, "Update failed", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                    else Count(unreadByFeed[f.id] ?: 0)
-                },
-                selected = state.view == ReaderView.OneFeed(f.id),
-                onClick = { onSelect(ReaderView.OneFeed(f.id)) },
-            )
+        folders.forEach { folder ->
+            val members = sorted.filter { it.folder == folder }
+            val collapsed = folder in state.collapsed
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { onToggleFolder(folder) }) {
+                    Icon(
+                        if (collapsed) Icons.Filled.KeyboardArrowRight else Icons.Filled.KeyboardArrowDown,
+                        if (collapsed) "Expand $folder" else "Collapse $folder",
+                    )
+                }
+                NavigationDrawerItem(
+                    label = { Text(folder, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    badge = { Count(members.sumOf { unreadByFeed[it.id] ?: 0 }) },
+                    selected = state.view == ReaderView.Folder(folder),
+                    onClick = { onSelect(ReaderView.Folder(folder)) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (!collapsed) members.forEach { FeedItem(it, indent = true) }
         }
+        sorted.filter { it.folder.isEmpty() }.forEach { FeedItem(it, indent = false) }
     }
 }
 
@@ -380,53 +486,68 @@ fun FeedBadge(feed: Feed) {
     val hues = listOf(0xFFD4521F, 0xFF2E7D32, 0xFF1565C0, 0xFF6A1B9A, 0xFF00838F, 0xFFAD1457, 0xFF5D4037, 0xFF283593)
     val color = Color(hues[(feed.id.hashCode() and 0x7fffffff) % hues.size])
     Box(Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(color), contentAlignment = Alignment.Center) {
-        Text(feed.title.trim().take(1).uppercase().ifEmpty { "?" }, color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        Text(feed.name.trim().take(1).uppercase().ifEmpty { "?" }, color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-private fun ArticleRow(a: Article, feedTitle: String, showFeed: Boolean, onClick: () -> Unit) {
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+private fun Tag(text: String, color: Color) {
+    Surface(color = color.copy(alpha = 0.14f), shape = RoundedCornerShape(50)) {
+        Text(text, color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+    }
+}
+
+@Composable
+private fun ArticleRow(a: Article, feedTitle: String, showFeed: Boolean, highlight: String?, muted: String?, onClick: () -> Unit) {
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 12.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onClick).alpha(if (muted != null) 0.55f else 1f),
         verticalAlignment = Alignment.Top,
     ) {
-        Box(
-            Modifier.padding(top = 7.dp).size(8.dp).clip(CircleShape)
-                .background(if (a.read) Color.Transparent else MaterialTheme.colorScheme.primary),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val meta = listOfNotNull(feedTitle.takeIf { showFeed && it.isNotEmpty() }, relativeTime(a.date)).joinToString(" · ")
-                Text(meta, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (a.starred) {
-                    Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Filled.Star, "Starred", tint = StarColor, modifier = Modifier.size(14.dp))
+        // Gold edge marks highlighted articles.
+        Box(Modifier.width(3.dp).fillMaxHeight().background(if (highlight != null && muted == null) StarColor else Color.Transparent))
+        Row(Modifier.weight(1f).padding(start = 9.dp, end = 16.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.Top) {
+            Box(
+                Modifier.padding(top = 7.dp).size(8.dp).clip(CircleShape)
+                    .background(if (a.read) Color.Transparent else MaterialTheme.colorScheme.primary),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val meta = listOfNotNull(feedTitle.takeIf { showFeed && it.isNotEmpty() }, relativeTime(a.date)).joinToString(" · ")
+                    Text(meta, style = MaterialTheme.typography.labelMedium, color = mutedColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (a.starred) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Filled.Star, "Starred", tint = StarColor, modifier = Modifier.size(14.dp))
+                    }
+                    when {
+                        muted != null -> { Spacer(Modifier.width(6.dp)); Tag("muted: $muted", mutedColor) }
+                        highlight != null -> { Spacer(Modifier.width(6.dp)); Tag("★ $highlight", StarColor) }
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    a.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (a.read) FontWeight.Normal else FontWeight.SemiBold,
+                    color = if (a.read) mutedColor else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (a.snippet.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(a.snippet, style = MaterialTheme.typography.bodySmall, color = mutedColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                a.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (a.read) FontWeight.Normal else FontWeight.SemiBold,
-                color = if (a.read) muted else MaterialTheme.colorScheme.onSurface,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (a.snippet.isNotEmpty()) {
-                Spacer(Modifier.height(2.dp))
-                Text(a.snippet, style = MaterialTheme.typography.bodySmall, color = muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (a.thumbnail != null) {
+                Spacer(Modifier.width(12.dp))
+                AsyncImage(
+                    model = a.thumbnail,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                )
             }
-        }
-        if (a.thumbnail != null) {
-            Spacer(Modifier.width(12.dp))
-            AsyncImage(
-                model = a.thumbnail,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
-            )
         }
     }
 }
@@ -441,6 +562,7 @@ private fun EmptyState(state: UiState, onSuggest: (String) -> Unit, onAdd: () ->
         val (heading, body) = when {
             state.feeds.isEmpty() -> "Welcome 👋" to "Add a feed to get started. Paste any RSS/Atom link or website address, or tap one of these:"
             state.view == ReaderView.Starred -> "No starred articles" to "Tap ★ on any article to save it here."
+            state.view == ReaderView.Highlights -> "No highlights yet" to "Articles mentioning ${state.highlight.joinToString(", ")} will show up here."
             state.unreadOnly -> "All caught up ✨" to "No unread articles here."
             else -> "No articles yet" to "Pull down to refresh."
         }

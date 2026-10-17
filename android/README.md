@@ -15,6 +15,12 @@ website or a relay.
   Cloud & AI, News, India, Business, Science, Learning) with search and one-tap
   adding, plus quick add for YouTube channels, subreddits, GitHub releases,
   Mastodon accounts and Medium/Substack.
+- **Folders**: group feeds (set when adding, from Discover by topic, or with
+  ✎ in Manage feeds), each with a combined view and unread count; collapse
+  them in the drawer. OPML import/export keeps folders.
+- **Manage feeds**: rename, move to a folder, or unsubscribe (🗑).
+- **Keyword filters**: *mute* words to hide matching articles, *highlight*
+  words to tag them and collect them under Highlights.
 - All / Starred / per-feed views, an "Unread only" filter, mark all as read.
 - Native article reader with inline images and tappable links, plus share and
   "Read on site".

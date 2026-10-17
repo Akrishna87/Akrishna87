@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -65,19 +66,20 @@ fun DiscoverScreen(
     feeds: List<Feed>,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
-    onAdd: suspend (String) -> String?,
+    onAdd: suspend (url: String, folder: String) -> String?,
 ) {
+    var useFolders by rememberSaveable { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     var topic by rememberSaveable { mutableStateOf(Directory.topics.first().name) }
     var query by rememberSaveable { mutableStateOf("") }
     val busy = remember { mutableStateListOf<String>() }
     val subscribed = remember(feeds) { feeds.map { it.id }.toHashSet() }
 
-    fun add(url: String, after: () -> Unit = {}) {
+    fun add(url: String, folder: String = "", after: () -> Unit = {}) {
         if (url in busy) return
         busy.add(url)
         scope.launch {
-            val err = onAdd(url)
+            val err = onAdd(url, folder)
             busy.remove(url)
             if (err != null) snackbar.showSnackbar(err) else after()
         }
@@ -104,7 +106,7 @@ fun DiscoverScreen(
     ) { padding ->
         LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             item(key = "quick") {
-                QuickAdd(busy = busy.isNotEmpty(), onSubmit = { url, clear -> add(url, clear) })
+                QuickAdd(busy = busy.isNotEmpty(), onSubmit = { url, clear -> add(url, after = clear) })
                 HorizontalDivider()
             }
             item(key = "search") {
@@ -131,6 +133,15 @@ fun DiscoverScreen(
                 }
             } else {
                 item(key = "space") { Spacer(Modifier.height(8.dp)) }
+            }
+            item(key = "folders") {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = useFolders, onCheckedChange = { useFolders = it })
+                    Text("Put feeds in a folder named after the topic", style = MaterialTheme.typography.bodyMedium)
+                }
             }
             if (rows.isEmpty()) {
                 item(key = "none") {
@@ -166,7 +177,7 @@ fun DiscoverScreen(
                         entry.url in busy -> Box(Modifier.width(88.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                         }
-                        else -> FilledTonalButton(onClick = { add(entry.url) }) { Text("+ Add") }
+                        else -> FilledTonalButton(onClick = { add(entry.url, folder = if (useFolders) topicName else "") }) { Text("+ Add") }
                     }
                 }
                 HorizontalDivider(Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
