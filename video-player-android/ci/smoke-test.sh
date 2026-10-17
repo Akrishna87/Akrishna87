@@ -20,7 +20,10 @@ fail() {
     echo "On screen:"; grep -o '\(text\|content-desc\)="[^"]\+"' "$OUT/failure.xml" | head -40 || true
   fi
   adb shell dumpsys media_session > "$OUT/session.txt" 2>/dev/null || true
+  echo "Media sessions:"; grep -E "package=|description=|state=PlaybackState" "$OUT/session.txt" | head -20 || true
   adb logcat -d > "$OUT/logcat.txt" || true
+  echo "Player log:"
+  grep -E "ExoPlayer|MediaCodec.*(rror|ail)|AndroidRuntime|Toast|myvideos" "$OUT/logcat.txt" | grep -vE "^.{0,40} [VD] " | tail -40 || true
   exit 1
 }
 dump() {
@@ -140,12 +143,17 @@ echo "PASS: the player's controls show"
 
 echo "--- Media 'next' and 'play' buttons (headphones)"
 adb shell input keyevent KEYCODE_MEDIA_NEXT
-sleep 2
-adb shell input keyevent KEYCODE_MEDIA_PLAY
-sleep 8
-session
+for _ in $(seq 1 10); do
+  sleep 1
+  session
+  grep -q "Smoke Video 2" "$OUT/session.txt" && break
+done
+echo "After 'next': $(grep -oE 'description=[^,]*' "$OUT/session.txt" | head -1)"
 grep -q "Smoke Video 2" "$OUT/session.txt" || fail "the media next button didn't skip to the next video"
+adb shell input keyevent KEYCODE_MEDIA_PLAY
+for _ in $(seq 1 10); do sleep 1; playing && break; done
 playing || fail "the next video isn't playing"
+grep -q "Smoke Video 2" "$OUT/session.txt" || fail "playing moved on from the next video"
 echo "PASS: media buttons skip to the next video and play it"
 
 echo "--- Back to the list: Continue watching"
