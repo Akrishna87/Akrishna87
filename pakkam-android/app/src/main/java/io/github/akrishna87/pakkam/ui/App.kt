@@ -156,7 +156,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // One document at a time: drop any previous viewer or tool screens.
                 while (stack.size > 1) stack.removeAt(stack.lastIndex)
                 stack.add(Screen.Viewer)
-                if (tool != null) stack.add(Screen.Tool(tool))
+                if (tool != null) {
+                    stack.add(Screen.Tool(tool))
+                } else if (startMode == null && settings.opensInReadingMode(uri.toString())) {
+                    // Last read as a book: open as a book again, with page view underneath.
+                    stack.add(Screen.Reading)
+                }
                 launch { s.refreshAnnotations() }
             } catch (e: Exception) {
                 work?.delete()
