@@ -131,6 +131,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.content.FileProvider
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.ui.layout.onSizeChanged
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -338,7 +339,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
         PageList(vs, actions)
 
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
-            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut()) {
+            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { vs.chromeTop = it.height }) {
                 when {
                     vs.searchOpen -> SearchBar(vs)
                     vs.mode != ViewerMode.READ -> EditTopBar(vs, onDone = { finishEditing() })
@@ -404,7 +405,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                 }
             }
             readAloud?.takeIf { it.speaking }?.let { ra -> ReadAloudBar(ra.page, onStop = { ra.stop() }) }
-            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut()) {
+            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { vs.chromeBottom = it.height }) {
                 Surface(tonalElevation = 3.dp, shadowElevation = 6.dp) {
                     Column(Modifier.navigationBarsPadding()) {
                         when (vs.mode) {
