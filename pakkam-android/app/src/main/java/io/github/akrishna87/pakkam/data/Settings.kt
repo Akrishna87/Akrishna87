@@ -96,6 +96,11 @@ class Settings(context: Context) {
 
     fun setReadPosition(uri: String, offset: Int) = prefs.edit().putInt("readPos:$uri", offset).apply()
 
+    /** Whether a document was last read in Reading mode, so it opens that way again. */
+    fun opensInReadingMode(uri: String): Boolean = prefs.getBoolean("readMode:$uri", false)
+
+    fun setOpensInReadingMode(uri: String, on: Boolean) = prefs.edit().putBoolean("readMode:$uri", on).apply()
+
     private inline fun <reified T : Enum<T>> enumValueOrNull(name: String?): T? =
         name?.let { n -> enumValues<T>().firstOrNull { it.name == n } }
 }

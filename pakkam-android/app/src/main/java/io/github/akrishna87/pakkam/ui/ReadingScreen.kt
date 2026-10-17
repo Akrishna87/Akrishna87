@@ -300,6 +300,12 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
         if (pdfPage >= 0) vm.rememberPage(pdfPage)
         vm.back()
     }
+    // Opened in Reading mode next time too, until the reader switches to page view.
+    LaunchedEffect(uriKey) { vm.settings.setOpensInReadingMode(uriKey, true) }
+    fun toPageView() {
+        vm.settings.setOpensInReadingMode(uriKey, false)
+        leave()
+    }
     BackHandler {
         when {
             sheet != null -> sheet = null
@@ -357,7 +363,8 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                     "This PDF seems to be made of pictures of pages (a scan), so there are no words to set as a book. It still reads normally in page view.",
                     color = fg,
                 )
-                Button(onClick = { leave() }) { Text("Back to page view") }
+                LaunchedEffect(Unit) { vm.settings.setOpensInReadingMode(uriKey, false) }
+                Button(onClick = { toPageView() }) { Text("Back to page view") }
             }
             else -> {
                 val b = book!!
@@ -620,6 +627,7 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             pdfPage = b.pdfPageOf(current),
                             unsaved = unsaved,
                             onBack = { leave() },
+                            onPageView = { toPageView() },
                             onNotes = { sheet = ReadSheet.Notes },
                             onSave = { saver.save(null) },
                             onStyle = { sheet = ReadSheet.Style },
@@ -790,6 +798,7 @@ private fun ReadingChrome(
     pdfPage: Int,
     unsaved: Boolean,
     onBack: () -> Unit,
+    onPageView: () -> Unit,
     onNotes: () -> Unit,
     onSave: () -> Unit,
     onStyle: () -> Unit,
@@ -807,7 +816,7 @@ private fun ReadingChrome(
                     IconButton(onClick = onNotes) { Icon(Icons.Filled.EditNote, "Notes and highlights") }
                     IconButton(onClick = onContents) { Icon(Icons.Filled.List, "Chapters") }
                     IconButton(onClick = onStyle) { Icon(Icons.Filled.TextFields, "Text and colours") }
-                    IconButton(onClick = onBack) { Icon(Icons.Filled.PictureAsPdf, "Page view") }
+                    IconButton(onClick = onPageView) { Icon(Icons.Filled.PictureAsPdf, "Page view") }
                 },
             )
         }
