@@ -374,6 +374,12 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                         vs.selection = null
                     },
                     onMark = { vs.markSelection(it) },
+                    highlightColor = vs.highlightColor,
+                    onHighlight = { c ->
+                        vs.highlightColor = c
+                        vs.rememberPen()
+                        vs.markSelection(MarkupKind.HIGHLIGHT)
+                    },
                     // A single word can be looked up in the dictionary.
                     onDefine = sel.text.trim().takeIf { t -> t.isNotEmpty() && t.length <= 40 && t.none { it.isWhitespace() } }?.let { t -> { defineWord = t } },
                 )
@@ -669,21 +675,35 @@ private fun SearchBar(vs: ViewerState) {
 }
 
 @Composable
-private fun SelectionBar(text: String, onCopy: () -> Unit, onMark: (MarkupKind) -> Unit, onDefine: (() -> Unit)? = null) {
+private fun SelectionBar(
+    text: String,
+    onCopy: () -> Unit,
+    onMark: (MarkupKind) -> Unit,
+    highlightColor: Int,
+    onHighlight: (Int) -> Unit,
+    onDefine: (() -> Unit)? = null,
+) {
     Surface(
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 6.dp,
         shadowElevation = 6.dp,
     ) {
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (onDefine != null) {
-                TextButton(onClick = onDefine) { Icon(Icons.Filled.MenuBook, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Define") }
+        Column(Modifier.padding(4.dp)) {
+            // Tapping a colour highlights the chosen text in it straight away.
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.BorderColor, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                ColorDots(HIGHLIGHT_COLORS, highlightColor, onHighlight)
             }
-            TextButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Copy") }
-            TextButton(onClick = { onMark(MarkupKind.HIGHLIGHT) }) { Icon(Icons.Filled.BorderColor, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Highlight") }
-            TextButton(onClick = { onMark(MarkupKind.UNDERLINE) }) { Icon(Icons.Filled.FormatUnderlined, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Underline") }
-            TextButton(onClick = { onMark(MarkupKind.STRIKEOUT) }) { Icon(Icons.Filled.FormatStrikethrough, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Strike") }
+            Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                if (onDefine != null) {
+                    TextButton(onClick = onDefine) { Icon(Icons.Filled.MenuBook, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Define") }
+                }
+                TextButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Copy") }
+                TextButton(onClick = { onMark(MarkupKind.UNDERLINE) }) { Icon(Icons.Filled.FormatUnderlined, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Underline") }
+                TextButton(onClick = { onMark(MarkupKind.STRIKEOUT) }) { Icon(Icons.Filled.FormatStrikethrough, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Strike") }
+            }
         }
     }
 }

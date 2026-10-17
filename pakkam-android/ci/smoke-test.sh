@@ -253,9 +253,9 @@ wait_for define-sheet 'the most interesting or memorable part' 20 "Define didn't
 shot 07b-define
 adb shell input keyevent KEYCODE_BACK
 sleep 2
-# Copying ends the selection without leaving the document.
+# A colour in the selection bar highlights the chosen word in it.
 dump define-done
-tap define-done "Copy"
+tap define-done "Green"
 sleep 1
 echo "PASS: define in page view"
 
@@ -286,8 +286,8 @@ adb shell input swipe "$ax" "$ay" "$bx" "$by" 800
 sleep 1
 dump hl-done
 show hl-done
-# Two marks from Reading mode wait to be saved too.
-grep -q 'Highlight · 3 changes' "$OUT/hl-done.xml" || fail "dragging over the text didn't highlight it"
+# Two marks from Reading mode and the green one wait to be saved too.
+grep -q 'Highlight · 4 changes' "$OUT/hl-done.xml" || fail "dragging over the text didn't highlight it"
 tap hl-done "Draw"
 sleep 1
 dump draw
@@ -298,7 +298,7 @@ adb shell input swipe "$cx" "$cy" "$dx" "$dy" 600
 sleep 1
 shot 08-comment
 dump drawn
-grep -Eq 'Draw · 4 changes' "$OUT/drawn.xml" || fail "the highlight and the drawing weren't both recorded"
+grep -Eq 'Draw · 5 changes' "$OUT/drawn.xml" || fail "the highlight and the drawing weren't both recorded"
 tap drawn "Done"
 wait_for applied 'text="Comment"' 30 "Done didn't go back to reading"
 grep -q 'Not saved yet' "$OUT/applied.xml" || fail "the document isn't marked as changed"

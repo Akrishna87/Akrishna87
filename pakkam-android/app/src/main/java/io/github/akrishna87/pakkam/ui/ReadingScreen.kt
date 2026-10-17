@@ -45,6 +45,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -526,6 +527,9 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                         val mark = hit?.let { g -> marksNow.value.firstOrNull { g >= it.start && g <= it.end } }
                         when {
                             mark != null -> openMark = mark.start
+                            // With the menus showing, any tap puts them away; the top of the page or,
+                            // when scrolling, anywhere brings them back, as in an ebook reader.
+                            chrome || style.scroll || o.y < h * 0.15f -> chrome = !chrome
                             o.x < w * 0.28f -> scope.launch {
                                 if (style.scroll) scroller.animateScrollBy(-h * 0.85f) else if (pager.currentPage > 0) pager.animateScrollToPage(pager.currentPage - 1)
                             }
@@ -747,17 +751,19 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                                     val (chunk, s0, e0) = sel
                                     val start = b.bases[chunk] + s0
                                     val end = b.bases[chunk] + e0
+                                    // Highlight the word in any colour, or add a note to it.
+                                    Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Highlight", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 12.dp))
+                                        ColorDots(HIGHLIGHT_COLORS, highlightColor) { col ->
+                                            highlightColor = col
+                                            vm.settings.highlightColor = col
+                                            if (addHighlight(start, end, col)) {
+                                                lookup = null
+                                                picked = null
+                                            }
+                                        }
+                                    }
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        AssistChip(
-                                            onClick = {
-                                                if (addHighlight(start, end, highlightColor)) {
-                                                    lookup = null
-                                                    picked = null
-                                                }
-                                            },
-                                            label = { Text("Highlight") },
-                                            leadingIcon = { Box(Modifier.size(16.dp).background(Color(highlightColor), CircleShape)) },
-                                        )
                                         AssistChip(
                                             onClick = {
                                                 lookup = null
@@ -1006,10 +1012,11 @@ private fun ReadSelectionBar(
 ) {
     Surface(modifier, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp), tonalElevation = 6.dp, shadowElevation = 8.dp) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            // Tapping a colour highlights the chosen words in it straight away.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Highlight", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 12.dp))
-                ColorDots(HIGHLIGHT_COLORS.take(4), color, onColor)
-                Spacer(Modifier.weight(1f))
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ColorDots(HIGHLIGHT_COLORS, color, onColor)
+                }
                 IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Close") }
             }
             Row {

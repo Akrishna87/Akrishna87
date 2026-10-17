@@ -73,6 +73,7 @@ val HIGHLIGHT_COLORS = listOf(
     0xFF40C4FF.toInt() to "Blue",
     0xFFFF80AB.toInt() to "Pink",
     0xFFFFAB40.toInt() to "Orange",
+    0xFFB388FF.toInt() to "Purple",
 )
 
 @Composable
