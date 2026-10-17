@@ -1,63 +1,59 @@
-# RSS Reader for Android
+# Reader: native RSS reader for Android
 
-A native Android app for the [RSS Reader](../docs/rss-reader/), built as a
-**Trusted Web Activity**: a small app shell that opens the live web app full
-screen in Chrome's engine. Because it runs the real web app, it always has the
-latest version, and Google sign-in, sync, offline reading and the share sheet
-all keep working.
+A standalone Android app written in Kotlin with Jetpack Compose. It fetches,
+parses and stores feeds itself, on the phone. It doesn't need Chrome, a
+website or a relay.
 
 **Download:** <https://github.com/Akrishna87/Akrishna87/releases/latest/download/rss-reader.apk>
 
+## Features
+
+- Subscribe by feed URL **or website address**: the app finds the site's feed.
+  YouTube channel, subreddit, GitHub project, Medium and Substack links work too.
+- RSS 2.0, RSS 1.0/RDF and Atom, including podcast and YouTube feeds.
+- **Discover feeds**: a directory of 38 popular feeds across 7 topics (Tech,
+  Cloud & AI, News, India, Business, Science, Learning) with search and one-tap
+  adding, plus quick add for YouTube channels, subreddits, GitHub releases,
+  Mastodon accounts and Medium/Substack.
+- **Folders**: group feeds (set when adding, from Discover by topic, or with
+  ✎ in Manage feeds), each with a combined view and unread count; collapse
+  them in the drawer. OPML import/export keeps folders.
+- **Manage feeds**: rename, move to a folder, or unsubscribe (🗑).
+- **Keyword filters**: *mute* words to hide matching articles, *highlight*
+  words to tag them and collect them under Highlights.
+- All / Starred / per-feed views, an "Unread only" filter, mark all as read.
+- Native article reader with inline images and tappable links, plus share and
+  "Read on site".
+- Pull to refresh; refreshes automatically when opened (if older than 15 minutes).
+- Works offline: articles are saved on the phone.
+- OPML import/export (bring feeds over from the web reader or any other app:
+  web reader ⚙ Settings → Export OPML, then here ⋮ → Import OPML).
+- Share a link to **Reader** from any app to subscribe to it.
+- Material You colours on Android 12+, dark mode.
+
 ## Installing
 
-1. Open the download link above on your Android phone.
-2. Open the downloaded `rss-reader.apk`. If Android asks, allow your browser
-   (or Files app) to **install unknown apps**, then tap **Install**.
-3. Open **Reader** from your app drawer and sign in to sync (⚙ Settings).
+1. Open the download link on your phone and open `rss-reader.apk`.
+2. Allow installing from your browser if Android asks, then tap **Install**.
+   If Play Protect warns about an unknown app, tap **More details → Install anyway**.
 
-Updates: download and install the newest APK the same way. It installs over
-the old one and keeps your data. The reader itself updates on its own, since
-it's the live web app; a new APK is only needed if this Android shell changes.
+New versions install over the old one and keep your feeds.
 
-## How it's built
+## Code
+
+- `app/src/main/java/.../data/`: plain Kotlin, no Android dependencies:
+  feed parser (`FeedParser.kt`), networking and feed discovery (`Net.kt`),
+  OPML, storage (`Store.kt`).
+- `ReaderViewModel.kt`: app state and actions.
+- `ui/`: Compose screens.
+
+## Building
 
 `.github/workflows/android-apk.yml` builds and signs the APK on every change
 to `android/` (or on demand from the Actions tab → *Android APK* → *Run
 workflow*) and publishes it as a GitHub Release.
 
-### Signing
-
-- `app/release.p12` is the app's signing key, encrypted (PKCS12, AES-256).
-- Its password is the **`ANDROID_KEYSTORE_PASSWORD`** repository secret
-  (Settings → Secrets and variables → Actions). Keep a copy of the password
-  somewhere safe. Without it, future versions can't be signed with the
-  same key and won't install over the existing app.
-- Certificate SHA-256 fingerprint:
-  `4A:EA:B4:00:4B:A2:B3:73:25:1C:D8:E3:FB:1A:DF:0A:B0:78:45:1D:C2:12:46:06:AE:E6:A0:0D:EF:D4:49:4D`
-
-### No address bar: Digital Asset Links
-
-Android only hides the browser address bar once the website confirms the app
-belongs to it. That's the file
-`https://akrishna87.github.io/.well-known/assetlinks.json`, served from the
-`Akrishna87.github.io` repository (with an empty `.nojekyll` file so GitHub
-Pages serves the `.well-known` folder):
-
-```json
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "io.github.akrishna87.rssreader",
-      "sha256_cert_fingerprints": [
-        "4A:EA:B4:00:4B:A2:B3:73:25:1C:D8:E3:FB:1A:DF:0A:B0:78:45:1D:C2:12:46:06:AE:E6:A0:0D:EF:D4:49:4D"
-      ]
-    }
-  }
-]
-```
-
-Until that file is live, the app works but shows a slim address bar at the top.
-If it still shows after the file is up, clear the app's storage once
-(Settings → Apps → Reader → Storage → Clear storage) so Android re-checks.
+The signing key `app/release.p12` is committed encrypted (PKCS12, AES-256).
+Its password is the **`ANDROID_KEYSTORE_PASSWORD`** repository secret.
+Keep a copy of it: without it, new versions can't be signed with the same key
+and won't install over the existing app.

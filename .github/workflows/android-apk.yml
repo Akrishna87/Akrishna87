@@ -1,5 +1,5 @@
-# Builds the RSS Reader Android app (a Trusted Web Activity wrapping the
-# live web app) and publishes the signed APK as a GitHub Release.
+# Builds the native RSS Reader Android app (Kotlin + Jetpack Compose) and
+# publishes the signed APK as a GitHub Release.
 # Latest download: https://github.com/Akrishna87/Akrishna87/releases/latest/download/rss-reader.apk
 name: Android APK
 
@@ -64,11 +64,11 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: rss-reader-v1.0.${{ github.run_number }}
-          name: RSS Reader for Android 1.0.${{ github.run_number }}
+          tag_name: rss-reader-v2.0.${{ github.run_number }}
+          name: RSS Reader for Android 2.0.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: rss-reader.apk
           body: |
             Install on Android: download **rss-reader.apk** below on your phone, open it, and allow installing from your browser when asked.
-            Updates install over the previous version. The app always runs the latest web version of the reader.
+            A native Android app: it fetches and stores feeds itself and doesn't need Chrome. Updates install over the previous version and keep your feeds.
