@@ -1,0 +1,8 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+# Built from Open English WordNet by ci/build_dictionary.py
+app/src/main/assets/dictionary.db

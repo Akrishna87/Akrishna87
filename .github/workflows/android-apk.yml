@@ -1,0 +1,74 @@
+# Builds the native RSS Reader Android app (Kotlin + Jetpack Compose) and
+# publishes the signed APK as a GitHub Release.
+# Latest download: https://github.com/Akrishna87/Akrishna87/releases/latest/download/rss-reader.apk
+name: Android APK
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secret
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Add the ANDROID_KEYSTORE_PASSWORD repository secret (Settings → Secrets and variables → Actions). See android/README.md."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          # The action's default list includes the long-removed "tools" package.
+          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build signed APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          # Ignore stray spaces/newlines picked up when the secret was pasted.
+          export ANDROID_KEYSTORE_PASSWORD="$(printf '%s' "$ANDROID_KEYSTORE_PASSWORD" | tr -d '[:space:]')"
+          if ! keytool -list -storetype pkcs12 -keystore android/app/release.p12 -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::ANDROID_KEYSTORE_PASSWORD doesn't unlock android/app/release.p12 (secret is ${#ANDROID_KEYSTORE_PASSWORD} characters; it should be 32). Re-enter it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          gradle -p android assembleRelease --no-daemon
+          cp android/app/build/outputs/apk/release/app-release.apk rss-reader.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rss-reader-apk
+          path: rss-reader.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rss-reader-v2.0.${{ github.run_number }}
+          name: RSS Reader for Android 2.0.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: rss-reader.apk
+          body: |
+            Install on Android: download **rss-reader.apk** below on your phone, open it, and allow installing from your browser when asked.
+            A native Android app: it fetches and stores feeds itself and doesn't need Chrome. Updates install over the previous version and keep your feeds.
