@@ -148,6 +148,17 @@
     },
     {
       "repo": "Akrishna87",
+      "tag": "selavu-latest",
+      "apk": "Selavu.apk",
+      "group": "Everyday",
+      "name": "Selavu",
+      "nameLocal": "செலவு",
+      "tagline": "Track spending and income, with budgets, repeating bills and charts. All on your phone.",
+      "emoji": "👛",
+      "hue": 22
+    },
+    {
+      "repo": "Akrishna87",
       "tag": "pakkam-latest",
       "apk": "Pakkam.apk",
       "group": "Everyday",

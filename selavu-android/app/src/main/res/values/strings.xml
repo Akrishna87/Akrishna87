@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Selavu</string>
+    <string name="shortcut_expense">Add expense</string>
+    <string name="shortcut_income">Add income</string>
+</resources>

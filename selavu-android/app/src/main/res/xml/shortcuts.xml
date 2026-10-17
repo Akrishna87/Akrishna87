@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon for these. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_expense"
+        android:shortcutId="add_expense"
+        android:shortcutShortLabel="@string/shortcut_expense">
+        <intent
+            android:action="io.github.akrishna87.selavu.ADD_EXPENSE"
+            android:targetClass="io.github.akrishna87.selavu.MainActivity"
+            android:targetPackage="io.github.akrishna87.selavu" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_income"
+        android:shortcutId="add_income"
+        android:shortcutShortLabel="@string/shortcut_income">
+        <intent
+            android:action="io.github.akrishna87.selavu.ADD_INCOME"
+            android:targetClass="io.github.akrishna87.selavu.MainActivity"
+            android:targetPackage="io.github.akrishna87.selavu" />
+    </shortcut>
+</shortcuts>
