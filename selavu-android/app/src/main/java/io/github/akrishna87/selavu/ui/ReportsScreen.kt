@@ -241,7 +241,7 @@ fun CategoryDetailScreen(vm: AppViewModel, ledger: Ledger, categoryId: String, p
     val category = ledger.category(categoryId)
     val period = vm.period()
     val today = LocalDate.now()
-    val items = ledger.transactions.inPeriod(period).filter { it.categoryId == categoryId }.sortedByDescending { it.date }
+    val entries = ledger.transactions.inPeriod(period).filter { it.categoryId == categoryId }.sortedByDescending { it.date }
     Column(Modifier.fillMaxSize().padding(padding)) {
         TopAppBar(
             windowInsets = WindowInsets(0),
@@ -254,12 +254,12 @@ fun CategoryDetailScreen(vm: AppViewModel, ledger: Ledger, categoryId: String, p
         LazyColumn(Modifier.weight(1f)) {
             item {
                 SectionHeader(
-                    "${items.size} ${if (items.size == 1) "entry" else "entries"}",
-                    Money.format(items.sumOf { it.amount }, ledger.settings.currency),
+                    "${entries.size} ${if (entries.size == 1) "entry" else "entries"}",
+                    Money.format(entries.sumOf { it.amount }, ledger.settings.currency),
                 )
             }
-            if (items.isEmpty()) item { EmptyState("🗂️", "Nothing in this period", "Try another period with the arrows above.") }
-            items(items, key = { it.id }) { t ->
+            if (entries.isEmpty()) item { EmptyState("🗂️", "Nothing in this period", "Try another period with the arrows above.") }
+            items(entries, key = { it.id }) { t ->
                 TransactionRow(t, category, ledger.settings.currency, subtitle = dayHeading(t.date, today)) {
                     vm.open(Screen.Edit(t.type, t.id))
                 }

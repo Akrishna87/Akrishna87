@@ -147,7 +147,7 @@ fun EditScreen(vm: AppViewModel, ledger: Ledger, startType: TxType, txId: String
                 textStyle = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Bold, color = amountColor(type)),
                 singleLine = true,
                 isError = triedSave && amount == null,
-                supportingText = if (triedSave && amount == null) ({ Text("Enter an amount") }) else null,
+                supportingText = { if (triedSave && amount == null) Text("Enter an amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { save() }),
             )

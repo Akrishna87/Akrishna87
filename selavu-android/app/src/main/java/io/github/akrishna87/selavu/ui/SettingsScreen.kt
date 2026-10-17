@@ -79,7 +79,7 @@ fun SettingsScreen(vm: AppViewModel, ledger: Ledger, padding: PaddingValues) {
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         uri?.let(vm::exportCsv)
     }
-    val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(vm::importCsv)
     }
 
@@ -147,7 +147,7 @@ fun SettingsScreen(vm: AppViewModel, ledger: Ledger, padding: PaddingValues) {
             ListItem(
                 headlineContent = { Text("Import from a file") },
                 supportingContent = { Text("Columns Date, Type, Category, Amount, Note. Entries already here are skipped.") },
-                modifier = Modifier.clickable { import.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream")) },
+                modifier = Modifier.clickable { importer.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream")) },
             )
         }
         item {
