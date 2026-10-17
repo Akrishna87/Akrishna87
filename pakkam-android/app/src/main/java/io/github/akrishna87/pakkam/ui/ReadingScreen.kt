@@ -299,15 +299,29 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
         }
     }
 
-    fun leave() {
+    // Opened in Reading mode next time too, until the reader switches to page view.
+    LaunchedEffect(uriKey) { vm.settings.setOpensInReadingMode(uriKey, true) }
+    /** To page view, which the file then opens in next time. */
+    fun toPageView() {
+        vm.settings.setOpensInReadingMode(uriKey, false)
         if (pdfPage >= 0) vm.rememberPage(pdfPage)
         vm.back()
     }
-    // Opened in Reading mode next time too, until the reader switches to page view.
-    LaunchedEffect(uriKey) { vm.settings.setOpensInReadingMode(uriKey, true) }
-    fun toPageView() {
-        vm.settings.setOpensInReadingMode(uriKey, false)
-        leave()
+    val saver = rememberDocSaver(vm, session) { pdfPage.coerceAtLeast(0) }
+    var askToSave by remember { mutableStateOf(false) }
+    /** Back closes the book, like an ebook reader, asking first about highlights and notes not yet saved. */
+    fun leave() {
+        if (session.dirty || session.edits.isNotEmpty()) {
+            askToSave = true
+            return
+        }
+        if (pdfPage >= 0) vm.rememberPage(pdfPage)
+        vm.leaveDocument()
+    }
+    fun leaveNow() {
+        askToSave = false
+        if (pdfPage >= 0) vm.rememberPage(pdfPage)
+        vm.leaveDocument()
     }
     BackHandler {
         when {
@@ -316,7 +330,25 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
             else -> leave()
         }
     }
-    val saver = rememberDocSaver(vm, session) { pdfPage.coerceAtLeast(0) }
+    if (askToSave) {
+        AlertDialog(
+            onDismissRequest = { askToSave = false },
+            title = { Text("Save your changes?") },
+            text = { Text("Your highlights, notes or other changes to “${session.name}” haven't been saved.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    askToSave = false
+                    saver.save { leaveNow() }
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { askToSave = false }) { Text("Cancel") }
+                    TextButton(onClick = { leaveNow() }) { Text("Don't save") }
+                }
+            },
+        )
+    }
 
     // Light or dark status-bar icons to suit the page colour.
     val view = LocalView.current

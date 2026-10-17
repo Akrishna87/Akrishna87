@@ -21,7 +21,8 @@ documents never leave the phone.
 - Day, Night and Sepia modes; keep the screen on; go to page; remembers where you stopped
 - **Reading mode**, like a Kindle: the text is lifted out of the page layout and set as a book you turn page by page,
   in your choice of font, size, line spacing, margins and page colour (white, sepia, green, black), with a chapter list,
-  a page slider and your place remembered. Pinch to change the text size. A PDF last read this way opens this way again. **Long-press any word** to see its meaning, offline, from the built-in
+  a page slider and your place remembered. Pinch to change the text size; tap the top of the page for the menus. Back closes the book, and a PDF last
+  read this way opens this way again. **Long-press any word** to see its meaning, offline, from the built-in
   English dictionary (also **Define** on a selected word in page view), with buttons for your translate apps and the web.
   **Highlight and add notes** as you read: hold a word and slide to choose more, then pick a colour or write a note;
   tap a highlight to change or remove it, and see them all under *Notes and highlights*. They are saved as ordinary
