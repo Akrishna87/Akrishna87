@@ -101,16 +101,19 @@ Friends can also be offered the update inside the app, without coming back here:
    (Alaimaani has no `INTERNET` permission today, which is part of what it promises. Add the
    updater there only if you're happy to give that up.)
 
-3. **Check on launch** and show a button:
+3. **Check for updates** (on launch, or only when the user taps a button) and show the answer:
 
    ```kotlin
    val updater = AppUpdater(context, "Akrishna87", "isaialai", "music-player-latest")
 
    // in a coroutine, e.g. viewModelScope.launch { ... }
-   val update = updater.checkForUpdate()          // null when up to date
-   if (update != null) { /* show "Update to ${update.versionName}" */ }
+   when (val result = updater.checkForUpdate()) {
+       is UpdateCheck.Available -> { /* show "Update to ${result.update.versionName}" */ }
+       UpdateCheck.UpToDate -> { /* "You have the latest build" */ }
+       is UpdateCheck.Failed -> { /* show result.reason, e.g. "No connection to GitHub right now" */ }
+   }
 
-   // when the user taps it:
+   // when the user taps the update button:
    if (!updater.canInstall()) updater.openInstallPermissionScreen()   // one-time Android setting
    else updater.downloadAndInstall(update) { percent -> /* progress */ }
    ```
@@ -119,8 +122,14 @@ Friends can also be offered the update inside the app, without coming back here:
    against the SHA-256 in `version.json` first, and Android refuses it unless it is signed with the same
    key as the installed app.
 
-> `AppUpdater.kt` has not been compiled or run on a device yet. Try it in one app first
-> (Isaialai is a good one, since its CI already runs an emulator smoke test).
+> **Status.** Isaialai is the first app to use it (Settings → App updates → Check for updates; see
+> `ui/UpdateCard.kt` and `ci/updater-test.sh` in that repo for a worked example). The code compiles in a
+> real release build, and its check runs on the emulator in Isaialai's CI, where it reaches GitHub and
+> shows the right message. The download-and-install half can only be tried once a newer build than the
+> installed one is published, so it hasn't been exercised yet.
+>
+> Isaialai also promised "no internet access", which the updater can't keep. It now says it goes
+> online only when you tap **Check for updates** (see its `SECURITY.md`). Decide that trade for each app.
 
 ## Limits worth knowing
 

@@ -9,12 +9,16 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 import java.security.MessageDigest
 
 /** A newer build than the one that is installed. */
@@ -26,6 +30,14 @@ data class AppUpdate(
     val sizeBytes: Long,
 )
 
+/** What [AppUpdater.checkForUpdate] found. */
+sealed interface UpdateCheck {
+    data object UpToDate : UpdateCheck
+    data class Available(val update: AppUpdate) : UpdateCheck
+    /** [reason] is a short sentence that is fine to show to the user. */
+    data class Failed(val reason: String) : UpdateCheck
+}
+
 /**
  * Checks GitHub for a newer build of this app and installs it.
  *
@@ -36,10 +48,13 @@ data class AppUpdate(
  * install silently, and it will only accept the update if it is signed with the same key.
  *
  *     val updater = AppUpdater(context, "Akrishna87", "isaialai", "music-player-latest")
- *     val update = updater.checkForUpdate()          // null when up to date or offline
- *     if (update != null) {
- *         if (!updater.canInstall()) updater.openInstallPermissionScreen()
- *         else updater.downloadAndInstall(update) { percent -> /* show progress */ }
+ *     when (val result = updater.checkForUpdate()) {
+ *         is UpdateCheck.Available -> {
+ *             if (!updater.canInstall()) updater.openInstallPermissionScreen()
+ *             else updater.downloadAndInstall(result.update) { percent -> /* show progress */ }
+ *         }
+ *         UpdateCheck.UpToDate -> { /* nothing to do */ }
+ *         is UpdateCheck.Failed -> { /* show result.reason, or stay quiet on an automatic check */ }
  *     }
  *
  * Call it while the app is on screen. All three suspend functions switch to Dispatchers.IO
@@ -65,24 +80,37 @@ class AppUpdater(
     @Suppress("DEPRECATION")
     private fun legacyVersionCode(info: android.content.pm.PackageInfo) = info.versionCode.toLong()
 
-    /** Returns the newer build, or null if this one is current or GitHub can't be reached. */
-    suspend fun checkForUpdate(): AppUpdate? = withContext(Dispatchers.IO) {
+    /** Asks GitHub whether a newer build than the one running is published. */
+    suspend fun checkForUpdate(): UpdateCheck = withContext(Dispatchers.IO) {
         try {
             val json = JSONObject(open(base + "version.json").inputStream.use { it.reader().readText() })
             val code = json.getLong("versionCode")
-            if (code <= installedVersionCode()) return@withContext null
-            AppUpdate(
-                versionCode = code,
-                versionName = json.optString("versionName", code.toString()),
-                apkUrl = base + Uri.encode(json.getString("apk")),
-                sha256 = json.optString("sha256").ifEmpty { null },
-                sizeBytes = json.optLong("size", -1),
+            if (code <= installedVersionCode()) return@withContext UpdateCheck.UpToDate
+            UpdateCheck.Available(
+                AppUpdate(
+                    versionCode = code,
+                    versionName = json.optString("versionName", code.toString()),
+                    apkUrl = base + Uri.encode(json.getString("apk")),
+                    sha256 = json.optString("sha256").ifEmpty { null },
+                    sizeBytes = json.optLong("size", -1),
+                )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            // Offline, or the release is being rebuilt right now. Try again next launch.
-            Log.i(TAG, "No update info: ${e.message}")
-            null
+            // Offline, or the release is being rebuilt right now. Try again later.
+            Log.i(TAG, "No update info: $e")
+            UpdateCheck.Failed(explain(e))
         }
+    }
+
+    private fun explain(e: Exception): String = when {
+        e is UnknownHostException || e is ConnectException || e is SocketTimeoutException ->
+            "No connection to GitHub right now"
+        e is IOException && e.message?.startsWith("HTTP 404") == true ->
+            "No update has been published yet"
+        e is IOException -> "Couldn't reach GitHub"
+        else -> "Couldn't read the update information"
     }
 
     /** On Android 8+ the user must allow this app to install apps. */
@@ -146,6 +174,7 @@ class AppUpdater(
             }
         } catch (e: Exception) {
             runCatching { installer.abandonSession(id) }
+            if (e is CancellationException) throw e
             throw if (e is IOException) e else IOException(e.message, e)
         }
     }
