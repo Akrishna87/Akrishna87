@@ -1,26 +1,21 @@
 plugins {
     id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "org.jetbrains.kotlin.plugin.compose"
 }
-
-// The app is a Trusted Web Activity: a thin native shell that opens the
-// live web app (in Chrome, full screen) — so it always runs the latest
-// version and keeps Google sign-in, offline mode and sync.
-// The URLs themselves are in res/values/strings.xml.
-def siteHost = "akrishna87.github.io"
 
 android {
     namespace "io.github.akrishna87.rssreader"
     compileSdk 34
 
     defaultConfig {
+        // Same id + signing key as the earlier Chrome-based app, so this installs over it.
         applicationId "io.github.akrishna87.rssreader"
-        minSdk 21
+        minSdk 26
         targetSdk 34
         // CI passes the workflow run number so every build installs over the last.
         versionCode((System.getenv("VERSION_CODE") ?: "1") as int)
-        versionName "1.0." + (System.getenv("VERSION_CODE") ?: "0")
-
-        manifestPlaceholders = [hostName: siteHost]
+        versionName "2.0." + (System.getenv("VERSION_CODE") ?: "0")
     }
 
     signingConfigs {
@@ -42,12 +37,30 @@ android {
         }
     }
 
+    buildFeatures {
+        compose true
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
-    implementation "com.google.androidbrowserhelper:androidbrowserhelper:2.5.0"
+    implementation platform("androidx.compose:compose-bom:2024.09.03")
+    implementation "androidx.compose.ui:ui"
+    implementation "androidx.compose.foundation:foundation"
+    implementation "androidx.compose.material3:material3"
+    implementation "androidx.compose.material:material-icons-core"
+    implementation "androidx.activity:activity-compose:1.9.2"
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6"
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:2.8.6"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+    implementation "io.coil-kt:coil-compose:2.7.0"
 }
