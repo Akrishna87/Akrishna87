@@ -20,6 +20,8 @@ data class MarkupEdit(
     val rects: List<PdfRect>,
     val color: Int,
     val text: String,
+    /** The reader's own comment on it; when there is none, the marked text is kept as the comment. */
+    val note: String = "",
 ) : Edit
 
 data class InkEdit(
@@ -93,6 +95,8 @@ data class AnnotInfo(
     val contents: String,
     val author: String,
     val color: Int?,
+    /** For highlights and other text markup: the box of each marked line. */
+    val quads: List<PdfRect> = emptyList(),
 ) {
     val label: String
         get() = when (subtype) {

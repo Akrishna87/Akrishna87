@@ -120,7 +120,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.akrishna87.pakkam.data.Files
 import io.github.akrishna87.pakkam.data.PaperTheme
-import io.github.akrishna87.pakkam.data.RecentFile
 import io.github.akrishna87.pakkam.data.Signatures
 import io.github.akrishna87.pakkam.data.ViewMode
 import io.github.akrishna87.pakkam.pdf.MarkupKind
@@ -130,6 +129,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.content.FileProvider
+import androidx.compose.material.icons.filled.PhotoCamera
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -143,6 +144,7 @@ private sealed interface ViewerDialog {
     data object Info : ViewerDialog
     data class Sign(val initials: Boolean) : ViewerDialog
     data class Draw(val initials: Boolean) : ViewerDialog
+    data class Photo(val initials: Boolean, val uri: Uri) : ViewerDialog
     data object Panels : ViewerDialog
 }
 
@@ -153,7 +155,6 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
     val startPage = remember(session) { vm.recentsStore.get(session.uri.toString())?.lastPage ?: 0 }
     val vs = remember(session) { ViewerState(session, scope, vm.settings, startPage) }
     var dialog by remember { mutableStateOf<ViewerDialog?>(null) }
-    var afterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
     var defineWord by remember { mutableStateOf<String?>(null) }
     val links = remember(session) { HashMap<Int, List<PageLink>>() }
     LaunchedEffect(session.version) { links.clear() }
@@ -203,42 +204,9 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
     }
 
     // ---- Saving ----
-    val saveCopy = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri: Uri? ->
-        val then = afterSave
-        afterSave = null
-        if (uri == null) return@rememberLauncherForActivityResult
-        vm.task("Saving a copy…", {
-            session.applyEdits()
-            withContext(Dispatchers.IO) { Files.writeTo(context, session.workFile, uri) }
-            Files.keepAccess(context, uri)
-            val name = withContext(Dispatchers.IO) { Files.displayName(context, uri) }
-            session.saved(uri, name)
-            session.canWriteBack = withContext(Dispatchers.IO) { Files.canWrite(context, uri) }
-            vm.recentsStore.put(RecentFile(uri.toString(), name, session.workFile.length(), session.doc.pageCount, vs.currentPage, System.currentTimeMillis(), false))
-            vm.refreshRecents()
-        }) {
-            vm.say("Saved as ${session.name}")
-            then?.invoke()
-        }
-    }
-    fun saveAs(then: (() -> Unit)? = null) {
-        afterSave = then
-        saveCopy.launch(Files.baseName(session.name) + " (edited).pdf")
-    }
-    fun save(then: (() -> Unit)? = null) {
-        if (!session.canWriteBack) {
-            saveAs(then)
-            return
-        }
-        vm.task("Saving…", {
-            session.applyEdits()
-            withContext(Dispatchers.IO) { Files.writeTo(context, session.workFile, session.uri) }
-            session.saved()
-        }) {
-            vm.say("Saved")
-            then?.invoke()
-        }
-    }
+    val saver = rememberDocSaver(vm, session) { vs.currentPage }
+    fun saveAs(then: (() -> Unit)? = null) = saver.saveAs(then)
+    fun save(then: (() -> Unit)? = null) = saver.save(then)
     fun finishEditing() {
         vs.placement = null
         vs.selection = null
@@ -280,6 +248,40 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
             val s = session.doc.pageSizes[page]
             vs.placement = imagePlacement(page, bmp.width, bmp.height, s.width, s.height, f, "Picture", 0.5f)
         }
+    }
+
+    // ---- Signatures from a photo of paper ----
+    var photoForInitials by remember { mutableStateOf(false) }
+    var pendingShot by remember { mutableStateOf<Uri?>(null) }
+    val pickSignPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
+        if (uri != null) dialog = ViewerDialog.Photo(photoForInitials, uri)
+    }
+    val shootSignPhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok: Boolean ->
+        val u = pendingShot
+        pendingShot = null
+        if (ok && u != null) dialog = ViewerDialog.Photo(photoForInitials, u)
+    }
+    fun signFromPhoto(initials: Boolean, camera: Boolean) {
+        photoForInitials = initials
+        dialog = null
+        if (!camera) {
+            pickSignPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            return
+        }
+        val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+        val u = FileProvider.getUriForFile(context, "${context.packageName}.files", File(dir, "signature-${System.currentTimeMillis()}.jpg"))
+        pendingShot = u
+        try {
+            shootSignPhoto.launch(u)
+        } catch (e: Exception) {
+            vm.say("No camera app was found")
+        }
+    }
+    fun placeSignature(bmp: android.graphics.Bitmap, initials: Boolean) {
+        val f = vm.signatures.add(bmp, initials)
+        val page = vs.currentPage
+        val s = session.doc.pageSizes[page]
+        vs.placement = imagePlacement(page, bmp.width, bmp.height, s.width, s.height, f, if (initials) "Initials" else "Signature", if (initials) 0.12f else 0.3f)
     }
 
     BackHandler {
@@ -486,6 +488,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
             initials = d.initials,
             onDismiss = { dialog = null },
             onDraw = { dialog = ViewerDialog.Draw(d.initials) },
+            onPhoto = { camera -> signFromPhoto(d.initials, camera) },
             onPick = { f ->
                 dialog = null
                 val bmp = vs.image(f) ?: return@SignatureSheet
@@ -499,10 +502,12 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
             onDismiss = { dialog = ViewerDialog.Sign(d.initials) },
         ) { bmp ->
             dialog = null
-            val f = vm.signatures.add(bmp, d.initials)
-            val page = vs.currentPage
-            val s = session.doc.pageSizes[page]
-            vs.placement = imagePlacement(page, bmp.width, bmp.height, s.width, s.height, f, if (d.initials) "Initials" else "Signature", if (d.initials) 0.12f else 0.3f)
+            placeSignature(bmp, d.initials)
+        }
+        is ViewerDialog.Photo -> SignaturePhotoDialog(d.uri, d.initials, onDismiss = { dialog = ViewerDialog.Sign(d.initials) }) { bmp ->
+            dialog = null
+            File(context.cacheDir, "camera").listFiles()?.forEach { it.delete() }
+            placeSignature(bmp, d.initials)
         }
         ViewerDialog.Panels -> PanelsSheet(vm, vs, onDismiss = { dialog = null }, onDeleteAnnot = { a ->
             dialog = null
@@ -880,12 +885,12 @@ private fun InfoDialog(session: DocSession, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SignatureSheet(vm: AppViewModel, initials: Boolean, onDismiss: () -> Unit, onDraw: () -> Unit, onPick: (File) -> Unit) {
+private fun SignatureSheet(vm: AppViewModel, initials: Boolean, onDismiss: () -> Unit, onDraw: () -> Unit, onPhoto: (camera: Boolean) -> Unit, onPick: (File) -> Unit) {
     var list by remember { mutableStateOf(vm.signatures.all().filter { Signatures.isInitials(it) == initials }) }
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(if (initials) "Your initials" else "Your signatures", style = MaterialTheme.typography.titleMedium)
-            if (list.isEmpty()) Text("Nothing saved yet. Draw one and it will be kept on this phone for next time.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (list.isEmpty()) Text("Nothing saved yet. Draw one, or sign on paper and take a photo of it. It will be kept on this phone for next time.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             for (f in list) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
@@ -910,6 +915,9 @@ private fun SignatureSheet(vm: AppViewModel, initials: Boolean, onDismiss: () ->
                 }
             }
             TextButton(onClick = onDraw) { Icon(Icons.Filled.Draw, null); Spacer(Modifier.width(8.dp)); Text(if (initials) "Draw new initials" else "Draw a new signature") }
+            // Signed on paper: a photo of it, with the paper taken away.
+            TextButton(onClick = { onPhoto(true) }) { Icon(Icons.Filled.PhotoCamera, null); Spacer(Modifier.width(8.dp)); Text("Take a photo of it on paper") }
+            TextButton(onClick = { onPhoto(false) }) { Icon(Icons.Filled.Image, null); Spacer(Modifier.width(8.dp)); Text("Choose a photo of it on paper") }
         }
     }
 }

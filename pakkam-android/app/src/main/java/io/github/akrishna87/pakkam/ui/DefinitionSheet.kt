@@ -52,9 +52,12 @@ import kotlinx.coroutines.withContext
 
 private const val FIRST_MEANINGS = 8
 
-/** What a long-pressed word means, from the built-in dictionary, with ways to look further. */
+/**
+ * What a long-pressed word means, from the built-in dictionary, with ways to look further.
+ * [actions] go above those, for what else can be done with the word where it was pressed.
+ */
 @Composable
-fun DefinitionSheet(vm: AppViewModel, word: String, onDismiss: () -> Unit) {
+fun DefinitionSheet(vm: AppViewModel, word: String, actions: (@Composable () -> Unit)? = null, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val shownWord = remember(word) { WordForms.clean(word) }
     // null while looking; then (dictionary present, definition or null).
@@ -90,6 +93,7 @@ fun DefinitionSheet(vm: AppViewModel, word: String, onDismiss: () -> Unit) {
                 Text("from “${def.looked}”", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             // The ways to look further sit up top, where they show without scrolling past a long entry.
+            actions?.invoke()
             LookFurther(context, def?.word ?: shownWord)
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             when {

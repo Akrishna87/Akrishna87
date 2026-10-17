@@ -20,7 +20,11 @@ documents never leave the phone.
 - **Reading mode**, like a Kindle: the text is lifted out of the page layout and set as a book you turn page by page,
   in your choice of font, size, line spacing, margins and page colour (white, sepia, green, black), with a chapter list,
   a page slider and your place remembered. **Long-press any word** to see its meaning, offline, from the built-in
-  English dictionary (also **Define** on a selected word in page view), with buttons for your translate apps and the web. Built from the text's sizes and positions, not AI. Pictures and tables stay
+  English dictionary (also **Define** on a selected word in page view), with buttons for your translate apps and the web.
+  **Highlight and add notes** as you read: hold a word and slide to choose more, then pick a colour or write a note;
+  tap a highlight to change or remove it, and see them all under *Notes and highlights*. They are saved as ordinary
+  PDF highlights, so they also show in page view, in the Comments list and in other PDF apps.
+  Built from the text's sizes and positions, not AI. Pictures and tables stay
   in page view, and scanned PDFs (pictures of text) can't be reflowed.
 - Read aloud with the phone's own voice
 - Opens password-protected PDFs; "Open with Pakkam" from Files, Gmail, WhatsApp…
@@ -35,6 +39,8 @@ documents never leave the phone.
 **Fill & Sign**
 - Type anywhere on the page, add the date, ticks, crosses and dots
 - Draw your signature and initials once; they're kept on the phone for next time
+- Or sign on paper and take (or choose) a photo of it: drag a box around it and the paper, its lines and shadows are
+  taken away so only the ink is left, as photographed or in blue or black
 - Fill in real PDF forms (text fields, checkboxes, choices)
 
 **Edit**
@@ -73,7 +79,7 @@ Every change is made on a private copy first. The file you opened is only touche
 
 | Folder | What's there |
 |---|---|
-| `app/src/main/java/…/pdf` | The PDF engine: `PdfDoc` (PDFium), `PdfEditor` (annotations, forms, flatten), `PdfTools` (whole-document tools), `Docx` (Word export), `Reflow` (text for Reading mode) |
+| `app/src/main/java/…/pdf` | The PDF engine: `PdfDoc` (PDFium), `PdfEditor` (annotations, forms, flatten), `PdfTools` (whole-document tools), `Docx` (Word export), `Reflow` and `ReadingMarks` (text and highlights for Reading mode), `InkLifter` (signatures from photos) |
 | `app/src/main/java/…/ui` | Screens: Home, the viewer (`ViewerScreen`, `PageList`, `ViewerState`), Reading mode (`ReadingScreen`), tools, combine and photos-to-PDF |
 | `app/src/main/java/…/data` | Recent files, settings, saved signatures, moving files in and out |
 | `ci/` | The emulator smoke test and the sample PDF it uses; `build_dictionary.py` turns Open English WordNet into the app's dictionary |
@@ -95,5 +101,5 @@ cd pakkam-android
 
 The release build is signed with `signing/sideload.keystore` so that every build installs as an update
 over the last one. The [workflow](../.github/workflows/pakkam-apk.yml) runs the unit tests, builds the APK,
-runs a smoke test on an Android 14 emulator (opening, search, contents, night mode, Reading mode, highlighting,
-drawing, signing, saving, organizing) and publishes the APK with the test's screenshots.
+runs a smoke test on an Android 14 emulator (opening, search, contents, night mode, Reading mode with its dictionary,
+highlights and notes, highlighting, drawing, signing with a drawn tick and a photographed signature, saving, organizing) and publishes the APK with the test's screenshots.

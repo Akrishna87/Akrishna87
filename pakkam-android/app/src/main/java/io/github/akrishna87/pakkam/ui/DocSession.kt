@@ -43,6 +43,10 @@ class DocSession(
     var version by mutableIntStateOf(0)
         private set
 
+    /** Goes up only when the words of the document may have changed (not for comments and marks). */
+    var textVersion by mutableIntStateOf(0)
+        private set
+
     /** The copy has changes that aren't in the original yet. */
     var dirty by mutableStateOf(false)
 
@@ -60,10 +64,10 @@ class DocSession(
 
     private var reflowCache: Pair<Int, List<io.github.akrishna87.pakkam.pdf.Block>>? = null
 
-    /** The document as running text for Reading mode, worked out once per version. */
+    /** The document as running text for Reading mode, worked out again only when the words change. */
     suspend fun reflowBlocks(): List<io.github.akrishna87.pakkam.pdf.Block> {
-        reflowCache?.takeIf { it.first == version }?.let { return it.second }
-        val v = version
+        reflowCache?.takeIf { it.first == textVersion }?.let { return it.second }
+        val v = textVersion
         val blocks = withContext(Dispatchers.IO) { io.github.akrishna87.pakkam.pdf.Reflow.extract(workFile, password) }
         reflowCache = v to blocks
         return blocks
@@ -78,7 +82,7 @@ class DocSession(
     }
 
     /** Makes [newFile] the working copy (after an edit or a tool) and redraws. */
-    suspend fun replaceWith(newFile: File, markDirty: Boolean = true) {
+    suspend fun replaceWith(newFile: File, markDirty: Boolean = true, sameText: Boolean = false) {
         val newDoc = PdfDoc.open(newFile, password)
         val oldDoc = doc
         val oldFile = workFile
@@ -86,6 +90,7 @@ class DocSession(
         workFile = newFile
         bitmaps.clear()
         version++
+        if (!sameText) textVersion++
         if (markDirty) dirty = true
         oldDoc.close()
         if (oldFile != newFile) oldFile.delete()
@@ -100,7 +105,8 @@ class DocSession(
         withContext(Dispatchers.IO) { PdfEditor.applyEdits(workFile, password, list, out) }
         edits.clear()
         redo.clear()
-        replaceWith(out)
+        // Annotations, stamps and white-out leave the text layer as it was.
+        replaceWith(out, sameText = true)
     }
 
     fun saved(newUri: Uri? = null, newName: String? = null) {
