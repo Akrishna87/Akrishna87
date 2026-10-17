@@ -154,7 +154,7 @@ grep -q 'Highlight this sentence please' "$OUT/reading.xml" || fail "Reading mod
 adb shell input swipe 516 196 516 196 900
 wait_for reading-define 'trying something to find out about it' 20 "long-pressing a word in Reading mode didn't show its meaning"
 shot 06b-reading-define
-grep -q 'Open English WordNet' "$OUT/reading-define.xml" || fail "the dictionary credit is missing"
+grep -q 'Search the web' "$OUT/reading-define.xml" || fail "the ways to look a word up further are missing"
 adb shell input keyevent KEYCODE_BACK
 sleep 2
 # Tap the middle for the controls, then pick sepia pages.

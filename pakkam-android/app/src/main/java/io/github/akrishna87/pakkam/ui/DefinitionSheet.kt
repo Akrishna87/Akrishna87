@@ -89,6 +89,9 @@ fun DefinitionSheet(vm: AppViewModel, word: String, onDismiss: () -> Unit) {
             if (def != null && !def.word.equals(def.looked, ignoreCase = true)) {
                 Text("from “${def.looked}”", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            // The ways to look further sit up top, where they show without scrolling past a long entry.
+            LookFurther(context, def?.word ?: shownWord)
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
             when {
                 r == null -> Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -119,10 +122,8 @@ fun DefinitionSheet(vm: AppViewModel, word: String, onDismiss: () -> Unit) {
                     }
                 }
             }
-            HorizontalDivider(Modifier.padding(vertical = 4.dp))
-            LookFurther(context, def?.word ?: shownWord)
             if (def != null) {
-                Text(Dictionary.CREDIT, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(Dictionary.CREDIT, Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
