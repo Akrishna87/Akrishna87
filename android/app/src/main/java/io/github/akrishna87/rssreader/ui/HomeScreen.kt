@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -114,6 +115,14 @@ fun ReaderApp(vm: ReaderViewModel) {
             onToggleStar = { vm.toggleStar(open.id) },
             onMarkUnread = { vm.setRead(open.id, false); vm.closeArticle() },
         )
+    } else if (state.discoverOpen) {
+        BackHandler { vm.closeDiscover() }
+        DiscoverScreen(
+            feeds = state.feeds,
+            snackbar = snackbar,
+            onBack = vm::closeDiscover,
+            onAdd = { url -> vm.addFeed(url, showFeed = false) },
+        )
     } else {
         HomeScreen(state, vm, snackbar)
     }
@@ -173,7 +182,10 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
         drawerState = drawer,
         drawerContent = {
             ModalDrawerSheet {
-                DrawerContent(state, unreadByFeed) { view ->
+                DrawerContent(state, unreadByFeed, onDiscover = {
+                    vm.openDiscover()
+                    scope.launch { drawer.close() }
+                }) { view ->
                     vm.setView(view)
                     scope.launch { drawer.close() }
                 }
@@ -252,6 +264,7 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
                                 onSuggest = { url -> scope.launch { vm.addFeed(url)?.let { snackbar.showSnackbar(it) } } },
                                 onAdd = { showAdd = true },
                                 onImport = { importLauncher.launch(arrayOf("*/*")) },
+                                onDiscover = vm::openDiscover,
                             )
                         }
                     }
@@ -284,7 +297,7 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
 }
 
 @Composable
-private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onSelect: (ReaderView) -> Unit) {
+private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onDiscover: () -> Unit, onSelect: (ReaderView) -> Unit) {
     val starred = remember(state.articles) { state.articles.count { it.starred } }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp)) {
         Text("Reader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
@@ -301,6 +314,12 @@ private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onSele
             badge = { Count(starred) },
             selected = state.view == ReaderView.Starred,
             onClick = { onSelect(ReaderView.Starred) },
+        )
+        NavigationDrawerItem(
+            label = { Text("Discover feeds") },
+            icon = { Icon(Icons.Filled.Search, null) },
+            selected = false,
+            onClick = onDiscover,
         )
         if (state.feeds.isNotEmpty()) {
             Text(
@@ -388,7 +407,7 @@ private fun ArticleRow(a: Article, feedTitle: String, showFeed: Boolean, onClick
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EmptyState(state: UiState, onSuggest: (String) -> Unit, onAdd: () -> Unit, onImport: () -> Unit) {
+private fun EmptyState(state: UiState, onSuggest: (String) -> Unit, onAdd: () -> Unit, onImport: () -> Unit, onDiscover: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 56.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -408,8 +427,9 @@ private fun EmptyState(state: UiState, onSuggest: (String) -> Unit, onAdd: () ->
                 SUGGESTED.forEach { (name, url) -> OutlinedButton(onClick = { onSuggest(url) }) { Text("+ $name") } }
             }
             Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAdd) { Text("Add a feed") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onDiscover) { Text("Discover feeds") }
+                OutlinedButton(onClick = onAdd) { Text("Add a feed") }
                 OutlinedButton(onClick = onImport) { Text("Import OPML") }
             }
         }

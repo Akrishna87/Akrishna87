@@ -11,6 +11,10 @@ website or a relay.
 - Subscribe by feed URL **or website address**: the app finds the site's feed.
   YouTube channel, subreddit, GitHub project, Medium and Substack links work too.
 - RSS 2.0, RSS 1.0/RDF and Atom, including podcast and YouTube feeds.
+- **Discover feeds**: a directory of 38 popular feeds across 7 topics (Tech,
+  Cloud & AI, News, India, Business, Science, Learning) with search and one-tap
+  adding, plus quick add for YouTube channels, subreddits, GitHub releases,
+  Mastodon accounts and Medium/Substack.
 - All / Starred / per-feed views, an "Unread only" filter, mark all as read.
 - Native article reader with inline images and tappable links, plus share and
   "Read on site".

@@ -51,6 +51,7 @@ data class UiState(
     val unreadOnly: Boolean = false,
     val refreshing: Boolean = false,
     val openArticleId: String? = null,
+    val discoverOpen: Boolean = false,
 )
 
 class ReaderViewModel(app: Application) : AndroidViewModel(app) {
@@ -89,6 +90,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     fun closeArticle() = _state.update { it.copy(openArticleId = null) }
 
+    fun openDiscover() = _state.update { it.copy(discoverOpen = true) }
+    fun closeDiscover() = _state.update { it.copy(discoverOpen = false) }
+
     fun setUnreadOnly(on: Boolean) {
         _state.update { it.copy(unreadOnly = on) }
         persist()
@@ -123,7 +127,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Feeds ------------------------------------------------------------
 
     /** Subscribe to [raw] (a feed URL or a website). Returns an error message, or null on success. */
-    suspend fun addFeed(raw: String): String? {
+    suspend fun addFeed(raw: String, showFeed: Boolean = true): String? {
         val normalized = normalizeUrl(raw) ?: return "That doesn't look like a web address"
         val url = rewriteKnownUrl(normalized)
         if (_state.value.feeds.any { it.url == url }) return "You're already subscribed to this feed"
@@ -139,7 +143,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     feeds = s.feeds + feed,
                     // Keep anything that changed while we were merging.
                     articles = (merged.filter { it.feedId == id } + s.articles.filter { it.feedId != id }).newestFirst(),
-                    view = ReaderView.OneFeed(id),
+                    view = if (showFeed) ReaderView.OneFeed(id) else s.view,
                 )
             }
             persist()
