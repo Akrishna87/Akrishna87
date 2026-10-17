@@ -115,6 +115,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Closes the open document and goes back to where it was opened from (Home). */
+    fun leaveDocument() {
+        while (stack.size > 1) {
+            val top = stack.removeAt(stack.lastIndex)
+            if (top == Screen.Viewer) {
+                closeSession()
+                break
+            }
+        }
+    }
+
     fun refreshRecents() {
         recents = recentsStore.all()
     }

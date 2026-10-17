@@ -237,8 +237,9 @@ grep -q 'elephant' "$OUT/reading-notes.xml" || fail "the noted word isn't in Not
 shot 07a-reading-notes
 adb shell input keyevent KEYCODE_BACK
 sleep 2
-# Back (not the Page view button) leaves Reading mode as the way this file opens next time.
-adb shell input keyevent KEYCODE_BACK
+# The Page view button goes to page view (Back would close the book).
+dump reading-sepia
+tap reading-sepia "Page view"
 wait_for back-to-pages 'text="[0-9] / 5"' 20 "Page view didn't go back to the PDF"
 echo "PASS: reading mode and its dictionary"
 
@@ -381,24 +382,26 @@ shot 13-home-recent
 grep -q 'smoke.pdf' "$OUT/home-again.xml" || fail "the file isn't in Recent"
 echo "PASS: save on leaving, Recent list"
 
-echo "--- A book read in Reading mode opens in Reading mode again"
+echo "--- Back in Reading mode closes the book, which opens in Reading mode again"
 tap home-again "smoke.pdf"
-wait_for reopened 'Page [0-9]+ of [0-9]+' 40 "the file last read in Reading mode didn't open in Reading mode"
+wait_for reopened 'text="[0-9] / 5"' 40 "after choosing page view, the file didn't open in page view"
+grep -Eq 'Page [0-9]+ of [0-9]+' "$OUT/reopened.xml" && fail "the file opened in Reading mode after choosing page view"
+tap reopened "Read mode"
+wait_for reading-again 'Page [0-9]+ of [0-9]+' 30 "Reading mode didn't open"
+adb shell input keyevent KEYCODE_BACK
+wait_for home-3 'text="Combine files"' 20 "Back in Reading mode didn't close the book"
+tap home-3 "smoke.pdf"
+wait_for reopened-2 'Page [0-9]+ of [0-9]+' 40 "the file last read in Reading mode didn't open in Reading mode"
 shot 14-reopened-reading
+# A tap at the top of the page brings the menus back.
 read -r rw rh < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
-adb shell input tap $((rw / 2)) $((rh / 2))
+adb shell input tap $((rw / 2)) $((rh / 12))
 sleep 2
 dump reopened-chrome
 tap reopened-chrome "Page view"
 wait_for reopened-pages 'text="[0-9] / 5"' 20 "Page view didn't open from Reading mode"
 adb shell input keyevent KEYCODE_BACK
-wait_for home-3 'text="Combine files"' 20 "leaving the document didn't return Home"
-# Switching to page view with its button makes the file open in page view again.
-tap home-3 "smoke.pdf"
-wait_for reopened-2 'text="[0-9] / 5"' 40 "after choosing page view, the file didn't open in page view"
-grep -Eq 'Page [0-9]+ of [0-9]+' "$OUT/reopened-2.xml" && fail "the file still opened in Reading mode"
-adb shell input keyevent KEYCODE_BACK
-sleep 2
+wait_for home-4 'text="Combine files"' 20 "leaving the document didn't return Home"
 echo "PASS: Reading mode remembered for each file"
 
 if crashed; then
