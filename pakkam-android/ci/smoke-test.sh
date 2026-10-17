@@ -149,7 +149,18 @@ sleep 1
 echo "PASS: night mode"
 
 echo "--- Fit the page to the screen"
+# Page 5 is twice as tall as the others: at the screen's width it runs off the bottom.
+dump fit-goto
+tap fit-goto "/ 5"
+sleep 1
+dump fit-goto-dialog
+tap fit-goto-dialog "Page (1–5)"
+sleep 1
+adb shell input text "5"
+adb shell input keyevent KEYCODE_ENTER
+sleep 2
 dump fit0
+grep -q 'text="5 / 5"' "$OUT/fit0.xml" || fail "Go to page didn't go to page 5"
 tap fit0 "More options"
 sleep 1
 dump fit-menu
