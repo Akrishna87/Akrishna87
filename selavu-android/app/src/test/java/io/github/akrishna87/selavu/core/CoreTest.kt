@@ -118,6 +118,7 @@ class LedgerTest {
         assertEquals(15000_00L, b.left)
         assertEquals(15, b.daysLeft) // 17th..31st
         assertEquals(1000_00L, b.perDay)
+        assertEquals(1250_00L, l.copy(transactions = listOf(tx(1249_00, today))).budgetFor(today, today)!!.perDay) // 1250.07 → 1250
         assertEquals(0, l.budgetFor(today.minusMonths(1), today)!!.daysLeft)
         assertNull(l.copy(settings = Settings()).budgetFor(today, today))
     }

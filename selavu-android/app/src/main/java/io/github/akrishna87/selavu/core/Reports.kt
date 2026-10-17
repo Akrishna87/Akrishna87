@@ -73,7 +73,7 @@ fun averagePerDay(period: Period, total: Long, today: LocalDate): Long {
     val last = if (today in period) today else period.end
     if (last.isBefore(period.start)) return 0
     val days = ChronoUnit.DAYS.between(period.start, last) + 1
-    return total / days
+    return total / days / 100 * 100 // whole rupees/dollars: "₹73 a day" reads better than "₹73.47"
 }
 
 data class BudgetStatus(
@@ -85,7 +85,8 @@ data class BudgetStatus(
 ) {
     val left: Long get() = budget - spent
     val fraction: Float get() = if (budget <= 0) 0f else spent.toFloat() / budget
-    val perDay: Long get() = if (daysLeft > 0 && left > 0) left / daysLeft else 0
+    /** Rounded down to whole rupees/dollars, so spending it each day stays within budget. */
+    val perDay: Long get() = if (daysLeft > 0 && left > 0) left / daysLeft / 100 * 100 else 0
     val over: Boolean get() = spent > budget
 }
 
