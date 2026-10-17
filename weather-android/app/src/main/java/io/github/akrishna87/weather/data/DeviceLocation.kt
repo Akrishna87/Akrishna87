@@ -8,7 +8,11 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
 import androidx.core.location.LocationManagerCompat
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -40,11 +44,25 @@ object DeviceLocation {
         val recent = providers.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
             .filter { System.currentTimeMillis() - it.time < 30 * 60_000 }
             .maxByOrNull { it.time }
-        val fix = recent ?: withTimeoutOrNull(20_000) {
-            providers.firstNotNullOfOrNull { p -> if (p == LocationManager.PASSIVE_PROVIDER) null else current(lm, p) }
-        } ?: providers.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.maxByOrNull { it.time }
-        ?: throw IOException("Couldn't find where you are; try searching for your town instead")
+        val fix = recent ?: withTimeoutOrNull(20_000) { firstFix(lm, providers - LocationManager.PASSIVE_PROVIDER) }
+            ?: providers.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.maxByOrNull { it.time }
+            ?: throw IOException("Couldn't get a location fix right now; check that location is on and try again")
         return LatLon(fix.latitude, fix.longitude)
+    }
+
+    /** Asks every provider at once and takes the first answer, so one slow provider can't hold things up. */
+    private suspend fun firstFix(lm: LocationManager, providers: List<String>): Location? = coroutineScope {
+        val pending = providers.map { p -> async { runCatching { current(lm, p) }.getOrNull() } }.toMutableList()
+        var found: Location? = null
+        while (found == null && pending.isNotEmpty()) {
+            val (done, loc) = select<Pair<Deferred<Location?>, Location?>> {
+                pending.forEach { d -> d.onAwait { d to it } }
+            }
+            pending.remove(done)
+            found = loc
+        }
+        pending.forEach { it.cancel() }
+        found
     }
 
     @SuppressLint("MissingPermission")

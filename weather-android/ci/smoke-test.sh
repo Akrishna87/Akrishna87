@@ -189,7 +189,9 @@ else
   read -r W H < <(adb shell wm size | grep -o "[0-9]*x[0-9]*" | tail -1 | tr x ' ')
   adb shell input tap $((W * 77 / 100)) $((H * 86 / 1000))
 fi
+# Like a real GPS, keep reporting the position while the app asks for it.
 for i in $(seq 1 20); do
+  adb emu geo fix 80.2707 13.0827 > /dev/null || true
   sleep 1
   sources_log | grep -q "went to your location" && break
 done
