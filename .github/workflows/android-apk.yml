@@ -47,6 +47,12 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           VERSION_CODE: ${{ github.run_number }}
         run: |
+          # Ignore stray spaces/newlines picked up when the secret was pasted.
+          export ANDROID_KEYSTORE_PASSWORD="$(printf '%s' "$ANDROID_KEYSTORE_PASSWORD" | tr -d '[:space:]')"
+          if ! keytool -list -storetype pkcs12 -keystore android/app/release.p12 -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::ANDROID_KEYSTORE_PASSWORD doesn't unlock android/app/release.p12 (secret is ${#ANDROID_KEYSTORE_PASSWORD} characters; it should be 32). Re-enter it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
           gradle -p android assembleRelease --no-daemon
           cp android/app/build/outputs/apk/release/app-release.apk rss-reader.apk
 
