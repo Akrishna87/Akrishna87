@@ -177,6 +177,30 @@ sleep 6
 shot 7-wind-map-moved
 crashed && fail "the app crashed while moving the map (see logcat.txt)"
 
+echo "--- The map's location button goes to where the phone is"
+adb shell pm grant "$PKG" android.permission.ACCESS_COARSE_LOCATION || true
+adb emu geo fix 80.2707 13.0827 > /dev/null || true # Chennai (longitude first)
+sleep 2
+dump locate
+if on_screen locate "Go to my current location"; then
+  tap locate "Go to my current location"
+else
+  # The animated map often can't be dumped; the button is near the top right.
+  read -r W H < <(adb shell wm size | grep -o "[0-9]*x[0-9]*" | tail -1 | tr x ' ')
+  adb shell input tap $((W * 77 / 100)) $((H * 86 / 1000))
+fi
+for i in $(seq 1 20); do
+  sleep 1
+  sources_log | grep -q "went to your location" && break
+done
+shot 7b-my-location
+if sources_log | grep -q "went to your location"; then
+  echo "$(sources_log | grep "went to your location" | tail -1)"
+else
+  echo "::warning::The map's location button didn't find the emulator's location"
+fi
+crashed && fail "the app crashed going to the current location (see logcat.txt)"
+
 echo "--- Storms"
 dump wind
 tab wind "Storms"

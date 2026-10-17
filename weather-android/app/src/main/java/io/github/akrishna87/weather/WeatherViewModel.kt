@@ -16,6 +16,7 @@ import io.github.akrishna87.weather.data.Alert
 import io.github.akrishna87.weather.data.DeviceLocation
 import io.github.akrishna87.weather.data.Forecast
 import io.github.akrishna87.weather.data.GeoBox
+import io.github.akrishna87.weather.data.LatLon
 import io.github.akrishna87.weather.data.Marine
 import io.github.akrishna87.weather.data.MetNorway
 import io.github.akrishna87.weather.data.Nws
@@ -94,6 +95,9 @@ class MapCamera {
 data class MapFocus(val lat: Double, val lon: Double, val spanDeg: Double, val stormKey: String? = null, val seq: Long)
 
 private const val TAG = "Vaanilai"
+
+/** Shown on the map while the phone's position is being found. */
+const val FINDING_YOU = "Finding your location…"
 
 class WeatherViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
@@ -200,6 +204,47 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                 _locating.value = e.message ?: "Couldn't find your location"
             }
         }
+    }
+
+    // ---- "Where am I" on the map ----
+
+    private val _myLocation = MutableStateFlow<LatLon?>(null)
+
+    /** The phone's own position, once found from the map's location button. */
+    val myLocation: StateFlow<LatLon?> = _myLocation.asStateFlow()
+
+    private val _mapLocating = MutableStateFlow<String?>(null)
+
+    /** "Finding your location…", an error from the last try, or null. */
+    val mapLocating: StateFlow<String?> = _mapLocating.asStateFlow()
+
+    /**
+     * Finds where the phone is and flies the map there, zoomed in to about town level. This
+     * doesn't change the forecast place (that's chosen on the Weather tab).
+     */
+    fun goToMyLocation() {
+        viewModelScope.launch {
+            _mapLocating.value = FINDING_YOU
+            try {
+                val at = DeviceLocation.position(getApplication())
+                _myLocation.value = at
+                Log.i(TAG, "Map: went to your location %.2f, %.2f".format(at.lat, at.lon))
+                _focus.value = MapFocus(at.lat, at.lon, 12.0, null, SystemClock.elapsedRealtime())
+                _mapLocating.value = null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _mapLocating.value = e.message ?: "Couldn't find your location"
+            }
+        }
+    }
+
+    fun mapLocationDenied() {
+        _mapLocating.value = "Location permission wasn't given, so the map can't find you"
+    }
+
+    fun clearMapLocating() {
+        _mapLocating.value = null
     }
 
     fun locationDenied() {

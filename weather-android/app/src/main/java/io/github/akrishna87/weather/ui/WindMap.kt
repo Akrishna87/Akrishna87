@@ -1,10 +1,14 @@
 package io.github.akrishna87.weather.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,6 +66,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import io.github.akrishna87.weather.FINDING_YOU
 import io.github.akrishna87.weather.MapCamera
 import io.github.akrishna87.weather.WeatherViewModel
 import io.github.akrishna87.weather.data.GeoBox
@@ -106,6 +112,25 @@ fun WindMapScreen(vm: WeatherViewModel) {
     val place by vm.place.collectAsState()
     val units by vm.units.collectAsState()
     val focus by vm.focus.collectAsState()
+    val myLocation by vm.myLocation.collectAsState()
+    val mapLocating by vm.mapLocating.collectAsState()
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.goToMyLocation() else vm.mapLocationDenied()
+    }
+    val locateMe = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            vm.goToMyLocation()
+        } else {
+            askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+    }
+    // An error about finding you fades after a few seconds.
+    LaunchedEffect(mapLocating) {
+        if (mapLocating != null && mapLocating != FINDING_YOU) {
+            kotlinx.coroutines.delay(5_000)
+            vm.clearMapLocating()
+        }
+    }
 
     var size by remember { mutableStateOf(IntSize.Zero) }
     var world by remember { mutableStateOf<WorldOutline?>(null) }
@@ -218,6 +243,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
             painter.drawLabels(this, cam, world, place?.let { LatLon(it.lat, it.lon) }, place?.name)
             painter.drawStorms(this, cam, storms, selected)
             place?.let { painter.drawPlace(this, cam, LatLon(it.lat, it.lon), it.name) }
+            myLocation?.let { painter.drawMe(this, cam, it) }
             probe?.let { painter.drawProbe(this, cam, it.first) }
         }
 
@@ -236,13 +262,20 @@ fun WindMapScreen(vm: WeatherViewModel) {
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                if (place != null) {
-                    MapButton(onClick = { vm.showPlaceOnMap() }) { Icon(Icons.Outlined.MyLocation, "Go to my place") }
-                }
+                MapButton(onClick = locateMe) { Icon(Icons.Outlined.MyLocation, "Go to my current location") }
                 MapButton(onClick = {
                     if (size.width > 0) vm.requestWind(viewBox(cam, size), force = true)
                     vm.refreshStorms()
                 }) { Icon(Icons.Outlined.Refresh, "Reload wind and storms") }
+            }
+            mapLocating?.let { msg ->
+                MapPill {
+                    if (msg == FINDING_YOU) {
+                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                        Text("  ")
+                    }
+                    Text(msg)
+                }
             }
             if (wind.loading || stormsState.loading) {
                 MapPill { CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White); Text("  Loading ${if (wind.loading) "wind" else "storms"}…") }
@@ -859,6 +892,21 @@ private class MapPainter(private val density: Float) {
             dot.color = 0xFF0EA5E9.toInt()
             c.drawCircle(px, py, 3.5f * density, dot)
             haloText(c, name, px + 8 * density, py + 4 * density, small)
+        }
+    }
+
+    /** "You are here": a blue dot with a white ring and a soft halo, like other map apps. */
+    fun drawMe(s: DrawScope, cam: MapCamera, at: LatLon) {
+        val c = s.drawContext.canvas.nativeCanvas
+        for (k in copies(viewOf(s, cam))) {
+            val px = x(cam, s, at.lon + k * 360)
+            val py = y(cam, s, at.lat)
+            dot.color = 0x4D3B82F6
+            c.drawCircle(px, py, 16f * density, dot)
+            dot.color = 0xFFFFFFFF.toInt()
+            c.drawCircle(px, py, 8f * density, dot)
+            dot.color = 0xFF2563EB.toInt()
+            c.drawCircle(px, py, 6f * density, dot)
         }
     }
 

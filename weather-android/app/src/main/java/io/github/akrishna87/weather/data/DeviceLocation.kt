@@ -19,8 +19,15 @@ import kotlin.coroutines.resume
 
 /** The phone's rough position, without Google Play services. Needs ACCESS_COARSE_LOCATION. */
 object DeviceLocation {
-    @SuppressLint("MissingPermission")
+    /** Where the phone is, named with the phone's geocoder: for choosing the forecast place. */
     suspend fun find(context: Context): Place {
+        val at = position(context)
+        return describe(context, at.lat, at.lon)
+    }
+
+    /** Where the phone is (a fix up to 30 minutes old will do), without naming it. */
+    @SuppressLint("MissingPermission")
+    suspend fun position(context: Context): LatLon {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if (!LocationManagerCompat.isLocationEnabled(lm)) throw IOException("Location is turned off on this phone")
         val providers = buildList {
@@ -37,7 +44,7 @@ object DeviceLocation {
             providers.firstNotNullOfOrNull { p -> if (p == LocationManager.PASSIVE_PROVIDER) null else current(lm, p) }
         } ?: providers.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }.maxByOrNull { it.time }
         ?: throw IOException("Couldn't find where you are; try searching for your town instead")
-        return describe(context, fix.latitude, fix.longitude)
+        return LatLon(fix.latitude, fix.longitude)
     }
 
     @SuppressLint("MissingPermission")
