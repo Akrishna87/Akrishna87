@@ -20,7 +20,10 @@ fail() {
     echo "On screen:"; grep -o '\(text\|content-desc\)="[^"]\+"' "$OUT/failure.xml" | head -40 || true
   fi
   adb shell dumpsys media_session > "$OUT/session.txt" 2>/dev/null || true
+  echo "Media sessions:"; grep -E "package=|description=|state=PlaybackState" "$OUT/session.txt" | head -20 || true
   adb logcat -d > "$OUT/logcat.txt" || true
+  echo "Player log:"
+  grep -E "ExoPlayer|MediaCodec.*(rror|ail)|AndroidRuntime|Toast|myvideos" "$OUT/logcat.txt" | grep -vE "^.{0,40} [VD] " | tail -40 || true
   exit 1
 }
 dump() {
@@ -105,6 +108,23 @@ grep -q 'text="Smoke Video 1"' "$OUT/library.xml" || fail "the video list doesn'
 grep -q 'text="0:40"' "$OUT/library.xml" || fail "the video list doesn't show video lengths"
 echo "PASS: lists the videos on the phone, with their lengths"
 
+echo "--- Sorting by name"
+# Tapping a video plays the list from there, as it's sorted. Newest-first order depends on which
+# second each test video was copied in, so sort by name to make "next" after Video 1 be Video 2.
+tap library "Sort"
+sleep 1
+dump sort-menu
+tap sort-menu "Name"
+sleep 2
+dump library
+python3 - "$OUT/library.xml" <<'PY' || fail "sorting by name didn't put Smoke Video 1, 2, 3 in order"
+import sys, xml.etree.ElementTree as ET
+titles = [n.get("text") for n in ET.parse(sys.argv[1]).iter("node") if (n.get("text") or "").startswith("Smoke Video ")]
+order = [t for t in titles if t in ("Smoke Video 1", "Smoke Video 2", "Smoke Video 3")]
+sys.exit(0 if order[:3] == ["Smoke Video 1", "Smoke Video 2", "Smoke Video 3"] else 1)
+PY
+echo "PASS: sorting by name"
+
 echo "--- Playing a video"
 tap library "Smoke Video 1"
 sleep 6
@@ -140,12 +160,17 @@ echo "PASS: the player's controls show"
 
 echo "--- Media 'next' and 'play' buttons (headphones)"
 adb shell input keyevent KEYCODE_MEDIA_NEXT
-sleep 2
-adb shell input keyevent KEYCODE_MEDIA_PLAY
-sleep 8
-session
+for _ in $(seq 1 10); do
+  sleep 1
+  session
+  grep -q "Smoke Video 2" "$OUT/session.txt" && break
+done
+echo "After 'next': $(grep -oE 'description=[^,]*' "$OUT/session.txt" | head -1)"
 grep -q "Smoke Video 2" "$OUT/session.txt" || fail "the media next button didn't skip to the next video"
+adb shell input keyevent KEYCODE_MEDIA_PLAY
+for _ in $(seq 1 10); do sleep 1; playing && break; done
 playing || fail "the next video isn't playing"
+grep -q "Smoke Video 2" "$OUT/session.txt" || fail "playing moved on from the next video"
 echo "PASS: media buttons skip to the next video and play it"
 
 echo "--- Back to the list: Continue watching"
