@@ -149,7 +149,10 @@ fun PageList(vs: ViewerState, actions: PageActions, modifier: Modifier = Modifie
                     LazyColumn(
                         state = vs.listState,
                         modifier = Modifier.width(contentW).fillMaxHeight().semantics { contentDescription = "Pages" },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            top = 12.dp + with(density) { vs.barTop.toDp() },
+                            bottom = 12.dp + with(density) { vs.barBottom.toDp() },
+                        ),
                         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
                     ) {
                         items(doc.pageCount, key = { "$version-$it" }) { i ->

@@ -339,7 +339,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
         PageList(vs, actions)
 
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
-            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { vs.chromeTop = it.height }) {
+            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { if (it.height > 0 && vs.mode == ViewerMode.READ && !vs.searchOpen) vs.barTop = it.height }) {
                 when {
                     vs.searchOpen -> SearchBar(vs)
                     vs.mode != ViewerMode.READ -> EditTopBar(vs, onDone = { finishEditing() })
@@ -405,7 +405,7 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                 }
             }
             readAloud?.takeIf { it.speaking }?.let { ra -> ReadAloudBar(ra.page, onStop = { ra.stop() }) }
-            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { vs.chromeBottom = it.height }) {
+            AnimatedVisibility(showChrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.onSizeChanged { if (it.height > 0 && vs.mode == ViewerMode.READ) vs.barBottom = it.height }) {
                 Surface(tonalElevation = 3.dp, shadowElevation = 6.dp) {
                     Column(Modifier.navigationBarsPadding()) {
                         when (vs.mode) {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -207,16 +208,19 @@ class ViewerState(
      */
     val minZoom: Float get() = if (paged) 1f else MIN_ZOOM
 
-    /** Heights of the toolbars over the pages, so a page fitted to the screen isn't hidden under them. */
-    var chromeTop = 0
-    var chromeBottom = 0
+    /**
+     * Heights of the reading toolbars over the pages. The pages are padded by them, so the first
+     * and last pages, and a page fitted to the screen, can sit wholly between the bars.
+     */
+    var barTop by mutableIntStateOf(0)
+    var barBottom by mutableIntStateOf(0)
 
     /** The zoom at which the whole of the page being read fits on the screen, between the toolbars. */
     fun fitPageZoom(): Float {
         if (paged) return 1f
         val s = session.doc.pageSizes.getOrNull(currentPage) ?: return 1f
         val vw = (viewport.width - 2 * MARGIN_PX).coerceAtLeast(1f)
-        val vh = (viewport.height - chromeTop - chromeBottom - 2 * MARGIN_PX).coerceAtLeast(1f)
+        val vh = (viewport.height - barTop - barBottom - 2 * MARGIN_PX).coerceAtLeast(1f)
         // At zoom 1 the page is as wide as the screen; shrink it until its height fits too.
         return (vh * 0.96f / (vw / s.aspect)).coerceIn(minZoom, 1f)
     }
@@ -231,19 +235,18 @@ class ViewerState(
         return (vw / s.width / fit).coerceIn(1f, MAX_ZOOM)
     }
 
-    /** Zooms to [z] with the page being read at the top left of the screen, or [below] pixels from the top. */
-    fun zoomTo(z: Float, below: Int = 0) {
+    /** Zooms to [z] with the page being read at the top left of the screen. */
+    fun zoomTo(z: Float) {
         val page = currentPage
         zoom = z.coerceIn(minZoom, MAX_ZOOM)
         scope.launch {
             withFrameNanos { }
             listState.scrollToItem(page)
-            if (below > 0) listState.scrollBy(-below.toFloat())
             crossScroll.scrollTo(0)
         }
     }
 
-    fun fitPage() = zoomTo(fitPageZoom(), if (paged) 0 else chromeTop + MARGIN_PX.roundToInt())
+    fun fitPage() = zoomTo(fitPageZoom())
 
     fun fitWidth() = zoomTo(fitWidthZoom())
 
