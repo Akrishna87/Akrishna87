@@ -89,6 +89,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -236,6 +238,10 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
     var style by remember { mutableStateOf(vm.settings.readStyle) }
     var chrome by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<ReadSheet?>(null) }
+    // The long-pressed word: (chunk, start, end) to shade, and the word to look up.
+    var picked by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+    var lookup by remember { mutableStateOf<String?>(null) }
+    val haptic = LocalHapticFeedback.current
     var offset by remember { mutableIntStateOf(vm.settings.readPosition(uriKey)) }
     var pdfPage by remember { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
@@ -338,15 +344,55 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             nc.save()
                             nc.translate(marginPx.toFloat(), y - top)
                             nc.clipRect(0, top, layout.width, bottom)
+                            picked?.takeIf { it.first == p.chunk }?.let { (_, s0, e0) ->
+                                val path = android.graphics.Path()
+                                layout.getSelectionPath(s0, e0, path)
+                                nc.drawPath(path, android.graphics.Paint().apply { color = if (theme.dark) 0x664F8DFF else 0x553D7BFF })
+                            }
                             layout.draw(nc)
                             nc.restore()
                         }
+                    }
+                    /** The word under a touch: what to shade and the word itself. */
+                    fun wordAt(o: androidx.compose.ui.geometry.Offset): Pair<Triple<Int, Int, Int>, String>? {
+                        val (i, pageTop) = if (style.scroll) {
+                            val item = scroller.layoutInfo.visibleItemsInfo.firstOrNull { o.y >= it.offset && o.y < it.offset + it.size } ?: return null
+                            item.index to item.offset.toFloat()
+                        } else {
+                            current to topPad.toFloat()
+                        }
+                        val p = b.pages.getOrNull(i) ?: return null
+                        val layout = b.layouts[p.chunk]
+                        val top = layout.getLineTop(p.startLine)
+                        val y = (o.y - pageTop + top).roundToInt()
+                        if (y < top || y > layout.getLineBottom(p.endLine - 1)) return null
+                        val line = layout.getLineForVertical(y)
+                        val x = o.x - marginPx
+                        if (x < layout.getLineLeft(line) - 12 || x > layout.getLineRight(line) + 12) return null
+                        val text = layout.text
+                        fun isWord(c: Char) = c.isLetterOrDigit() || c == '\'' || c == '’' || c == '-'
+                        var s0 = layout.getOffsetForHorizontal(line, x).coerceIn(0, text.length)
+                        if ((s0 >= text.length || !isWord(text[s0])) && s0 > 0 && isWord(text[s0 - 1])) s0--
+                        if (s0 >= text.length || !isWord(text[s0])) return null
+                        var e0 = s0
+                        while (s0 > 0 && isWord(text[s0 - 1])) s0--
+                        while (e0 < text.length && isWord(text[e0])) e0++
+                        while (s0 < e0 && !text[s0].isLetterOrDigit()) s0++
+                        while (e0 > s0 && !text[e0 - 1].isLetterOrDigit()) e0--
+                        if (e0 <= s0) return null
+                        return Triple(p.chunk, s0, e0) to text.substring(s0, e0)
                     }
                     Box(
                         Modifier
                             .fillMaxSize()
                             .pointerInput(b, style.scroll) {
-                                detectTapGestures { o ->
+                                detectTapGestures(onLongPress = { o ->
+                                    wordAt(o)?.let { (range, word) ->
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        picked = range
+                                        lookup = word
+                                    }
+                                }) { o ->
                                     val w = size.width
                                     val h = size.height
                                     when {
@@ -429,6 +475,12 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                         }
                     }
                 }
+            }
+        }
+        lookup?.let { w ->
+            DefinitionSheet(vm, w) {
+                lookup = null
+                picked = null
             }
         }
         if (sheet == ReadSheet.Style) {

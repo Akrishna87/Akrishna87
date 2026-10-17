@@ -19,7 +19,8 @@ documents never leave the phone.
 - Day, Night and Sepia modes; keep the screen on; go to page; remembers where you stopped
 - **Reading mode**, like a Kindle: the text is lifted out of the page layout and set as a book you turn page by page,
   in your choice of font, size, line spacing, margins and page colour (white, sepia, green, black), with a chapter list,
-  a page slider and your place remembered. Built from the text's sizes and positions, not AI. Pictures and tables stay
+  a page slider and your place remembered. **Long-press any word** to see its meaning, offline, from the built-in
+  English dictionary (also **Define** on a selected word in page view), with buttons for your translate apps and the web. Built from the text's sizes and positions, not AI. Pictures and tables stay
   in page view, and scanned PDFs (pictures of text) can't be reflowed.
 - Read aloud with the phone's own voice
 - Opens password-protected PDFs; "Open with Pakkam" from Files, Gmail, WhatsApp…
@@ -75,9 +76,17 @@ Every change is made on a private copy first. The file you opened is only touche
 | `app/src/main/java/…/pdf` | The PDF engine: `PdfDoc` (PDFium), `PdfEditor` (annotations, forms, flatten), `PdfTools` (whole-document tools), `Docx` (Word export), `Reflow` (text for Reading mode) |
 | `app/src/main/java/…/ui` | Screens: Home, the viewer (`ViewerScreen`, `PageList`, `ViewerState`), Reading mode (`ReadingScreen`), tools, combine and photos-to-PDF |
 | `app/src/main/java/…/data` | Recent files, settings, saved signatures, moving files in and out |
-| `ci/` | The emulator smoke test and the sample PDF it uses |
+| `ci/` | The emulator smoke test and the sample PDF it uses; `build_dictionary.py` turns Open English WordNet into the app's dictionary |
 
 ## Building
+
+The dictionary is built from [Open English WordNet](https://github.com/globalwordnet/english-wordnet) (© the Open English
+WordNet team, CC BY 4.0) and isn't kept in git. Make it once before building, or the app builds without a dictionary:
+
+```
+curl -L -o /tmp/oewn.xml.gz https://github.com/globalwordnet/english-wordnet/releases/download/2025-edition/english-wordnet-2025.xml.gz
+python3 ci/build_dictionary.py /tmp/oewn.xml.gz app/src/main/assets/dictionary.db
+```
 
 ```
 cd pakkam-android
