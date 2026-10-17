@@ -114,12 +114,12 @@ echo "--- Choosing a place by searching"
 open_until search "Search for a place" "Town or city"
 tap search "Town or city"
 sleep 1
-adb shell input text "London"
+adb shell input text "Chennai"
 FOUND=""
 for i in $(seq 1 10); do
   sleep 2
   dump results
-  if on_screen results "United Kingdom"; then FOUND=1; break; fi
+  if on_screen results "Tamil Nadu"; then FOUND=1; break; fi
 done
 if [ -z "$FOUND" ]; then
   echo "::warning::Place search (Open-Meteo) couldn't be reached from the emulator; skipping the forecast checks."
@@ -130,7 +130,7 @@ if [ -z "$FOUND" ]; then
   sleep 1
 else
   shot 2-search
-  tap results "United Kingdom"
+  tap results "Tamil Nadu"
   for i in $(seq 1 15); do
     sleep 2
     dump weather

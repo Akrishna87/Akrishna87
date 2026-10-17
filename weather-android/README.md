@@ -46,7 +46,10 @@ Each new build installs as an update over the last one.
   - pinch and drag to explore (it wraps around the date line);
   - use the **time slider** to step through the next 48 hours;
   - switch between **Wind** and **Gusts**;
-  - tap anywhere to read the wind speed and direction at that spot.
+  - tap anywhere to read the wind speed and direction at that spot;
+  - read the map: country names, India's states and union territories
+    (with their borders), and cities appear as you zoom in, with more
+    Indian towns than elsewhere. Borders follow India's official map.
 - **Named storms on the map**: each active tropical cyclone is drawn with a
   spiral symbol, its **name** and category, and its track and wind areas.
   Tap one for its details (wind, pressure, movement, distance from you)
@@ -65,7 +68,7 @@ Each new build installs as an update over the last one.
 | US forecast and alerts | [National Weather Service](https://api.weather.gov) | Public domain |
 | Tropical cyclones in every ocean, tracks and wind areas | [GDACS](https://www.gdacs.org) (UN / European Commission) | Free to use with credit |
 | Atlantic and East/Central Pacific storms | [NOAA National Hurricane Center](https://www.nhc.noaa.gov) | Public domain |
-| Coastlines and borders (bundled in the app) | [Natural Earth](https://www.naturalearthdata.com) | Public domain |
+| Coastlines, borders, Indian states and place names (bundled in the app) | [Natural Earth](https://www.naturalearthdata.com) | Public domain |
 
 ## A few honest notes
 
@@ -93,8 +96,8 @@ This is a standard Gradle project (Kotlin, Jetpack Compose), built with JDK 17:
 ./gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The map outlines in `app/src/main/assets` are made by `tools/pack_map.py`
-from Natural Earth's 1:50m data.
+The map outlines and place names in `app/src/main/assets` are made by
+`tools/pack_map.py` from Natural Earth data (see the script for the files).
 
 CI (`.github/workflows/weather-apk.yml`) builds the release APK on every push
 that touches `weather-android/`, signs it, and runs it on an Android 14

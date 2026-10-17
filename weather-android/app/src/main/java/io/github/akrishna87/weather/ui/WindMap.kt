@@ -1,6 +1,7 @@
 package io.github.akrishna87.weather.ui
 
 import android.graphics.Bitmap
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -65,6 +66,7 @@ import io.github.akrishna87.weather.MapCamera
 import io.github.akrishna87.weather.WeatherViewModel
 import io.github.akrishna87.weather.data.GeoBox
 import io.github.akrishna87.weather.data.LatLon
+import io.github.akrishna87.weather.data.MapLabel
 import io.github.akrishna87.weather.data.Storm
 import io.github.akrishna87.weather.data.Units
 import io.github.akrishna87.weather.data.WindField
@@ -124,7 +126,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
             val p = place
             cam.lon = p?.lon ?: 80.0
             cam.lat = p?.lat ?: 15.0
-            cam.ppd = size.width / 60f
+            cam.ppd = size.width / 40f
             cam.lat = clampLat(cam.lat, cam.ppd, size)
         }
     }
@@ -213,6 +215,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
             if (field != null) painter.drawHeat(this, cam, field, hourIndex(cam, field), cam.gusts)
             painter.drawCoasts(this, cam, world)
             particles.draw(this, cam)
+            painter.drawLabels(this, cam, world)
             painter.drawStorms(this, cam, storms, selected)
             place?.let { painter.drawPlace(this, cam, LatLon(it.lat, it.lon), it.name) }
             probe?.let { painter.drawProbe(this, cam, it.first) }
@@ -538,6 +541,31 @@ private class MapPainter(private val density: Float) {
     }
     private val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE5E7EB.toInt(); textSize = 11f * density }
     private val labelBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCC0B1220.toInt() }
+    private val stateLine = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x80FCD34D.toInt(); style = Paint.Style.STROKE }
+    private var stateDashPpd = 0f
+
+    // Place names: countries in spaced capitals, Indian states in amber italics, cities with a dot.
+    private val countryText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xD0FFFFFF.toInt(); textSize = 11.5f * density; typeface = Typeface.DEFAULT_BOLD
+        letterSpacing = 0.14f; textAlign = Paint.Align.CENTER
+    }
+    private val stateText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xEEFDE68A.toInt(); textSize = 10.5f * density
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC); textAlign = Paint.Align.CENTER
+    }
+    private val cityText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xF2FFFFFF.toInt(); textSize = 11f * density }
+    private val capitalText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt(); textSize = 11.5f * density; typeface = Typeface.DEFAULT_BOLD
+    }
+    private val halo = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cityDot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
+    private val cityRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = 1.5f * density
+    }
+
+    private class PlacedLabel(val label: MapLabel, val x: Float, val y: Float)
+    private var placed: List<PlacedLabel> = emptyList()
+    private val layoutKey = FloatArray(5) { Float.NaN }
     private val rect = RectF()
     private val path = android.graphics.Path()
 
@@ -556,10 +584,98 @@ private class MapPainter(private val density: Float) {
         val c = s.drawContext.canvas.nativeCanvas
         coast.strokeWidth = 1f * density / cam.ppd
         border.strokeWidth = 0.8f * density / cam.ppd
+        // India's state and union territory borders, once zoomed in to about country level.
+        val showStates = cam.ppd / density >= 4f
+        if (showStates && stateDashPpd != cam.ppd) {
+            stateLine.strokeWidth = 0.9f * density / cam.ppd
+            stateLine.pathEffect = DashPathEffect(floatArrayOf(4f * density / cam.ppd, 3f * density / cam.ppd), 0f)
+            stateDashPpd = cam.ppd
+        }
         forEachCopy(s, cam) {
+            if (showStates) c.drawPath(world.states, stateLine)
             c.drawPath(world.land, coast)
             c.drawPath(world.borders, border)
         }
+    }
+
+    private fun paintFor(kind: MapLabel.Kind) = when (kind) {
+        MapLabel.Kind.Country -> countryText
+        MapLabel.Kind.State -> stateText
+        MapLabel.Kind.Capital -> capitalText
+        MapLabel.Kind.City -> cityText
+    }
+
+    private fun textOf(l: MapLabel) = if (l.kind == MapLabel.Kind.Country) l.name.uppercase() else l.name
+
+    /**
+     * Country, state and city names. More appear as you zoom in (each has its own zoom level, and
+     * India's cities appear earlier than elsewhere); the most important are placed first and any
+     * that would overlap one already placed are left out. Re-laid out only when the view moves.
+     */
+    fun drawLabels(s: DrawScope, cam: MapCamera, world: WorldOutline?) {
+        val labels = world?.labels ?: return
+        val w = s.size.width
+        val h = s.size.height
+        if (layoutKey[0] != cam.lon.toFloat() || layoutKey[1] != cam.lat.toFloat() || layoutKey[2] != cam.ppd ||
+            layoutKey[3] != w || layoutKey[4] != h
+        ) {
+            layoutKey[0] = cam.lon.toFloat(); layoutKey[1] = cam.lat.toFloat(); layoutKey[2] = cam.ppd
+            layoutKey[3] = w; layoutKey[4] = h
+            placed = layoutLabels(s, cam, labels)
+        }
+        val c = s.drawContext.canvas.nativeCanvas
+        for (p in placed) {
+            val paint = paintFor(p.label.kind)
+            when (p.label.kind) {
+                MapLabel.Kind.Country, MapLabel.Kind.State -> haloText(c, textOf(p.label), p.x, p.y, paint)
+                MapLabel.Kind.Capital, MapLabel.Kind.City -> {
+                    if (p.label.kind == MapLabel.Kind.Capital) c.drawCircle(p.x, p.y, 3.5f * density, cityRing)
+                    c.drawCircle(p.x, p.y, 2f * density, cityDot)
+                    haloText(c, p.label.name, p.x + 6f * density, p.y + paint.textSize * 0.35f, paint)
+                }
+            }
+        }
+    }
+
+    private fun layoutLabels(s: DrawScope, cam: MapCamera, labels: List<MapLabel>): List<PlacedLabel> {
+        val zoom = cam.ppd / density
+        val w = s.size.width
+        val h = s.size.height
+        val pad = 3f * density
+        val taken = ArrayList<RectF>()
+        val out = ArrayList<PlacedLabel>()
+        for (l in labels) {
+            if (l.minZoom > zoom) break // sorted by zoom: nothing after this shows yet
+            // The copy of the world nearest the middle of the view.
+            val lon = l.lon + Math.round((cam.lon - l.lon) / 360.0) * 360.0
+            val px = x(cam, s, lon)
+            val py = y(cam, s, l.lat)
+            if (px < -60f * density || px > w + 60f * density || py < 0f || py > h) continue
+            val paint = paintFor(l.kind)
+            if (l.width < 0f) l.width = paint.measureText(textOf(l))
+            val th = paint.textSize
+            val r = when (l.kind) {
+                MapLabel.Kind.Country, MapLabel.Kind.State -> RectF(px - l.width / 2, py - th * 0.85f, px + l.width / 2, py + th * 0.25f)
+                else -> RectF(px - 4f * density, py - th * 0.6f, px + 6f * density + l.width, py + th * 0.55f)
+            }
+            r.inset(-pad, -pad)
+            if (taken.any { RectF.intersects(it, r) }) continue
+            taken += r
+            out += PlacedLabel(l, px, py)
+            if (out.size >= 160) break
+        }
+        return out
+    }
+
+    /** Text with a dark outline, so it reads over the particles and the colour wash. */
+    private fun haloText(c: android.graphics.Canvas, text: String, x: Float, y: Float, paint: Paint) {
+        halo.set(paint)
+        halo.style = Paint.Style.STROKE
+        halo.strokeWidth = 3f * density
+        halo.strokeJoin = Paint.Join.ROUND
+        halo.color = 0xC0060B14.toInt()
+        c.drawText(text, x, y, halo)
+        c.drawText(text, x, y, paint)
     }
 
     /** Applies the degrees → pixels transform once for each world copy in view. */
