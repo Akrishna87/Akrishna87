@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A rounded play triangle, kept inside the adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path
+            android:pathData="M120,96 L432,96 Q464,96 464,128 L464,384 Q464,416 432,416 L80,416 Q48,416 48,384 L48,128 Q48,96 80,96 Z"
+            android:strokeWidth="28"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineJoin="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M212,180 Q212,164 226,172 L330,244 Q342,256 330,268 L226,340 Q212,348 212,332 Z" />
+    </group>
+</vector>
