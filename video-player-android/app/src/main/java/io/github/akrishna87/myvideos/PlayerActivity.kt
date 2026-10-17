@@ -151,6 +151,9 @@ class PlayerActivity : ComponentActivity() {
         player.addListener(listener)
         // Lets headphone buttons and the system's media controls drive the player.
         session = MediaSession.Builder(this, player).build()
+        // Send this screen's media and volume keys straight to that session, rather than relying on
+        // Android to pick the right app's session for them.
+        mediaController = android.media.session.MediaController(this, session.platformToken)
 
         playerView = PlayerView(this).apply {
             player = this@PlayerActivity.player
