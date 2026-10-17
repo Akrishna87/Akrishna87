@@ -194,7 +194,8 @@ sleep 1
 echo "PASS: define in page view"
 
 echo "--- Highlight and draw on page 1"
-dump goto
+# Android's "copied" clipboard popup can hold the screen for a few seconds after Copy.
+wait_for goto 'text="[0-9] / 5"' 20 "the page counter didn't come back after copying a word"
 tap goto "/ 5"
 sleep 1
 dump goto-dialog
