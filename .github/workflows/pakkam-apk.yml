@@ -89,15 +89,32 @@ jobs:
     permissions:
       contents: write
     steps:
+      # A branch whose app is the same as main's (a new branch for other work, say) mustn't
+      # replace the download with an older build of the app than the one being worked on.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Does this build change the app?
+        id: changes
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ] && git diff --quiet origin/main HEAD -- pakkam-android .github/workflows/pakkam-apk.yml; then
+            echo "The app on this branch is the same as on main; not publishing."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/download-artifact@v4
+        if: steps.changes.outputs.publish == 'true'
         with:
           name: Pakkam-apk
           path: out
       - uses: actions/download-artifact@v4
+        if: steps.changes.outputs.publish == 'true'
         with:
           name: pakkam-smoke-test-screens
           path: smoke
       - name: Publish the APK as the "pakkam-latest" release
+        if: steps.changes.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
