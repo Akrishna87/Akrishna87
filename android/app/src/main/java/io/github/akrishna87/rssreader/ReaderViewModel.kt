@@ -52,6 +52,7 @@ data class UiState(
     val refreshing: Boolean = false,
     val openArticleId: String? = null,
     val discoverOpen: Boolean = false,
+    val manageOpen: Boolean = false,
 )
 
 class ReaderViewModel(app: Application) : AndroidViewModel(app) {
@@ -92,6 +93,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openDiscover() = _state.update { it.copy(discoverOpen = true) }
     fun closeDiscover() = _state.update { it.copy(discoverOpen = false) }
+
+    fun openManage() = _state.update { it.copy(manageOpen = true) }
+    fun closeManage() = _state.update { it.copy(manageOpen = false) }
 
     fun setUnreadOnly(on: Boolean) {
         _state.update { it.copy(unreadOnly = on) }

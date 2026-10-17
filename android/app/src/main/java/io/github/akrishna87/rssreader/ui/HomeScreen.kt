@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -115,6 +116,16 @@ fun ReaderApp(vm: ReaderViewModel) {
             onToggleStar = { vm.toggleStar(open.id) },
             onMarkUnread = { vm.setRead(open.id, false); vm.closeArticle() },
         )
+    } else if (state.manageOpen) {
+        BackHandler { vm.closeManage() }
+        ManageFeedsScreen(
+            feeds = state.feeds,
+            articles = state.articles,
+            snackbar = snackbar,
+            onBack = vm::closeManage,
+            onRemove = vm::removeFeed,
+            onOpen = { id -> vm.setView(ReaderView.OneFeed(id)); vm.closeManage() },
+        )
     } else if (state.discoverOpen) {
         BackHandler { vm.closeDiscover() }
         DiscoverScreen(
@@ -185,6 +196,9 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
                 DrawerContent(state, unreadByFeed, onDiscover = {
                     vm.openDiscover()
                     scope.launch { drawer.close() }
+                }, onManage = {
+                    vm.openManage()
+                    scope.launch { drawer.close() }
                 }) { view ->
                     vm.setView(view)
                     scope.launch { drawer.close() }
@@ -214,6 +228,10 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
                                     onClick = { vm.markAllRead(visible.map { it.id }); menuOpen = false },
                                 )
                                 HorizontalDivider()
+                                DropdownMenuItem(text = { Text("Manage feeds") }, onClick = {
+                                    menuOpen = false
+                                    vm.openManage()
+                                })
                                 DropdownMenuItem(text = { Text("Import OPML") }, onClick = {
                                     menuOpen = false
                                     importLauncher.launch(arrayOf("*/*"))
@@ -297,7 +315,7 @@ private fun HomeScreen(state: UiState, vm: ReaderViewModel, snackbar: SnackbarHo
 }
 
 @Composable
-private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onDiscover: () -> Unit, onSelect: (ReaderView) -> Unit) {
+private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onDiscover: () -> Unit, onManage: () -> Unit, onSelect: (ReaderView) -> Unit) {
     val starred = remember(state.articles) { state.articles.count { it.starred } }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp)) {
         Text("Reader", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, bottom = 12.dp))
@@ -321,6 +339,14 @@ private fun DrawerContent(state: UiState, unreadByFeed: Map<String, Int>, onDisc
             selected = false,
             onClick = onDiscover,
         )
+        if (state.feeds.isNotEmpty()) {
+            NavigationDrawerItem(
+                label = { Text("Manage feeds") },
+                icon = { Icon(Icons.Filled.Settings, null) },
+                selected = false,
+                onClick = onManage,
+            )
+        }
         if (state.feeds.isNotEmpty()) {
             Text(
                 "FEEDS",
