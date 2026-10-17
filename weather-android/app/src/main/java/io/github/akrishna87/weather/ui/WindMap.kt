@@ -215,7 +215,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
             if (field != null) painter.drawHeat(this, cam, field, hourIndex(cam, field), cam.gusts)
             painter.drawCoasts(this, cam, world)
             particles.draw(this, cam)
-            painter.drawLabels(this, cam, world)
+            painter.drawLabels(this, cam, world, place?.let { LatLon(it.lat, it.lon) }, place?.name)
             painter.drawStorms(this, cam, storms, selected)
             place?.let { painter.drawPlace(this, cam, LatLon(it.lat, it.lon), it.name) }
             probe?.let { painter.drawProbe(this, cam, it.first) }
@@ -612,16 +612,18 @@ private class MapPainter(private val density: Float) {
      * India's cities appear earlier than elsewhere); the most important are placed first and any
      * that would overlap one already placed are left out. Re-laid out only when the view moves.
      */
-    fun drawLabels(s: DrawScope, cam: MapCamera, world: WorldOutline?) {
+    fun drawLabels(s: DrawScope, cam: MapCamera, world: WorldOutline?, you: LatLon?, youName: String?) {
         val labels = world?.labels ?: return
         val w = s.size.width
         val h = s.size.height
         if (layoutKey[0] != cam.lon.toFloat() || layoutKey[1] != cam.lat.toFloat() || layoutKey[2] != cam.ppd ||
-            layoutKey[3] != w || layoutKey[4] != h
+            layoutKey[3] != w || layoutKey[4] != h || layoutFor != you
         ) {
             layoutKey[0] = cam.lon.toFloat(); layoutKey[1] = cam.lat.toFloat(); layoutKey[2] = cam.ppd
             layoutKey[3] = w; layoutKey[4] = h
-            placed = layoutLabels(s, cam, labels)
+            layoutFor = you
+            if (byPriority.size != labels.size) byPriority = labels.sortedBy(::priority)
+            placed = layoutLabels(s, cam, byPriority, you, youName)
         }
         val c = s.drawContext.canvas.nativeCanvas
         for (p in placed) {
@@ -637,15 +639,37 @@ private class MapPainter(private val density: Float) {
         }
     }
 
-    private fun layoutLabels(s: DrawScope, cam: MapCamera, labels: List<MapLabel>): List<PlacedLabel> {
+    /**
+     * Which names win when they'd overlap: countries and capitals, then the biggest cities (the
+     * ones shown from furthest out), then states, then other cities, each by its zoom level.
+     */
+    private fun priority(l: MapLabel): Float = when (l.kind) {
+        MapLabel.Kind.Country, MapLabel.Kind.Capital -> l.minZoom
+        MapLabel.Kind.State -> 3.5f + l.minZoom / 100f
+        MapLabel.Kind.City -> if (l.minZoom <= 3.5f) l.minZoom else 3.6f + l.minZoom
+    }
+
+    private var byPriority: List<MapLabel> = emptyList()
+    private var layoutFor: LatLon? = null
+
+    private fun layoutLabels(s: DrawScope, cam: MapCamera, labels: List<MapLabel>, you: LatLon?, youName: String?): List<PlacedLabel> {
         val zoom = cam.ppd / density
         val w = s.size.width
         val h = s.size.height
         val pad = 3f * density
         val taken = ArrayList<RectF>()
         val out = ArrayList<PlacedLabel>()
+        // Your place's marker and name (drawn separately) come first; the city of the same name is left out.
+        if (you != null && youName != null) {
+            val px = x(cam, s, you.lon + Math.round((cam.lon - you.lon) / 360.0) * 360.0)
+            val py = y(cam, s, you.lat)
+            taken += RectF(px - 6f * density, py - 8f * density, px + 10f * density + small.measureText(youName), py + 8f * density)
+        }
         for (l in labels) {
-            if (l.minZoom > zoom) break // sorted by zoom: nothing after this shows yet
+            if (l.minZoom > zoom) continue
+            if (you != null && abs(l.lat - you.lat) < 0.25 && abs(l.lon - you.lon) < 0.25 &&
+                (l.kind == MapLabel.Kind.City || l.kind == MapLabel.Kind.Capital)
+            ) continue
             // The copy of the world nearest the middle of the view.
             val lon = l.lon + Math.round((cam.lon - l.lon) / 360.0) * 360.0
             val px = x(cam, s, lon)
@@ -833,7 +857,7 @@ private class MapPainter(private val density: Float) {
             c.drawCircle(px, py, 5f * density, dot)
             dot.color = 0xFF0EA5E9.toInt()
             c.drawCircle(px, py, 3.5f * density, dot)
-            c.drawText(name, px + 8 * density, py + 4 * density, small)
+            haloText(c, name, px + 8 * density, py + 4 * density, small)
         }
     }
 

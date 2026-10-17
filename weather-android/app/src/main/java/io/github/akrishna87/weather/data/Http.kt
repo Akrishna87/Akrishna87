@@ -28,7 +28,9 @@ object Http {
             try {
                 return if (limited) openMeteoSlots.withPermit { fetch(url, accept, timeoutMs) } else fetch(url, accept, timeoutMs)
             } catch (e: Exception) {
-                val retry = (e is HttpException && e.code == 429 && attempt < 3) || (e is SocketTimeoutException && attempt < 1)
+                // Busy (429) or briefly overloaded (502-504): wait a moment and try again.
+                val busy = e is HttpException && (e.code == 429 || e.code in 502..504)
+                val retry = (busy && attempt < 3) || (e is SocketTimeoutException && attempt < 1)
                 if (!retry) throw e
                 attempt++
                 delay(1_500L * attempt)
