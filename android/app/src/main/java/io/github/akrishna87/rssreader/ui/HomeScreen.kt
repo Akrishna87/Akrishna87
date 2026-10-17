@@ -35,10 +35,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -432,17 +430,17 @@ private fun DrawerContent(
         if (state.highlight.isNotEmpty()) {
             NavigationDrawerItem(
                 label = { Text("Highlights") },
-                icon = { Icon(Icons.Filled.ThumbUp, null) },
+                icon = { Icon(AppIcons.Label, null) },
                 badge = { Count(highlighted) },
                 selected = state.view == ReaderView.Highlights,
                 onClick = { onSelect(ReaderView.Highlights) },
             )
         }
-        NavigationDrawerItem(label = { Text("Discover feeds") }, icon = { Icon(Icons.Filled.Search, null) }, selected = false, onClick = onDiscover)
+        NavigationDrawerItem(label = { Text("Discover feeds") }, icon = { Icon(AppIcons.Explore, null) }, selected = false, onClick = onDiscover)
         if (state.feeds.isNotEmpty()) {
             NavigationDrawerItem(label = { Text("Manage feeds") }, icon = { Icon(Icons.Filled.Settings, null) }, selected = false, onClick = onManage)
         }
-        NavigationDrawerItem(label = { Text("Keyword filters") }, icon = { Icon(Icons.Filled.Warning, null) }, selected = false, onClick = onFilters)
+        NavigationDrawerItem(label = { Text("Keyword filters") }, icon = { Icon(AppIcons.Filter, null) }, selected = false, onClick = onFilters)
 
         if (state.feeds.isNotEmpty()) {
             Text(
