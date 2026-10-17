@@ -281,6 +281,8 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
     var openMark by remember { mutableStateOf<Int?>(null) }
     var noteFor by remember { mutableStateOf<NoteFor?>(null) }
     var highlightColor by remember { mutableIntStateOf(vm.settings.highlightColor) }
+    // While two fingers pinch: the text size they would set.
+    var pinchSize by remember { mutableStateOf<Float?>(null) }
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var offset by remember { mutableIntStateOf(vm.settings.readPosition(uriKey)) }
@@ -536,6 +538,36 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                     Box(
                         Modifier
                             .fillMaxSize()
+                            // Two fingers change the text size, like zooming; the pages are laid out again on letting go.
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                    var startDist = 0f
+                                    var startSize = 0f
+                                    while (true) {
+                                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                                        val pressed = event.changes.filter { it.pressed }
+                                        if (pressed.size >= 2) {
+                                            val a = pressed[0].position
+                                            val d = kotlin.math.hypot(a.x - pressed[1].position.x, a.y - pressed[1].position.y).coerceAtLeast(1f)
+                                            if (startDist == 0f) {
+                                                startDist = d
+                                                startSize = style.sizeSp
+                                                picked = null
+                                            }
+                                            pinchSize = (startSize * d / startDist).coerceIn(10f, 34f).roundToInt().toFloat()
+                                        }
+                                        if (startDist > 0f) event.changes.forEach { it.consume() }
+                                        if (event.changes.none { it.pressed }) break
+                                    }
+                                    val size = pinchSize
+                                    pinchSize = null
+                                    if (size != null && size != style.sizeSp) {
+                                        style = style.copy(sizeSp = size)
+                                        vm.settings.readStyle = style
+                                    }
+                                }
+                            }
                             .pointerInput(b, style.scroll) {
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -606,6 +638,19 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                                         .fillMaxSize()
                                         .semantics { contentDescription = pageText },
                                 ) { drawReadPage(i, topPad.toFloat()) }
+                            }
+                        }
+                        pinchSize?.let { size ->
+                            Surface(
+                                Modifier.align(Alignment.Center),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                tonalElevation = 6.dp,
+                                shadowElevation = 8.dp,
+                            ) {
+                                Column(Modifier.padding(horizontal = 28.dp, vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Aa", fontSize = size.sp, fontFamily = if (style.serif) FontFamily.Serif else FontFamily.SansSerif)
+                                    Text("Text size ${size.roundToInt()}", style = MaterialTheme.typography.labelLarge)
+                                }
                             }
                         }
                         // The page line at the bottom, like an ebook's.

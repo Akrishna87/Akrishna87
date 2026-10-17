@@ -148,6 +148,24 @@ tap menu2 "Day mode"
 sleep 1
 echo "PASS: night mode"
 
+echo "--- Fit the page to the screen"
+dump fit0
+tap fit0 "More options"
+sleep 1
+dump fit-menu
+tap fit-menu "Fit page to screen"
+wait_for fitted 'text="[0-9]+%"' 15 "Fit page to screen didn't zoom out"
+shot 05b-fit-page
+zoomed=$(grep -o 'text="[0-9]*%"' "$OUT/fitted.xml" | head -1 | sed 's/text="//; s/"$//')
+echo "  zoomed out to $zoomed"
+[ "${zoomed%\%}" -lt 100 ] || fail "Fit page to screen should make the page smaller than the screen's width, not $zoomed"
+# The zoom badge takes it back to the normal size.
+tap fitted "$zoomed"
+sleep 2
+dump unfitted
+grep -Eq 'text="[0-9]+%"' "$OUT/unfitted.xml" && fail "tapping the zoom badge didn't go back to the normal size"
+echo "PASS: fit page and back"
+
 echo "--- Reading mode"
 dump to-reading
 tap to-reading "Read mode"

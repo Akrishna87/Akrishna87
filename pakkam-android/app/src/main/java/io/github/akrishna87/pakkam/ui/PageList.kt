@@ -143,7 +143,8 @@ fun PageList(vs: ViewerState, actions: PageActions, modifier: Modifier = Modifie
                 },
         ) {
             if (!vs.paged) {
-                val contentW = with(density) { (vw * z).toDp() }
+                // Zoomed out, the column stays as wide as the screen and the pages sit in its middle.
+                val contentW = with(density) { (vw * maxOf(z, 1f)).toDp() }
                 Box(Modifier.fillMaxSize().horizontalScroll(vs.crossScroll, enabled = z > 1f)) {
                     LazyColumn(
                         state = vs.listState,
@@ -204,7 +205,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.pinchAnd
                     vs.pinchOrigin = centroid
                 } else {
                     val maxScale = ViewerState.MAX_ZOOM / vs.zoom
-                    val minScale = 1f / vs.zoom
+                    val minScale = vs.minZoom / vs.zoom
                     vs.pinchScale = (dist / startDist).coerceIn(minScale * 0.85f, maxScale * 1.1f)
                     vs.panBy((centroid - lastCentroid) / vs.pinchScale)
                 }
