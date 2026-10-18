@@ -1,8 +1,17 @@
-# Reader: native RSS reader for Android
+# Vellum: RSS reader for Android
 
 A standalone Android app written in Kotlin with Jetpack Compose. It fetches,
 parses and stores feeds itself, on the phone. It doesn't need Chrome, a
 website or a relay.
+
+The design follows Apple's iOS conventions: iOS system colours (light and
+dark), iOS text sizes and weights, inset-grouped lists, large titles that
+collapse into the navigation bar, a segmented All/Unread control, swipe
+actions, bottom sheets and a reader-style article view. Text is set in
+[Inter](https://rsms.me/inter/), an open-source typeface designed along the
+same lines as Apple's San Francisco (which can't be bundled outside Apple
+platforms). Inter is licensed under the SIL Open Font License 1.1; see
+`third_party/Inter-LICENSE.txt`.
 
 **Download:** <https://github.com/Akrishna87/Akrishna87/releases/latest/download/rss-reader.apk>
 
@@ -22,8 +31,9 @@ website or a relay.
 - **Keyword filters**: *mute* words to hide matching articles, *highlight*
   words to tag them and collect them under Highlights.
 - All / Starred / per-feed views, an "Unread only" filter, mark all as read.
-- Native article reader with inline images and tappable links, plus share and
-  "Read on site".
+- Reader-style article view with inline images and tappable links, and a
+  toolbar for unread, star, share and open in browser.
+- Swipe an article right to mark it read/unread, left to star it.
 - Pull to refresh; refreshes automatically when opened (if older than 15 minutes).
 - Works offline: articles are saved on the phone.
 - OPML import/export (bring feeds over from the web reader or any other app:

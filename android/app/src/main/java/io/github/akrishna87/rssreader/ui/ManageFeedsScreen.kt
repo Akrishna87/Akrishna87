@@ -1,34 +1,21 @@
 package io.github.akrishna87.rssreader.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,14 +23,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import io.github.akrishna87.rssreader.data.Article
 import io.github.akrishna87.rssreader.data.Feed
 import io.github.akrishna87.rssreader.hostOf
 
-/** Every subscription in one list, each with a delete button. Tap a row to open that feed. */
+/** Every subscription with edit (rename / folder) and delete. Tap a row to open that feed. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManageFeedsScreen(
@@ -55,97 +41,85 @@ fun ManageFeedsScreen(
     onEdit: (id: String, name: String, folder: String) -> Unit,
     onOpen: (String) -> Unit,
 ) {
+    val apple = LocalApple.current
     var confirm by remember { mutableStateOf<Feed?>(null) }
     var editing by remember { mutableStateOf<Feed?>(null) }
     val folders = remember(feeds) { feeds.map { it.folder }.filter { it.isNotEmpty() }.distinct().sorted() }
     val counts = remember(articles) { articles.groupingBy { it.feedId }.eachCount() }
     val starred = remember(articles) { articles.filter { it.starred }.groupingBy { it.feedId }.eachCount() }
+    val groups = remember(feeds) {
+        feeds.sortedBy { it.name.lowercase() }.groupBy { it.folder }.toList().sortedWith(compareBy<Pair<String, List<Feed>>>({ it.first.isEmpty() }, { it.first.lowercase() }))
+    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Manage feeds (${feeds.size})") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            if (feeds.isEmpty()) {
-                item(key = "empty") {
-                    Text(
-                        "No feeds yet. Add some with ➕ or from Discover feeds.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
-            items(feeds.sortedWith(compareBy<Feed>({ it.folder.isEmpty() }, { it.folder.lowercase() }, { it.name.lowercase() })), key = { it.id }) { f ->
-                Row(
-                    Modifier.fillMaxWidth().clickable { onOpen(f.id) }.padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    FeedBadge(f)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(f.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            (if (f.folder.isNotEmpty()) "📁 ${f.folder} · " else "") + hostOf(f.url) + " · ${counts[f.id] ?: 0} articles",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+    AppleScreen(title = "Manage Feeds", snackbar = snackbar, backLabel = "Feeds", onBack = onBack) {
+        if (feeds.isEmpty()) {
+            item(key = "empty") { EmptyMessage("No Feeds", "Add some with + or from Discover.") }
+        }
+        groups.forEach { (folder, members) ->
+            item(key = "group-$folder") {
+                GroupedSection(header = folder.ifEmpty { if (folders.isEmpty()) "Feeds" else "No folder" }) {
+                    members.forEachIndexed { i, f ->
+                        AppleRow(
+                            f.name,
+                            subtitle = (f.error?.let { "⚠ $it" }) ?: "${hostOf(f.url)} · ${counts[f.id] ?: 0} articles",
+                            leading = { FeedBadge(f) },
+                            chevron = false,
+                            showDivider = i != members.lastIndex,
+                            onClick = { onOpen(f.id) },
+                            trailing = {
+                                BarIcon(AppIcons.Pencil, "Rename or move ${f.name}", tint = apple.tint) { editing = f }
+                                BarIcon(AppIcons.Trash, "Unsubscribe from ${f.name}", tint = apple.red) { confirm = f }
+                            },
                         )
-                        if (f.error != null) {
-                            Text("⚠ ${f.error}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
-                        }
-                    }
-                    IconButton(onClick = { editing = f }) {
-                        Icon(Icons.Filled.Edit, "Rename or move ${f.name}")
-                    }
-                    IconButton(onClick = { confirm = f }) {
-                        Icon(Icons.Filled.Delete, "Unsubscribe from ${f.name}", tint = MaterialTheme.colorScheme.error)
                     }
                 }
-                HorizontalDivider(Modifier.padding(start = 52.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
         }
     }
 
     confirm?.let { feed ->
         val stars = starred[feed.id] ?: 0
-        AlertDialog(
-            onDismissRequest = { confirm = null },
-            title = { Text("Unsubscribe?") },
-            text = {
-                Text(
-                    "Remove “${feed.name}” and its saved articles" +
-                        (if (stars > 0) ", including $stars starred article${if (stars == 1) "" else "s"}?" else "?"),
-                )
-            },
-            confirmButton = { TextButton(onClick = { onRemove(feed.id); confirm = null }) { Text("Unsubscribe") } },
-            dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } },
+        AppleAlert(
+            title = "Unsubscribe from “${feed.name}”?",
+            message = "Its saved articles will be removed" + if (stars > 0) ", including $stars starred." else ".",
+            confirm = "Unsubscribe",
+            destructive = true,
+            onConfirm = { onRemove(feed.id); confirm = null },
+            onDismiss = { confirm = null },
         )
     }
 
     editing?.let { feed ->
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var name by remember(feed.id) { mutableStateOf(feed.name) }
         var folder by remember(feed.id) { mutableStateOf(feed.folder) }
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { editing = null },
-            title = { Text("Edit feed") },
-            text = {
-                Column {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true)
-                    Spacer(Modifier.height(12.dp))
-                    FolderPicker(folder, folders) { folder = it }
+            sheetState = sheet,
+            containerColor = apple.groupedBackground,
+            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+            dragHandle = {
+                Box(Modifier.padding(top = 6.dp).size(width = 36.dp, height = 5.dp).clip(RoundedCornerShape(50)).background(apple.tertiaryLabel))
+            },
+        ) {
+            Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(bottom = 16.dp)) {
+                Box(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 8.dp)) {
+                    Box(Modifier.align(Alignment.CenterStart)) { BarText("Cancel") { editing = null } }
+                    Text("Edit Feed", style = AppleType.headline, color = apple.label, modifier = Modifier.align(Alignment.Center))
+                    Box(Modifier.align(Alignment.CenterEnd)) {
+                        BarText("Save", bold = true) {
+                            onEdit(feed.id, name.ifBlank { feed.title }, folder)
+                            editing = null
+                        }
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { onEdit(feed.id, name.ifBlank { feed.title }, folder); editing = null }) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } },
-        )
+                GroupedSection(header = "Name", footer = "Leave as is to keep the feed's own title (${feed.title}).") {
+                    Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        AppleTextField(name, { name = it }, feed.title, Modifier.weight(1f))
+                    }
+                }
+                FolderPicker(folder, folders) { folder = it }
+            }
+        }
     }
 }

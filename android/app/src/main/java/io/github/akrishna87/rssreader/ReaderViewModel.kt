@@ -57,6 +57,8 @@ data class UiState(
     val discoverOpen: Boolean = false,
     val manageOpen: Boolean = false,
     val filtersOpen: Boolean = false,
+    /** The article list for [view] is showing (otherwise the Feeds home screen). */
+    val listOpen: Boolean = false,
     val mute: List<String> = emptyList(),
     val highlight: List<String> = emptyList(),
     val collapsed: Set<String> = emptySet(),
@@ -94,7 +96,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Navigation -------------------------------------------------------
 
-    fun setView(view: ReaderView) = _state.update { it.copy(view = view, showMuted = false) }
+    /** Open the article list for [view]. */
+    fun setView(view: ReaderView) = _state.update { it.copy(view = view, showMuted = false, listOpen = true) }
+
+    fun closeList() = _state.update { it.copy(listOpen = false) }
 
     fun openArticle(id: String) {
         _state.update { s -> s.copy(openArticleId = id, articles = s.articles.map { if (it.id == id) it.copy(read = true) else it }) }
@@ -183,6 +188,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     // Keep anything that changed while we were merging.
                     articles = (merged.filter { it.feedId == id } + s.articles.filter { it.feedId != id }).newestFirst(),
                     view = if (showFeed) ReaderView.OneFeed(id) else s.view,
+                    listOpen = showFeed || s.listOpen,
                 )
             }
             persist()
