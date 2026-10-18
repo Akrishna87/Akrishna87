@@ -1,8 +1,6 @@
 package io.github.akrishna87.rssreader.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -46,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -133,17 +132,17 @@ fun NavBar(
                     }
                 }
             }
-            AnimatedVisibility(showTitle, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
-                Text(
-                    title,
-                    style = AppleType.headline,
-                    color = apple.label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(0.5f),
-                )
-            }
+            // The small title fades in once the large title has scrolled away.
+            val titleAlpha by animateFloatAsState(if (showTitle) 1f else 0f, label = "navTitle")
+            Text(
+                title,
+                style = AppleType.headline,
+                color = apple.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.Center).fillMaxWidth(0.5f).alpha(titleAlpha),
+            )
             Row(
                 Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
