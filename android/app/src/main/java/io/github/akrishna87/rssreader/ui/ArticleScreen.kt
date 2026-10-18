@@ -12,6 +12,8 @@ import android.text.Html
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,25 +24,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
@@ -48,11 +37,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.res.ResourcesCompat
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import io.github.akrishna87.rssreader.R
 import io.github.akrishna87.rssreader.data.Article
 import io.github.akrishna87.rssreader.data.Feed
 import io.github.akrishna87.rssreader.data.resolveUrl
@@ -62,86 +54,101 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticleScreen(
     article: Article,
     feed: Feed?,
+    backLabel: String,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     onToggleStar: () -> Unit,
     onMarkUnread: () -> Unit,
 ) {
+    val apple = LocalApple.current
     val context = LocalContext.current
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {},
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                actions = {
-                    IconButton(onClick = onToggleStar) {
-                        Icon(
-                            Icons.Filled.Star,
-                            if (article.starred) "Unstar" else "Star",
-                            tint = if (article.starred) StarColor else LocalContentColor.current.copy(alpha = 0.45f),
-                        )
-                    }
-                    IconButton(onClick = onMarkUnread) { Icon(Icons.Filled.Email, "Mark as unread") }
-                    if (article.link.isNotEmpty()) {
-                        IconButton(onClick = { share(context, article) }) { Icon(Icons.Filled.Share, "Share") }
-                    }
-                },
+    val scroll = rememberScrollState()
+    Box(Modifier.fillMaxSize().background(apple.background)) {
+        Column(Modifier.fillMaxSize()) {
+            NavBar(
+                title = feed?.name.orEmpty(),
+                showTitle = scroll.value > 200,
+                showDivider = scroll.value > 0,
+                backLabel = backLabel,
+                onBack = onBack,
             )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-        ) {
-            val meta = listOfNotNull(
-                feed?.name,
-                article.author.takeIf { it.isNotBlank() },
-                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(article.date)),
-            ).joinToString(" · ")
-            Text(meta, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            Text(article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(16.dp))
-            val hasInlineImages = remember(article.contentHtml) { Regex("<img\\b", RegexOption.IGNORE_CASE).containsMatchIn(article.contentHtml) }
-            if (article.thumbnail != null && !hasInlineImages) {
-                AsyncImage(
-                    model = article.thumbnail,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+            Column(
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(horizontal = 20.dp),
+            ) {
+                Spacer(Modifier.height(8.dp))
+                if (feed != null) {
+                    Text(
+                        feed.name.uppercase(),
+                        style = AppleType.footnote.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.4.sp),
+                        color = apple.tint,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                Text(article.title, style = AppleType.title1, color = apple.label)
+                Spacer(Modifier.height(8.dp))
+                val meta = listOfNotNull(
+                    article.author.takeIf { it.isNotBlank() },
+                    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(article.date)),
+                ).joinToString(" · ")
+                Text(meta, style = AppleType.subheadline, color = apple.secondaryLabel)
+                Spacer(Modifier.height(18.dp))
+                val hasInlineImages = remember(article.contentHtml) { Regex("<img\\b", RegexOption.IGNORE_CASE).containsMatchIn(article.contentHtml) }
+                if (article.thumbnail != null && !hasInlineImages) {
+                    AsyncImage(
+                        model = article.thumbnail,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).clip(RoundedCornerShape(12.dp)).background(apple.fill),
+                    )
+                    Spacer(Modifier.height(18.dp))
+                }
+                if (article.contentHtml.isNotBlank()) {
+                    HtmlText(article.contentHtml, baseUrl = article.link.ifEmpty { feed?.url.orEmpty() })
+                } else {
+                    Text(
+                        "This feed only includes a headline. Open the original to read the full article.",
+                        style = AppleType.body,
+                        color = apple.secondaryLabel,
+                    )
+                }
+                if (article.link.isNotEmpty()) {
+                    Spacer(Modifier.height(28.dp))
+                    Text(
+                        "Read on ${hostOf(article.link)}",
+                        style = AppleType.body.copy(fontWeight = FontWeight.SemiBold),
+                        color = apple.tint,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(apple.fill)
+                            .clickable { openLink(context, article.link) }.padding(horizontal = 16.dp, vertical = 11.dp),
+                    )
+                }
+                Spacer(Modifier.height(40.dp))
+            }
+            BottomToolbar {
+                BarIcon(AppIcons.EnvelopeBadge, "Mark as unread", onClick = onMarkUnread)
+                BarIcon(
+                    if (article.starred) AppIcons.StarFill else AppIcons.Star,
+                    if (article.starred) "Unstar" else "Star",
+                    tint = if (article.starred) apple.yellow else null,
+                    onClick = onToggleStar,
                 )
-                Spacer(Modifier.height(16.dp))
+                BarIcon(AppIcons.Share, "Share", enabled = article.link.isNotEmpty()) { share(context, article) }
+                BarIcon(AppIcons.Safari, "Open in browser", enabled = article.link.isNotEmpty()) { openLink(context, article.link) }
             }
-            if (article.contentHtml.isNotBlank()) {
-                HtmlText(article.contentHtml, baseUrl = article.link.ifEmpty { feed?.url.orEmpty() })
-            } else {
-                Text(
-                    "This feed only includes a headline. Open the original to read the full article.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (article.link.isNotEmpty()) {
-                Spacer(Modifier.height(24.dp))
-                OutlinedButton(onClick = { openLink(context, article.link) }) { Text("Read on ${hostOf(article.link)}") }
-            }
-            Spacer(Modifier.height(32.dp))
         }
+        AppleSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 56.dp))
     }
 }
 
 /** Renders feed HTML natively in a TextView, with links and inline images. */
 @Composable
 private fun HtmlText(html: String, baseUrl: String) {
-    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
-    val linkColor = MaterialTheme.colorScheme.primary.toArgb()
+    val apple = LocalApple.current
+    val textColor = apple.label.toArgb()
+    val linkColor = apple.tint.toArgb()
     val scope = rememberCoroutineScope()
     val cleaned = remember(html, baseUrl) { cleanHtml(html, baseUrl) }
     AndroidView(
@@ -149,8 +156,10 @@ private fun HtmlText(html: String, baseUrl: String) {
         factory = { ctx ->
             TextView(ctx).apply {
                 movementMethod = LinkMovementMethod.getInstance()
-                textSize = 17f
-                setLineSpacing(0f, 1.35f)
+                typeface = ResourcesCompat.getFont(ctx, R.font.inter)
+                textSize = 18f
+                letterSpacing = -0.012f
+                setLineSpacing(0f, 1.42f)
             }
         },
         update = { tv ->
