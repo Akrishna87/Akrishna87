@@ -240,7 +240,13 @@ shot 07-reading-sepia
 dump reading-sepia
 grep -Eq 'Page 1 of [0-9]+' "$OUT/reading-sepia.xml" || fail "Reading mode lost its place after changing colours"
 # Both show in the list of notes and highlights.
-tap reading-sepia "Notes and highlights"
+# The top bar has the quick actions; the rest are under More.
+grep -q 'content-desc="Read aloud"' "$OUT/reading-sepia.xml" || fail "Reading mode's menu has no Read aloud"
+grep -q 'content-desc="Share"' "$OUT/reading-sepia.xml" || fail "Reading mode's menu has no Share"
+tap reading-sepia "More options"
+sleep 1
+dump reading-more
+tap reading-more "Notes and highlights"
 wait_for reading-notes 'Remember this' 15 "the note isn't in Notes and highlights"
 grep -q 'Highlight this sentence' "$OUT/reading-notes.xml" || fail "the highlight isn't in Notes and highlights"
 grep -q 'elephant' "$OUT/reading-notes.xml" || fail "the noted word isn't in Notes and highlights"
@@ -249,7 +255,10 @@ adb shell input keyevent KEYCODE_BACK
 sleep 2
 # The Page view button goes to page view (Back would close the book).
 dump reading-sepia
-tap reading-sepia "Page view"
+tap reading-sepia "More options"
+sleep 1
+dump reading-more2
+tap reading-more2 "Page view"
 wait_for back-to-pages 'text="[0-9] / 5"' 20 "Page view didn't go back to the PDF"
 echo "PASS: reading mode and its dictionary"
 
@@ -414,7 +423,10 @@ read -r rw rh < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x'
 adb shell input tap $((rw / 2)) $((rh / 12))
 sleep 2
 dump reopened-chrome
-tap reopened-chrome "Page view"
+tap reopened-chrome "More options"
+sleep 1
+dump reopened-more
+tap reopened-more "Page view"
 wait_for reopened-pages 'text="[0-9] / 5"' 20 "Page view didn't open from Reading mode"
 adb shell input keyevent KEYCODE_BACK
 wait_for home-4 'text="Combine files"' 20 "leaving the document didn't return Home"
