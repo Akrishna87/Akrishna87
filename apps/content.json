@@ -1,0 +1,759 @@
+{
+ "isaialai": {
+  "about": [
+   "Isaialai means \"music wave\" in Tamil: isai (music) + alai (wave). The app was first called \"My Music\". Its internal ID is unchanged, so new builds install over the old one and keep your playlists and settings.",
+   "A native Android music player that plays the songs already saved on your phone straight from storage. There's nothing to pick or import and no copies, uploads, ads or account. (It goes online only when you tap Check for updates in Settings.) New songs you download show up by themselves."
+  ],
+  "features": [
+   "Home · Search · Library along the bottom, with a mini player above them tinted in the current song's cover colour.",
+   "Home greets you by time of day and has quick tiles (Liked songs, Shuffle all, recent albums), plus rows for Jump back in (recently played), Recently…",
+   "Search matches songs, artists, albums and folders as you type.",
+   "Your Library has filter chips for Songs, Albums, Artists, Composers, Folders and Playlists.",
+   "Music directors (Composers): Tamil and other film songs list the singers as the artist, so this groups songs by the Composer tag instead…",
+   "Instant mix: a song's ⋮ menu → Instant mix plays that song, then songs like it: same singers or music director, the same movie and era, songs you…",
+   "Similar artists at the bottom of each artist page: singers who sang in the same movies or for the same music directors, duet partners, and artists…",
+   "Autoplay (Settings → Playback, off unless you turn it on): when the last song in the queue starts, songs like the last few you played are added after…",
+   "Your recap (Home, or Library ⋮ → Your recap): how much you listened this month, last month, this year or ever; your top songs, artists, music…",
+   "Make it yours (Settings): pick an accent colour (coral, rose, red, amber, green, teal, blue or violet), switch Home's rows on or off and put them in…"
+  ],
+  "sha": "0b60507ff0022fbe2fe93b8954c097e1bc9c86da",
+  "changes": [
+   {
+    "title": "Add Check for updates in Settings",
+    "date": "2026-10-17T05:51:30Z"
+   },
+   {
+    "title": "Pack all songs into one zip, and unpack it on a new phone",
+    "date": "2026-10-16T15:55:56Z"
+   },
+   {
+    "title": "Instant mix, similar artists, autoplay, recap and app customisation",
+    "date": "2026-10-11T15:30:09Z"
+   },
+   {
+    "title": "Settings switch rows: no extra label (wrong bounds, read twice by TalkBack)",
+    "date": "2026-10-11T13:59:56Z"
+   },
+   {
+    "title": "Settings: Home screen card after Playback; crossfade test scrolls to its buttons",
+    "date": "2026-10-11T11:06:16Z"
+   },
+   {
+    "title": "Rename setStartSection (clashed with the property's setter)",
+    "date": "2026-10-11T10:52:12Z"
+   }
+  ]
+ },
+ "myvideos": {
+  "about": [
+   "A native Android video player for the movies and videos already saved on your phone. It plays them straight from storage. There's nothing to import and no copies, uploads, ads or account. New downloads and recordings show up by themselves."
+  ],
+  "features": [
+   "Videos lists every video on the phone with a thumbnail, its length, quality (720p, 1080p, 4K…) and size.",
+   "Continue watching at the top shows videos you started but didn't finish, with how much is left.",
+   "Folders groups videos by where they are (Camera, Download, WhatsApp Video, Movies…).",
+   "Search matches video and folder names as you type.",
+   "Tapping a video plays the list from there, so the next video starts when one ends.",
+   "The player: several languages) and subtitles.",
+   "Open with My Videos: file managers, Downloads and chat apps can open videos in the player.",
+   "Details in a video's ⋮ menu shows its file name, folder, resolution, size and date."
+  ],
+  "sha": "dd4b9042da8de7ea2e2c5717e9bbcf852ceff985",
+  "changes": [
+   {
+    "title": "My Videos: route the player's media keys straight to its session",
+    "date": "2026-10-17T14:36:23Z"
+   },
+   {
+    "title": "Add My Videos: a native Android player for videos stored on the phone",
+    "date": "2026-10-01T17:42:27Z"
+   }
+  ]
+ },
+ "lumen": {
+  "about": [
+   "A photo gallery for Android designed the way Apple designs Photos for iPhone: iOS colours, layouts, controls and gestures, set in Inter, an open-source typeface designed along the same lines as Apple's San Francisco. It shows the photos and videos already on your phone, straight from storage. There's nothing to import, and no copies, uploads, ads or account."
+  ],
+  "features": [
+   "Library: every photo and video in one grid, oldest at the top and newest at the bottom, where it opens.",
+   "Select: tap Select (or long-press a photo) to pick several, then share, favourite or delete them from the toolbar.",
+   "The viewer: swipe between photos, pinch or double-tap to zoom, and drag down to close.",
+   "Albums: My Albums (Recents, Favorites, then each folder like Camera, Screenshots or WhatsApp Images) as two rows of covers that scroll sideways, with…",
+   "Search: albums, months (\"October\", \"2025\") and file names, with suggestions for albums and recent months before you type.",
+   "Limited access (Android 14+): if you let Lumen see only some photos, Albums says so and Manage… lets you change the selection.",
+   "Light and dark mode follow the phone's setting."
+  ],
+  "sha": "81071de65254dc47eaf0de1c5c65607f70912200",
+  "changes": [
+   {
+    "title": "Lumen, a photo gallery for Android in Apple's Photos style",
+    "date": "2026-10-19T09:35:58Z"
+   }
+  ]
+ },
+ "vaanalai": {
+  "about": [
+   "Vaanalai (vaan, sky + alai, wave: the Tamil word for the airwaves) plays live internet radio from around the world, including your own country's stations. The stations come from the free, community-run Radio Browser directory, which lists about 50,000 of them. There are no ads, no account and no tracking."
+  ],
+  "features": [
+   "Home shows the most popular stations in your country, worked out from your SIM card or phone settings.",
+   "Browse by genre or language: Tamil, Hindi, Bollywood, Malayalam, Telugu, Carnatic, devotional, news, talk, pop, rock, jazz, classical, lo-fi and more.",
+   "Search by station name, city, language or genre, either everywhere or only in your country.",
+   "Favourites: tap ♡ on any station to keep it.",
+   "Plays in the background, with controls in the notification, on the lock screen, and from Bluetooth headphones and the car.",
+   "Shows the song that's on, when the station sends song titles, with the song's album cover on the player, the notification and the lock screen (looked…",
+   "Station logos: from the directory, or, when that's missing or blurry, from the station's own website.",
+   "Reconnects by itself when the connection drops or the station's server hangs up.",
+   "Sleep timer (moon icon on the full player): stops the radio after 15 minutes to 2 hours, fading out gently.",
+   "Android Auto: browse Favourites, Recently played and Popular stations from the car's screen, or say \"play on Vaanalai\"."
+  ],
+  "sha": "31927953967e3f15b5ad9fd298c906d8f17767ad",
+  "changes": [
+   {
+    "title": "Add All India Radio and Zeno.fm stations",
+    "date": "2026-10-19T14:46:27Z"
+   },
+   {
+    "title": "Create the assets folder before saving All India Radio's list",
+    "date": "2026-10-19T14:39:23Z"
+   },
+   {
+    "title": "Retry fetching All India Radio's list",
+    "date": "2026-10-19T14:38:28Z"
+   },
+   {
+    "title": "Probe AIR list (temporary)",
+    "date": "2026-10-19T14:27:27Z"
+   },
+   {
+    "title": "Probe radio sources (temporary)",
+    "date": "2026-10-19T14:16:58Z"
+   },
+   {
+    "title": "Probe radio sources again (temporary)",
+    "date": "2026-10-19T14:15:26Z"
+   }
+  ]
+ },
+ "kural": {
+  "about": [
+   "Yap is a free podcast player for Android, because a podcast is people having a good yap. It has no account, ads or tracking. It opens on your shows rather than on promotions, and it brings together the features people like most in Pocket Casts, Overcast, Apple Podcasts, Castro and AntennaPod."
+  ],
+  "features": [],
+  "sha": "807118282c6e9e4d292570b2663579336bfb8000",
+  "changes": [
+   {
+    "title": "Rename the app to Yap, with a speech-bubble sticker icon",
+    "date": "2026-10-18T13:33:49Z"
+   },
+   {
+    "title": "New smiling-mic icon, and louder playback by default",
+    "date": "2026-10-17T16:04:04Z"
+   },
+   {
+    "title": "Podcasts: louder by default, with Off/Low/Medium/High volume boost",
+    "date": "2026-10-17T15:52:33Z"
+   },
+   {
+    "title": "Podcasts: new launcher icon, a smiling microphone sticker",
+    "date": "2026-10-17T15:52:33Z"
+   },
+   {
+    "title": "Podcasts: Home shows your shows, their latest episodes and suggestions",
+    "date": "2026-10-03T14:08:19Z"
+   },
+   {
+    "title": "Podcasts: read feeds as they stream in, so huge shows can be followed",
+    "date": "2026-10-03T13:31:27Z"
+   }
+  ]
+ },
+ "folio": {
+  "about": [
+   "Folio is a free, Libby-style app for public-domain audiobooks and ebooks. Search, tap a book, then listen or read. Everything can be downloaded to read or listen offline. There are no accounts or ads, and every book comes from a catalog that gives it away legally:",
+   "Copyright rules differ between countries. A book that's free in the USA may still be under copyright where you live, so check your own country's rules if you're outside the USA."
+  ],
+  "features": [
+   "Home has a Continue row for the books you've started, the most popular audiobooks and ebooks, and browse tiles by subject (Adventure, Mystery,…",
+   "Search looks in both catalogs at once as you type.",
+   "Book pages show the cover, author, length, licence and description, plus Play / Read and Download.",
+   "Audiobook player with chapters (\"parts\"), 10 s back and 30 s forward, speeds from 0.75× to 2.5×, a sleep timer (minutes or end of part), lock-screen…",
+   "Downloads run through Android's download manager, so they carry on with the app closed and show their progress in the notification shade.",
+   "Built-in ebook reader with pages you turn by tapping the right or left edge (or swiping), a tap in the middle for the menu, a table of contents, text…",
+   "Your shelf lists every book you've played, read, downloaded or saved, with your progress and how much space downloads use."
+  ],
+  "sha": "45ff6b70d8836006b7ff90ccdd51456131379d22",
+  "changes": [
+   {
+    "title": "Reader: size pages from the measured screen, so a page never holds one line",
+    "date": "2026-10-07T12:17:22Z"
+   },
+   {
+    "title": "Temporary: print the contents of Gutenberg's text-only EPUB in CI",
+    "date": "2026-10-07T12:06:38Z"
+   },
+   {
+    "title": "Ebooks: download progress, resume dropped downloads, skip huge editions",
+    "date": "2026-10-07T12:02:12Z"
+   },
+   {
+    "title": "Ebooks: show download progress, resume dropped downloads, skip huge editions",
+    "date": "2026-10-07T11:26:43Z"
+   },
+   {
+    "title": "Books: rename the app to Folio",
+    "date": "2026-10-02T23:26:51Z"
+   },
+   {
+    "title": "Books: new launcher icon, an open book wearing headphones",
+    "date": "2026-10-02T23:26:05Z"
+   }
+  ]
+ },
+ "vellum": {
+  "about": [
+   "A standalone Android app written in Kotlin with Jetpack Compose. It fetches, parses and stores feeds itself, on the phone. It doesn't need Chrome, a website or a relay.",
+   "The design follows Apple's iOS conventions: iOS system colours (light and dark), iOS text sizes and weights, inset-grouped lists, large titles that collapse into the navigation bar, a segmented All/Unread control, swipe actions, bottom sheets and a reader-style article view. Text is set in Inter, an open-source typeface designed along the same lines as Apple's San Francisco (which can't be bundled outside Apple platforms). Inter is licensed under the SIL…"
+  ],
+  "features": [
+   "Subscribe by feed URL or website address: the app finds the site's feed.",
+   "RSS 2.0, RSS 1.0/RDF and Atom, including podcast and YouTube feeds.",
+   "Discover feeds: a directory of 38 popular feeds across 7 topics (Tech, Cloud & AI, News, India, Business, Science, Learning) with search and one-tap…",
+   "Folders: group feeds (set when adding, from Discover by topic, or with ✎ in Manage feeds), each with a combined view and unread count; collapse them…",
+   "Manage feeds: rename, move to a folder, or unsubscribe (🗑).",
+   "Keyword filters: mute words to hide matching articles, highlight words to tag them and collect them under Highlights.",
+   "All / Starred / per-feed views, an \"Unread only\" filter, mark all as read.",
+   "Reader-style article view with inline images and tappable links, and a toolbar for unread, star, share and open in browser.",
+   "Swipe an article right to mark it read/unread, left to star it.",
+   "Pull to refresh; refreshes automatically when opened (if older than 15 minutes)."
+  ],
+  "sha": "dd4b9042da8de7ea2e2c5717e9bbcf852ceff985",
+  "changes": [
+   {
+    "title": "Android app: fade the nav-bar title with an alpha animation",
+    "date": "2026-10-18T09:31:12Z"
+   },
+   {
+    "title": "Android app: Apple-style redesign, new name (Vellum) and icon",
+    "date": "2026-10-18T09:26:51Z"
+   },
+   {
+    "title": "Android app: proper icons for Keyword filters, Discover and Highlights",
+    "date": "2026-10-17T11:47:25Z"
+   },
+   {
+    "title": "Android app: folders, rename/move feeds, and keyword filters",
+    "date": "2026-10-17T11:26:52Z"
+   },
+   {
+    "title": "Android app: add a Manage feeds screen for removing subscriptions",
+    "date": "2026-10-17T11:19:01Z"
+   },
+   {
+    "title": "Android app: add Discover feeds",
+    "date": "2026-10-17T11:11:13Z"
+   }
+  ]
+ },
+ "vasi": {
+  "about": [
+   "Vaasi (வாசி, \"read!\") is an Android app that turns a PDF into natural, human-sounding speech. The voices are Kokoro, an open neural text-to-speech model, running on the phone itself through sherpa-onnx. After a one-time voice download nothing goes to the internet, and nothing you listen to leaves the phone."
+  ],
+  "features": [
+   "Add a PDF with the Add PDF button, or open or share one to Vaasi from Files, Gmail, a browser or any other app.",
+   "Cleans up the text first: drops running headers, footers and page numbers, mends words hyphenated across lines, rejoins paragraphs split by a page…",
+   "Starts where the book starts: skips the title page, copyright notice and table of contents and begins at the Introduction, Prologue or Chapter 1…",
+   "Reads it aloud sentence by sentence, highlighting the sentence being spoken.",
+   "Different voices: 11 voices in the Compact pack and 28 in the Studio pack, American and British, women and men.",
+   "Dialogue voice: optionally reads words in \"quotation marks\" in a second voice, so a story sounds like a narrator and a speaker.",
+   "Keeps going in the background with the screen off, with play/pause and skip on the lock screen, in the notification and on headphones.",
+   "Remembers where you stopped in every PDF.",
+   "Converts the whole PDF to audio: as soon as a PDF is added, Vaasi turns it into audio in the background (screen off is fine), working just ahead of…",
+   "Save to Music: joins the converted audio into one .m4a in Music/Vaasi, to play in any music app or copy elsewhere (seconds, once converted)."
+  ],
+  "sha": "b1b692f129dd39cb108082f23c3bf5ad5d3bef7d",
+  "changes": [
+   {
+    "title": "Start ebooks at their introduction, and tune the voice to each phone",
+    "date": "2026-10-11T06:18:32Z"
+   },
+   {
+    "title": "Name the conversion buttons apart from playback's Pause",
+    "date": "2026-10-11T03:09:08Z"
+   },
+   {
+    "title": "Convert whole PDFs to audio first, then play the audio",
+    "date": "2026-10-11T02:55:21Z"
+   },
+   {
+    "title": "Only say the voice is catching up when the speaker has really run dry",
+    "date": "2026-10-10T11:40:45Z"
+   },
+   {
+    "title": "Smoother loading, Studio recommended, and expressive reading",
+    "date": "2026-10-10T10:16:57Z"
+   },
+   {
+    "title": "Build, test and publish Vaasi from its own repository",
+    "date": "2026-10-10T04:32:40Z"
+   }
+  ]
+ },
+ "songgrab": {
+  "about": [
+   "SongGrab saves the audio of a YouTube video as a song on your phone, as an MP3 or an M4A, with the title, artist and cover art filled in, or saves the whole video as an MP4. Songs go into your phone's Music/SongGrab folder, so SongGrab's own player, your other music apps (including Isaialai) and the Files app can all play them, offline. Videos go into Movies/SongGrab, so they also show up in your Gallery or Photos app.",
+   "It's for your own phone and is installed straight from GitHub (sideloaded). It isn't on the Play Store, because Google doesn't allow YouTube downloaders there."
+  ],
+  "features": [],
+  "sha": "b793d7f0907ab2459ee849f668b92e228525013c",
+  "changes": [
+   {
+    "title": "SongGrab: save the whole video too, at 480p, 720p or 1080p",
+    "date": "2026-10-04T13:45:02Z"
+   },
+   {
+    "title": "SongGrab: a shared link closes the full player so its download shows",
+    "date": "2026-10-04T11:17:38Z"
+   },
+   {
+    "title": "SongGrab: save a YouTube link as an MP3 or M4A song on the phone",
+    "date": "2026-10-04T11:05:07Z"
+   }
+  ]
+ },
+ "mytorrents": {
+  "about": [
+   "A native Android BitTorrent app. Add a magnet link or a .torrent file and it downloads into Download/Torrents on your phone, where your Files app, gallery and music player can find it."
+  ],
+  "features": [],
+  "sha": "125923ea77c77aed1147a2738299525650fadfe8",
+  "changes": [
+   {
+    "title": "Torrent app: security hardening",
+    "date": "2026-10-01T17:21:44Z"
+   },
+   {
+    "title": "Torrent engine: fix finishing hybrid torrents and resuming after pause",
+    "date": "2026-10-01T13:36:45Z"
+   },
+   {
+    "title": "Torrent app: fix adding magnet links",
+    "date": "2026-10-01T13:09:06Z"
+   },
+   {
+    "title": "Torrent engine: report the first status error instead of hiding it",
+    "date": "2026-10-01T13:00:43Z"
+   },
+   {
+    "title": "Torrent app: log engine start-up and adds, report start-up failures",
+    "date": "2026-10-01T13:00:27Z"
+   },
+   {
+    "title": "Add My Torrents, a native Android BitTorrent app",
+    "date": "2026-10-01T12:16:29Z"
+   }
+  ]
+ },
+ "daybook": {
+  "about": [
+   "Daybook is notes and tasks in one app: Evernote-style notebooks and notes, with Todoist-style tasks and Quick Add. A note can hold the tasks that come out of it, so a meeting's notes and its action items stay together. Everything stays on your phone: there are no accounts, no ads and no internet access."
+  ],
+  "features": [],
+  "sha": "37eccd6b6790c8680a2005bd6930e355414b83ba",
+  "changes": [
+   {
+    "title": "Daybook: under a day's heading, show a task's time without repeating the day",
+    "date": "2026-10-03T10:51:21Z"
+   },
+   {
+    "title": "Daybook 2: notes and tasks, Evernote meets Todoist",
+    "date": "2026-10-03T10:43:04Z"
+   },
+   {
+    "title": "Daybook: explain how to keep Android's big lock screen clock out of the way",
+    "date": "2026-10-03T07:30:28Z"
+   },
+   {
+    "title": "Daybook: a calendar, to-do and notes app that puts your day on the lock screen",
+    "date": "2026-10-03T07:03:26Z"
+   }
+  ]
+ },
+ "doable": {
+  "about": [
+   "Doable is a to-do app: Todoist-style tasks with Quick Add, projects, labels, reminders and repeating tasks. Everything stays on your phone: there are no accounts, no ads and no internet access.",
+   "It is one of three separate apps that work alike: Doable (tasks), Dayline (calendar) and Jotter (notes)."
+  ],
+  "features": [
+   "Quick Add: tap + and type a task in plain words.",
+   "Today shows overdue tasks (with Reschedule), then today's, with a progress bar; Upcoming shows the coming days as a list or a month calendar.",
+   "Projects with sub-projects, sections, favourites, colours and archiving, viewed as a list, a board (a column per section) or a calendar, each with…",
+   "Labels and saved filters in Todoist's filter language, for example today | overdue, #Work & p1, @home & !no date, due before: next week, has:…",
+   "Task details: description, due date and time, duration, deadline, repeat (including a custom repeat dialog), priority, project, section, labels,…",
+   "Swipe actions you can choose for each direction (complete, schedule, delete), with Undo.",
+   "Productivity: Karma points and levels, daily and weekly goals, streaks, days off and vacation mode.",
+   "Reminders with Complete and Snooze on the notification, an automatic reminder at the due time if you want one, and an optional daily summary.",
+   "Search (plain words or a filter query), light and dark themes with accent colours, a choice of start page, and a home screen widget for today's tasks.",
+   "Backup: Settings → Export backup saves everything to a JSON file, and Restore from backup reads one back."
+  ],
+  "sha": "76285383075204067b641b26054dd4c3071a7402",
+  "changes": [
+   {
+    "title": "Import Modifier.height in the task page",
+    "date": "2026-10-16T15:18:31Z"
+   },
+   {
+    "title": "New look: Plus Jakarta Sans, tinted page with rounded cards, floating tab bar, icon tiles",
+    "date": "2026-10-16T15:15:53Z"
+   },
+   {
+    "title": "README: describe the Todoist Pro features",
+    "date": "2026-10-12T18:27:29Z"
+   },
+   {
+    "title": "Doable: scroll a new comment into view",
+    "date": "2026-10-12T18:15:48Z"
+   },
+   {
+    "title": "Doable: Todoist Pro features",
+    "date": "2026-10-12T18:08:18Z"
+   },
+   {
+    "title": "Doable: a to-do app for Android",
+    "date": "2026-10-12T15:23:36Z"
+   }
+  ]
+ },
+ "dayline": {
+  "about": [
+   "Dayline is a calendar app with what you'd expect from Google Calendar: schedule, day, 3-day, week and month views, repeating events, notifications, time zones, .ics import and export, and widgets. Everything stays on your phone: there are no accounts, no ads and no internet access.",
+   "It is one of three separate apps that work alike: Doable (tasks), Dayline (calendar) and Jotter (notes)."
+  ],
+  "features": [
+   "Views: Schedule (the next three months, day by day), and on the Calendar tab Day, 3 days, Week and Month.",
+   "New events in plain words: tap + and type the title the way you'd say it.",
+   "Events: all-day or with times, over several days, in their own time zone, with a place, notes, guests, a colour of their own, and busy/free.",
+   "Repeats like Google Calendar's: daily, weekly on chosen days, monthly on a date, on the last day or on the 2nd Tuesday, yearly, every N of any of…",
+   "Notifications: as many as you like per event, from at the start to a week before; all-day events notify on the day or days before at a time you…",
+   "Calendars: Personal and Work to start with.",
+   "Import .ics files (from Google Calendar, Outlook or Apple Calendar): open one with Dayline, share it to Dayline, or use Calendars → Import events.",
+   "Widgets: a schedule of the coming days, and a month that marks busy days.",
+   "Search (titles, places, notes and guests), light and dark themes, and backups (Settings → Export backup / Restore from backup) as a JSON file."
+  ],
+  "sha": "e15c8f7ba68cebfae33bac95ce01787ffeb37098",
+  "changes": [
+   {
+    "title": "Show the title example only on the first few new events",
+    "date": "2026-10-16T16:41:54Z"
+   },
+   {
+    "title": "New look: Plus Jakarta Sans, tinted page with cards, floating tab bar, tinted events",
+    "date": "2026-10-16T15:19:54Z"
+   },
+   {
+    "title": "Import the Check icon in Settings",
+    "date": "2026-10-12T18:28:52Z"
+   },
+   {
+    "title": "Google Calendar parity: day, 3-day and week views, rich repeats, time zones, .ics import/export, widgets",
+    "date": "2026-10-12T18:26:46Z"
+   },
+   {
+    "title": "Dayline: a new event opens ready to type its title",
+    "date": "2026-10-12T15:41:41Z"
+   },
+   {
+    "title": "Dayline: a calendar app for Android",
+    "date": "2026-10-12T15:34:45Z"
+   }
+  ]
+ },
+ "jotter": {
+  "about": [
+   "Jotter is a notes app in the spirit of Evernote: notebooks and stacks, tags, checklists, rich formatting, photos, scans, recordings, sketches, reminders and powerful search. Everything stays on your phone: there are no accounts, no ads and no internet access.",
+   "It is one of three separate apps that work alike: Doable (tasks), Dayline (calendar) and Jotter (notes)."
+  ],
+  "features": [
+   "Home: buttons to start a note, checklist, photo, scan, recording, sketch or a note from a template; a scratch pad that becomes a note; pinned and…",
+   "Writing: notes open ready to read.",
+   "Attachments: photos from the gallery or the camera, document scans (made grey and high-contrast, like a scan), audio recordings with a player in the…",
+   "Organising: notebooks, grouped into stacks; nested tags; a default notebook; shortcuts to notes, notebooks, stacks, tags and searches; and templates…",
+   "Reminders on any note, with Mark as done and Snooze on the notification, and a list of what's coming up and what's done.",
+   "Search in Evernote's syntax: \"exact words\", bud, -word, any:, intitle:, notebook:, stack:, tag: (with nested tags), created:day-7, updated:week,…",
+   "Notes list as snippets with a picture, cards or a simple list; sorted by date updated, date created, title or reminder; pinned notes first.",
+   "Note tools: note history (earlier versions you can restore), note info (dates, words, size, links), duplicate, copy a link to the note, share, print…",
+   "Import Evernote .enex files (with their attachments, checklists, tables and reminders), Markdown and text files.",
+   "Passcode lock, with fingerprint unlock and a choice of how soon it locks again."
+  ],
+  "sha": "ab6dc7306ec427d5ffae5037faf5269b3b47b373",
+  "changes": [
+   {
+    "title": "While editing, the note's text box scrolls by itself so dragging a selection doesn't scroll the page",
+    "date": "2026-10-19T02:53:03Z"
+   },
+   {
+    "title": "Selected lines become a checklist, bulleted or numbered list together; text can be selected and copied while reading",
+    "date": "2026-10-19T01:56:38Z"
+   },
+   {
+    "title": "Tapping the empty space under a note starts writing at the end, on a new line",
+    "date": "2026-10-19T01:19:29Z"
+   },
+   {
+    "title": "Sketch pen sizes in dp: thin, medium, thick and marker, clearly different on every screen",
+    "date": "2026-10-19T00:54:47Z"
+   },
+   {
+    "title": "Sketch pad is drawn in the app's window so its tools stay above the navigation buttons",
+    "date": "2026-10-18T16:37:43Z"
+   },
+   {
+    "title": "Templates are picked inside the note, insert today's date, sketch tools fit the screen",
+    "date": "2026-10-18T14:06:45Z"
+   }
+  ]
+ },
+ "budget-tracker-android": {
+  "about": [
+   "A native Android budget tracker: expenses, income, recurring monthly expenses, and per-category budgets. Kotlin + Jetpack Compose + Room, fully local (no account, no internet needed)."
+  ],
+  "features": [
+   "Add income/expense entries (amount, date, category/payment method or income source, note), with quick-add chips and smart defaults.",
+   "Editable categories with optional monthly budgets.",
+   "Dashboard: month picker, income/expense/net, category budget progress — tap a category to see its individual entries.",
+   "\"Repeat last expense\" one-tap button, reachable via a FAB.",
+   "History with filters (type, category, month, note search) and edit/delete, with Undo on every delete.",
+   "Recurring expenses (rent, subscriptions, etc.): configure a fixed monthly cost once, and it's auto-logged as a real expense on its due day every…"
+  ],
+  "sha": "603a6044797889f57b796f453090f73d0ff04a00",
+  "changes": [
+   {
+    "title": "Checklist: per-subcategory checkboxes with auto-checked master; fix recurring entries not updating/clearing on edit",
+    "date": "2026-10-11T02:46:24Z"
+   },
+   {
+    "title": "Checklist: rename from Monthly, break totals down by subcategory, preview recurring amounts ahead of their due day",
+    "date": "2026-10-10T15:22:02Z"
+   },
+   {
+    "title": "Remove Recurring tab, rename Left to Savings, show Monthly amounts, add recurring checkbox to Add Transaction",
+    "date": "2026-10-10T13:08:16Z"
+   },
+   {
+    "title": "Dashboard: add \"Left\" stat, drop income-only categories from Categories panel",
+    "date": "2026-10-10T08:06:10Z"
+   },
+   {
+    "title": "Loans: type in months remaining directly instead of calculating it",
+    "date": "2026-10-10T07:38:14Z"
+   },
+   {
+    "title": "Dashboard: simplify - drop repeat-last-expense card and the three by-category panels",
+    "date": "2026-10-10T07:28:10Z"
+   }
+  ]
+ },
+ "tomorrows-bag-android": {
+  "about": [
+   "A native Android app for tracking which notebooks a kid needs to bring to school the next day — no sign-up, no account, everything stays on the device."
+  ],
+  "features": [
+   "Kid mode — greets the kid by name, shows their class, a subject grid to tap for tomorrow, a note field, and an \"All Packed!\" confirmation",
+   "Parent mode — kid's name/class/location, a usual weekly plan per weekday (suggests subjects automatically), manage subjects (add/rename/remove +…",
+   "Everything stored locally (Room database + SharedPreferences) — fully standalone, not connected to any account or the web version"
+  ],
+  "sha": "439d64c29b8d542d70421ecf636153220d7c3a8c",
+  "changes": [
+   {
+    "title": "Native Android app: Kid/Parent notebook tracker",
+    "date": "2026-10-09T16:15:30Z"
+   }
+  ]
+ },
+ "selavu": {
+  "about": [
+   "Log what you spend and what you earn, see where the money went, and know how much is left in your budget. Everything stays on the phone: no account, no bank linking, and no INTERNET permission."
+  ],
+  "features": [
+   "Day, Week, Month or Year at the top; ‹ › step through them, and tapping the label goes back to today",
+   "Balance for the period, with income and spending under it",
+   "Every entry, grouped by day with each day's total; tap one to change or delete it",
+   "Big Expense and Income buttons at the bottom",
+   "Amount, category (the last one you used is already picked), date (Today, Yesterday or any day), and a note",
+   "Repeat every day, week, month or year: rent, salary, subscriptions and EMIs are then logged on their own when they come due.",
+   "Long-press the app icon for Add expense and Add income shortcuts",
+   "One spending budget, weekly or monthly",
+   "Home shows how much is left, a bar that turns amber then red, and how much you can spend a day for the rest of the period",
+   "A donut chart of spending (or income) by category, with each category's amount and share"
+  ],
+  "sha": "4431e1d0c423ae1a210bf875b6bcc65555bc98b5",
+  "changes": [
+   {
+    "title": "Keep the currency symbol next to the amount as it's typed",
+    "date": "2026-10-18T11:23:05Z"
+   },
+   {
+    "title": "Redesign the screens after iOS",
+    "date": "2026-10-18T11:14:28Z"
+   },
+   {
+    "title": "Softer colours: muted terracotta, sage and dusty rose",
+    "date": "2026-10-18T04:48:10Z"
+   },
+   {
+    "title": "Number this repo's builds from 101, so they update the earlier ones",
+    "date": "2026-10-17T17:30:13Z"
+   },
+   {
+    "title": "Build, test and publish from this repo",
+    "date": "2026-10-17T17:18:38Z"
+   },
+   {
+    "title": "Selavu: show per-day amounts in whole rupees",
+    "date": "2026-10-17T17:03:51Z"
+   }
+  ]
+ },
+ "pakkam": {
+  "about": [
+   "Pakkam does what Adobe Acrobat Reader does with a paid subscription, without the AI features, without an account and without the internet. The app has no INTERNET permission, so documents never leave the phone."
+  ],
+  "features": [
+   "Fast, sharp pages drawn by PDFium (the PDF engine in Chrome), including annotations and form fields made in other apps",
+   "Continuous scroll or page by page; pinch or double-tap to zoom, in to 500% or out until whole pages fit on the screen; Fit page to screen and Fit to…",
+   "Search with every match highlighted, and next/previous",
+   "Table of contents, page thumbnails, your own bookmarks, and a list of all comments",
+   "Select and copy text (long-press a word)",
+   "Day, Night and Sepia modes; keep the screen on; go to page; remembers where you stopped",
+   "Reading mode, like a Kindle: the text is lifted out of the page layout and set as a book you turn page by page, in your choice of font, size, line…",
+   "Read aloud with the phone's own voice",
+   "Opens password-protected PDFs; \"Open with Pakkam\" from Files, Gmail, WhatsApp…",
+   "Share, print, save a copy, document properties"
+  ],
+  "sha": "d770fbf7a4667aa32e7e5c0096ffd8c2e3e6ccac",
+  "changes": [
+   {
+    "title": "Pakkam Reading mode: quick actions at the top, with read aloud and share",
+    "date": "2026-10-19T14:42:25Z"
+   },
+   {
+    "title": "Pakkam: undo and redo for highlights, in page view and Reading mode",
+    "date": "2026-10-19T11:22:27Z"
+   },
+   {
+    "title": "Pakkam: Back in Reading mode closes the book instead of going to page view",
+    "date": "2026-10-17T11:27:10Z"
+   },
+   {
+    "title": "Pakkam: highlight colours wherever text is chosen; taps bring the menus back",
+    "date": "2026-10-17T10:51:07Z"
+   },
+   {
+    "title": "Pakkam: pad the pages by the toolbars, so a fitted last page sits between them",
+    "date": "2026-10-17T08:04:11Z"
+   },
+   {
+    "title": "Pakkam: fit a page between the toolbars, not under them",
+    "date": "2026-10-17T07:52:14Z"
+   }
+  ]
+ },
+ "vaanilai": {
+  "about": [
+   "Vaanilai (Tamil for weather) brings together the forecasts of weather services from around the world and shows them side by side. It also has a live wind-flow map that shows the world's named storms (hurricanes, typhoons and cyclones) with their names, strength and tracks. There are no ads, no account and no API keys."
+  ],
+  "features": [
+   "Weather: right now, the next 48 hours and 7 days for your location or any place you search for.",
+   "Every source side by side: \"What each source says now\" lists the current forecast from up to a dozen models and services, with the range they span:",
+   "Air quality (US and European AQI, PM2.5, PM10, ozone, NO₂, SO₂, dust) from Copernicus CAMS, and waves and swell for places near the sea.",
+   "Official alerts: US National Weather Service watches and warnings, plus a banner when a named storm is within 2,000 km of your place (\"Cyclone X is…",
+   "Wind map: thousands of particles drift with the wind, coloured by speed from calm blue to hurricane-force white, over a world map.",
+   "Named storms on the map: each active tropical cyclone is drawn with a spiral symbol, its name and category, and its track and wind areas.",
+   "Storms: a list of every active named storm in every ocean.",
+   "Sources: shows which data sources answered on the last refresh, how fast, and why any were skipped (for example \"Only covers the USA\")."
+  ],
+  "sha": "af71813de4bb2a3d59ca047fe0747dc8266b7036",
+  "changes": [
+   {
+    "title": "Weather: tell you to take an umbrella when it's raining or about to",
+    "date": "2026-10-03T06:32:17Z"
+   },
+   {
+    "title": "Weather UI polish: status bar scrim, dark bottom bar, centred hourly curve",
+    "date": "2026-10-03T04:59:37Z"
+   },
+   {
+    "title": "Weather: new launcher icon and a modern look",
+    "date": "2026-10-03T04:49:28Z"
+   },
+   {
+    "title": "Weather: read all models from one hourly reply; tolerate a failing model",
+    "date": "2026-10-03T03:04:17Z"
+   },
+   {
+    "title": "Weather: fall back to one request per model when the combined reply is empty",
+    "date": "2026-10-03T02:55:39Z"
+   },
+   {
+    "title": "Weather: one request for all models; retry storms and wind after failures",
+    "date": "2026-10-03T02:47:09Z"
+   }
+  ]
+ },
+ "neram": {
+  "about": [
+   "Neram (neram, the Tamil word for time) shows how long you use each app on your phone, by day, week and month. There are no ads, no account and no internet access: your usage never leaves the phone."
+  ],
+  "features": [
+   "Day / Week / Month tabs at the top, with ‹ › arrows to step back through earlier days, weeks or months.",
+   "Total screen time for the period, plus the daily average for a week or month.",
+   "Compared with before: \"25 min less than yesterday at this time (−18%)\", or more than last week or last month.",
+   "A bar chart: screen time per hour for a day, per day for a week or a month.",
+   "Every app you used, longest first, with its icon, its time, a bar for its share, and how many times you opened it.",
+   "Tap an app for its own page: its time and opens over the same day, week or month, a per-day chart, and a shortcut to its Android App info page.",
+   "Dark and light themes follow the phone's setting."
+  ],
+  "sha": "fffb9c2473b6f6ebc41666fbb389c4a76cd9df35",
+  "changes": [
+   {
+    "title": "Neram: compare screen time with the day, week or month before",
+    "date": "2026-10-03T10:42:17Z"
+   },
+   {
+    "title": "Neram: explain how to unlock a greyed-out Usage access switch",
+    "date": "2026-10-03T08:30:50Z"
+   },
+   {
+    "title": "Add Neram, a screen-time app for Android",
+    "date": "2026-10-03T06:55:24Z"
+   }
+  ]
+ },
+ "alaimaani": {
+  "about": [
+   "Alaimaani (alai, wave + maani, meter, as in வெப்பமானி, thermometer) shows how good your mobile signal really is: the actual numbers behind the bars, in plain words. There are no ads, no account, and no internet access at all."
+  ],
+  "features": [
+   "Signal shows a live gauge of your signal strength in dBm (RSRP on 4G/5G, RSCP on 3G, RSSI on 2G), coloured from excellent to very poor, with a…",
+   "Quality (SINR and RSRQ), with a note on why full bars can still mean slow data.",
+   "4G, 4G+, 5G, or 5G on 4G (NSA), the way the operator actually connects you.",
+   "Last 10 minutes graph, with the lowest, average and highest readings.",
+   "Tower details: band and frequency (e.g.",
+   "Other towers nearby that the phone can hear, strongest first.",
+   "Dual SIM: switch between SIMs at the top of the screen.",
+   "Best spot: stand somewhere, tap Measure a spot, give it a name (Bedroom, Balcony…) and hold still for 20 seconds.",
+   "Guide: what the numbers mean, the difference between 5G kinds, low vs high bands, and what to do about a weak signal."
+  ],
+  "sha": "d98bc242eeb958c843b8d56c7b154e62294afa82",
+  "changes": [
+   {
+    "title": "Alaimaani: trust the registered cell over a stale network type; tidy spot time",
+    "date": "2026-10-02T15:17:09Z"
+   },
+   {
+    "title": "Add Alaimaani, a mobile signal meter for Android",
+    "date": "2026-10-02T15:10:11Z"
+   }
+  ]
+ }
+}

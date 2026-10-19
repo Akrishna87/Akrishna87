@@ -13,9 +13,12 @@
       "hue": 265
     },
     {
-      "repo": "myvideos",
+      "repo": "Akrishna87",
+      "id": "myvideos",
       "tag": "video-player-latest",
       "apk": "MyVideos.apk",
+      "readme": "video-player-android/README.md",
+      "path": "video-player-android",
       "group": "Media",
       "name": "My Videos",
       "tagline": "A video player for the movies already on your phone. No imports, no ads.",
@@ -48,8 +51,7 @@
       "tag": "podcasts-latest",
       "apk": "Kural.apk",
       "group": "Media",
-      "name": "Kural",
-      "nameLocal": "குரல்",
+      "name": "Yap",
       "tagline": "A podcast player that opens on your shows, with a queue you control.",
       "emoji": "🎙️",
       "hue": 340
@@ -63,6 +65,19 @@
       "tagline": "Free audiobooks and ebooks from LibriVox and Project Gutenberg.",
       "emoji": "📚",
       "hue": 28
+    },
+    {
+      "repo": "Akrishna87",
+      "id": "vellum",
+      "tagPrefix": "rss-reader-v",
+      "apk": "rss-reader.apk",
+      "readme": "android/README.md",
+      "path": "android",
+      "group": "Media",
+      "name": "Vellum",
+      "tagline": "An RSS reader in Apple's iOS style. It fetches and stores your feeds on the phone itself.",
+      "emoji": "📰",
+      "hue": 210
     },
     {
       "repo": "vasi",
@@ -169,8 +184,11 @@
     },
     {
       "repo": "Akrishna87",
+      "id": "pakkam",
       "tag": "pakkam-latest",
       "apk": "Pakkam.apk",
+      "readme": "pakkam-android/README.md",
+      "path": "pakkam-android",
       "group": "Everyday",
       "name": "Pakkam",
       "nameLocal": "பக்கம்",

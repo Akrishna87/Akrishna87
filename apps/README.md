@@ -14,9 +14,11 @@ always up to date without anyone editing it.
 - A card per app with its version, size, and when that build was made.
 - **Install** (first time) / **Update** (when a newer build exists than the one they last
   downloaded on that browser) / **Download again**.
-- **Details**: SHA-256 fingerprint, the latest change (the commit message of that build),
-  a QR code to open the app's page on another phone, screenshots from the automatic emulator test,
-  and older builds (where the release keeps them).
+- **Details**, laid out like a Play Store listing: icon, name, a stats row (size, build or version,
+  updated, downloads), Install and Share, screenshots from the automatic emulator test, **About this
+  app** (from the app's README, with Read more and Highlights), **What's new** (the recent commit
+  messages that went into the build), **App info** (version, size, file, SHA-256), a QR code to open
+  the app's page on another phone, and older builds (where the release keeps them).
 - A short how-to-install guide, including the Play Protect warning.
 - Works on phones and computers, in light and dark mode. Each app has its own link,
   for example `…/apps/?app=isaialai`.
@@ -47,10 +49,23 @@ Edit [`apps.json`](apps.json) and add an entry:
 | `emoji`, `hue` | The icon tile (0–360 is the colour). |
 | `channel` | `"debug"` shows a "Test build" label. Leave it out for normal builds. |
 | `group` | Heading the card is listed under. Apps are shown in file order. |
+| `id` | Name used for the card, deep link (`?app=<id>`) and saved state. Defaults to `repo`. Needed when several apps share one repo. |
+| `tagPrefix` | Use the newest release whose tag starts with this (for apps with versioned tags). |
+| `readme`, `path` | README to build "About this app" from (default `README.md`), and the folder whose commits make up "What's new". For apps that live inside a larger repo. |
+| `about` | Optional text that replaces the README-derived description. |
 | `note` | Optional line shown at the top of the app's Details, for example which of two APKs to use. |
 
 The page needs the repo's release to contain an `.apk` file. Everything else (version, size, date,
 fingerprint, screenshots) is read from the release itself.
+
+## Icons and saved text
+
+- **Icons** are each app's own launcher icon, drawn from its repository (`icons/<id>.svg`). After an
+  app's icon changes, run `python3 tools/build-icons.py` and commit the result. The emoji in
+  `apps.json` is only shown if an icon can't load.
+- **Description and What's new** appear straight away from `content.json`, then the page asks GitHub
+  and replaces them when it has a newer answer. If GitHub is out of requests, the saved text stays
+  on screen. Refresh it with `python3 tools/build-content.py`.
 
 ## How a new build reaches friends
 
@@ -137,7 +152,7 @@ Friends can also be offered the update inside the app, without coming back here:
 - **Same signing key every time.** Build 31 can only update build 30 if both are signed with the same key. Each app's
   CI signs with a fixed key for this reason (the debug apps commit a `debug.keystore`).
 - **`versionCode` must go up** with every build.
-- **GitHub's rate limit.** The page makes one request per app (17 today), and GitHub allows 60 per
+- **GitHub's rate limit.** The page makes one request per app (21 today), and GitHub allows 60 per
   hour per network without signing in. The browser keeps each answer for 10 minutes, repeat checks
   that find nothing new don't count against the limit, and the page shows the saved
   copy if GitHub says no, so a couple of friends will never notice. If it ever matters, a scheduled
@@ -151,5 +166,7 @@ Friends can also be offered the update inside the app, without coming back here:
 |---|---|
 | `index.html`, `style.css`, `app.js` | The page |
 | `apps.json` | The list of apps |
+| `icons/` | The app icons (made by `tools/build-icons.py`) |
+| `content.json` | Saved descriptions and changes (made by `tools/build-content.py`) |
 | `vendor/qrcode.js` | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) 1.4.4 (MIT), draws the QR code in the browser |
 | `android/AppUpdater.kt` | Drop-in code for the in-app update check and install |
