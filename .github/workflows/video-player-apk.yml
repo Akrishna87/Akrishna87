@@ -50,17 +50,7 @@ jobs:
       - name: Make test videos
         run: |
           command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-          mkdir -p videos
-          for i in 1 2 3; do
-            ffmpeg -loglevel error -f lavfi -i "testsrc=size=640x360:rate=25:duration=40" \
-              -f lavfi -i "sine=frequency=$((300 + i * 110)):duration=40" \
-              -c:v libx264 -pix_fmt yuv420p -preset veryfast -c:a aac -shortest "videos/Smoke Video $i.mp4"
-          done
-          # A tall phone video, which should play upright
-          ffmpeg -loglevel error -f lavfi -i "testsrc2=size=360x640:rate=25:duration=40" \
-            -f lavfi -i "sine=frequency=660:duration=40" \
-            -c:v libx264 -pix_fmt yuv420p -preset veryfast -c:a aac -shortest "videos/Smoke Portrait.mp4"
-          ls -la videos
+          bash video-player-android/ci/make-videos.sh videos
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
