@@ -134,6 +134,14 @@ import io.github.akrishna87.pakkam.pdf.MarkupEdit
 import io.github.akrishna87.pakkam.pdf.MarkupKind
 import io.github.akrishna87.pakkam.pdf.ReadMark
 import io.github.akrishna87.pakkam.pdf.ReadingText
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.SideEffect
 import kotlin.math.max
 import kotlin.math.min
 
@@ -318,6 +326,25 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
         vm.back()
     }
     val saver = rememberDocSaver(vm, session) { pdfPage.coerceAtLeast(0) }
+    var readAloud by remember { mutableStateOf<ReadAloud?>(null) }
+    val pageDone = remember { arrayOf<(Int) -> Unit>({}) }
+    DisposableEffect(Unit) { onDispose { readAloud?.shutdown() } }
+    /** To page view's comment and drawing tools; the file still opens in Reading mode next time. */
+    fun toComment() {
+        vm.startMode = ViewerMode.COMMENT
+        if (pdfPage >= 0) vm.rememberPage(pdfPage)
+        vm.back()
+    }
+    fun share() {
+        vm.task("Preparing…", { session.applyEdits() }) {
+            val uri = io.github.akrishna87.pakkam.data.Files.shareUri(context, session.workFile, session.name)
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                .setType("application/pdf")
+                .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            context.startActivity(android.content.Intent.createChooser(send, "Share ${session.name}"))
+        }
+    }
     var askToSave by remember { mutableStateOf(false) }
     /** Back closes the book, like an ebook reader, asking first about highlights and notes not yet saved. */
     fun leave() {
@@ -426,6 +453,18 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                     }
                     fun goTo(page: Int) {
                         scope.launch { if (style.scroll) scroller.scrollToItem(page) else pager.scrollToPage(page) }
+                    }
+                    // Reading aloud goes on to the next page and turns to it.
+                    SideEffect {
+                        pageDone[0] = { done ->
+                            val ra = readAloud
+                            if (ra != null && done + 1 < b.pages.size) {
+                                goTo(done + 1)
+                                ra.speak(done + 1, b.textOf(done + 1), vm.settings.speechRate)
+                            } else {
+                                ra?.stop()
+                            }
+                        }
                     }
 
                     // Highlights and notes: kept as highlight annotations in the PDF itself.
@@ -689,6 +728,20 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                                 ) { drawReadPage(i, topPad.toFloat()) }
                             }
                         }
+                        readAloud?.takeIf { it.speaking && !chrome }?.let { ra ->
+                            Surface(
+                                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                                tonalElevation = 6.dp,
+                                shadowElevation = 6.dp,
+                            ) {
+                                Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.AutoMirrored.Filled.VolumeUp, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Text("Reading aloud", Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.labelLarge)
+                                    IconButton(onClick = { ra.stop() }) { Icon(Icons.Filled.Stop, "Stop reading aloud") }
+                                }
+                            }
+                        }
                         undoHint?.takeIf { !chrome }?.let { hint ->
                             Surface(
                                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 40.dp),
@@ -737,8 +790,25 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                                 .lastOrNull { it.kind == Block.Kind.HEADING }?.text,
                             pdfPage = b.pdfPageOf(current),
                             unsaved = unsaved,
+                            readingAloud = readAloud?.speaking == true,
                             onBack = { leave() },
                             onPageView = { toPageView() },
+                            onComment = { toComment() },
+                            onReadAloud = {
+                                val ra = readAloud ?: ReadAloud(context) { p -> pageDone[0](p) }.also { readAloud = it }
+                                if (ra.speaking) {
+                                    ra.stop()
+                                } else {
+                                    val from = current
+                                    scope.launch {
+                                        // The voice engine takes a moment to start the first time.
+                                        var tries = 0
+                                        while (!ra.isReady && tries++ < 30) kotlinx.coroutines.delay(100)
+                                        if (ra.isReady) ra.speak(from, b.textOf(from), vm.settings.speechRate) else vm.say("No voice for reading aloud is set up on this phone")
+                                    }
+                                }
+                            },
+                            onShare = { share() },
                             canUndo = session.canUndo,
                             canRedo = session.canRedo,
                             onUndo = { session.undo() },
@@ -914,8 +984,12 @@ private fun ReadingChrome(
     chapter: String?,
     pdfPage: Int,
     unsaved: Boolean,
+    readingAloud: Boolean,
     onBack: () -> Unit,
     onPageView: () -> Unit,
+    onComment: () -> Unit,
+    onReadAloud: () -> Unit,
+    onShare: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean,
     onUndo: () -> Unit,
@@ -932,12 +1006,36 @@ private fun ReadingChrome(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)),
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                // The quick actions an ebook reader has at the top; the rest are under More.
                 actions = {
                     if (unsaved) IconButton(onClick = onSave) { Icon(Icons.Filled.Save, "Save") }
-                    IconButton(onClick = onNotes) { Icon(Icons.Filled.EditNote, "Notes and highlights") }
-                    IconButton(onClick = onContents) { Icon(Icons.Filled.List, "Chapters") }
+                    IconButton(onClick = onComment) { Icon(Icons.Filled.Draw, "Comment and draw") }
                     IconButton(onClick = onStyle) { Icon(Icons.Filled.TextFields, "Text and colours") }
-                    IconButton(onClick = onPageView) { Icon(Icons.Filled.PictureAsPdf, "Page view") }
+                    IconButton(onClick = onReadAloud) {
+                        if (readingAloud) Icon(Icons.Filled.Stop, "Stop reading aloud") else Icon(Icons.AutoMirrored.Filled.VolumeUp, "Read aloud")
+                    }
+                    IconButton(onClick = onShare) { Icon(Icons.Filled.Share, "Share") }
+                    Box {
+                        var menu by remember { mutableStateOf(false) }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More options") }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Notes and highlights") },
+                                leadingIcon = { Icon(Icons.Filled.EditNote, null) },
+                                onClick = { menu = false; onNotes() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Chapters") },
+                                leadingIcon = { Icon(Icons.Filled.List, null) },
+                                onClick = { menu = false; onContents() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Page view") },
+                                leadingIcon = { Icon(Icons.Filled.PictureAsPdf, null) },
+                                onClick = { menu = false; onPageView() },
+                            )
+                        }
+                    }
                 },
             )
         }

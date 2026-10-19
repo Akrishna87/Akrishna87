@@ -120,6 +120,7 @@ class ViewerState(
     // Pen and highlighter settings.
     var penColor by mutableStateOf(settings.penColor)
     var penWidth by mutableFloatStateOf(settings.penWidth)
+    var markerWidth by mutableFloatStateOf(settings.markerWidth)
     var highlightColor by mutableStateOf(settings.highlightColor)
     var textColor by mutableStateOf(settings.textColor)
 
@@ -183,6 +184,7 @@ class ViewerState(
     fun rememberPen() {
         settings.penColor = penColor
         settings.penWidth = penWidth
+        settings.markerWidth = markerWidth
         settings.highlightColor = highlightColor
         settings.textColor = textColor
     }

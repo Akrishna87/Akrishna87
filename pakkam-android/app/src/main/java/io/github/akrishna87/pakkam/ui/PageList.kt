@@ -346,7 +346,7 @@ private fun PageView(vs: ViewerState, index: Int, actions: PageActions) {
                         index,
                         listOf(pts.toList()),
                         if (marker) vs.highlightColor else vs.penColor,
-                        if (marker) vs.penWidth * 6f else vs.penWidth,
+                        if (marker) vs.markerWidth else vs.penWidth,
                         if (marker) 0.4f else 1f,
                     ),
                 )
@@ -482,7 +482,7 @@ private fun DrawScope.drawOverlay(vs: ViewerState, page: Int, g: PageGeometry, p
     for (e in vs.session.edits) if (e.page == page) drawEdit(vs, e, g, ptToPx)
     vs.liveInk?.takeIf { it.first == page }?.let { (_, pts) ->
         val marker = vs.tool == Tool.MARKER
-        drawStroke(g, pts, Color(if (marker) vs.highlightColor else vs.penColor).copy(alpha = if (marker) 0.4f else 1f), (if (marker) vs.penWidth * 6f else vs.penWidth) * ptToPx)
+        drawStroke(g, pts, Color(if (marker) vs.highlightColor else vs.penColor).copy(alpha = if (marker) 0.4f else 1f), (if (marker) vs.markerWidth else vs.penWidth) * ptToPx)
     }
     vs.liveShape?.takeIf { it.first == page }?.let { (_, a, b) ->
         val kind = when (vs.tool) {

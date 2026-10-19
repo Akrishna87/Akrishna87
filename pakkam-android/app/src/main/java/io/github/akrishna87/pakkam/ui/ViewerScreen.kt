@@ -21,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -132,6 +133,8 @@ import kotlinx.coroutines.withContext
 import androidx.core.content.FileProvider
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -771,6 +774,25 @@ private fun CommentBar(vs: ViewerState) {
     } else if (t == Tool.HIGHLIGHT || t == Tool.MARKER) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
             ColorDots(HIGHLIGHT_COLORS, vs.highlightColor) { vs.highlightColor = it }
+        }
+        if (t == Tool.MARKER) {
+            // How wide the marker paints, with a sample of the stroke.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Size", style = MaterialTheme.typography.labelLarge)
+                Slider(
+                    value = vs.markerWidth,
+                    onValueChange = { vs.markerWidth = it },
+                    valueRange = 4f..40f,
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp).semantics { contentDescription = "Marker size" },
+                )
+                Box(Modifier.size(width = 40.dp, height = 40.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier
+                            .size(width = 36.dp, height = (vs.markerWidth * 0.9f).coerceIn(3f, 36f).dp)
+                            .background(Color(vs.highlightColor).copy(alpha = 0.4f), RoundedCornerShape(3.dp)),
+                    )
+                }
+            }
         }
     }
     ToolRow(
