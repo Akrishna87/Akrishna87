@@ -50,6 +50,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -282,6 +284,14 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
     var openMark by remember { mutableStateOf<Int?>(null) }
     var noteFor by remember { mutableStateOf<NoteFor?>(null) }
     var highlightColor by remember { mutableIntStateOf(vm.settings.highlightColor) }
+    // What was just changed, shown for a few seconds with Undo.
+    var undoHint by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(undoHint) {
+        if (undoHint != null) {
+            kotlinx.coroutines.delay(4000)
+            undoHint = null
+        }
+    }
     // While two fingers pinch: the text size they would set.
     var pinchSize by remember { mutableStateOf<Float?>(null) }
     val context = LocalContext.current
@@ -431,36 +441,39 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             return false
                         }
                         val text = quote(start, end)
-                        for ((i, part) in parts.withIndex()) {
-                            session.edits.add(MarkupEdit(part.first, MarkupKind.HIGHLIGHT, part.second, color, text, if (i == 0) note else ""))
+                        session.change {
+                            for ((i, part) in parts.withIndex()) add(MarkupEdit(part.first, MarkupKind.HIGHLIGHT, part.second, color, text, if (i == 0) note else ""))
                         }
-                        session.redo.clear()
+                        undoHint = if (note.isBlank()) "Highlighted" else "Note added"
                         return true
                     }
                     fun removeMark(m: ReadMark) {
-                        for (o in m.origins) when (o) {
-                            is MarkOrigin.Pending -> session.edits.remove(o.edit)
-                            is MarkOrigin.Saved -> session.edits.add(DeleteAnnotEdit(o.annot.page, o.annot))
+                        session.change {
+                            for (o in m.origins) when (o) {
+                                is MarkOrigin.Pending -> remove(o.edit)
+                                is MarkOrigin.Saved -> add(DeleteAnnotEdit(o.annot.page, o.annot))
+                            }
                         }
-                        session.redo.clear()
+                        undoHint = "Highlight removed"
                     }
                     fun restyle(m: ReadMark, color: Int, note: String) {
                         val text = quote(m.start, m.end)
-                        for ((i, o) in m.origins.withIndex()) {
-                            val n = if (i == 0) note else ""
-                            when (o) {
-                                is MarkOrigin.Pending -> {
-                                    val at = session.edits.indexOf(o.edit)
-                                    if (at >= 0) session.edits[at] = o.edit.copy(color = color, note = n)
-                                }
-                                is MarkOrigin.Saved -> {
-                                    // A changed annotation is written as a new one in place of the old.
-                                    session.edits.add(DeleteAnnotEdit(o.annot.page, o.annot))
-                                    session.edits.add(MarkupEdit(o.annot.page, MarkupKind.HIGHLIGHT, o.annot.quads.ifEmpty { listOf(o.annot.rect) }, color, text, n))
+                        session.change {
+                            for ((i, o) in m.origins.withIndex()) {
+                                val n = if (i == 0) note else ""
+                                when (o) {
+                                    is MarkOrigin.Pending -> {
+                                        val at = indexOf(o.edit)
+                                        if (at >= 0) this[at] = o.edit.copy(color = color, note = n)
+                                    }
+                                    is MarkOrigin.Saved -> {
+                                        // A changed annotation is written as a new one in place of the old.
+                                        add(DeleteAnnotEdit(o.annot.page, o.annot))
+                                        add(MarkupEdit(o.annot.page, MarkupKind.HIGHLIGHT, o.annot.quads.ifEmpty { listOf(o.annot.rect) }, color, text, n))
+                                    }
                                 }
                             }
                         }
-                        session.redo.clear()
                     }
 
                     val markPaint = remember { android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG) }
@@ -676,6 +689,23 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                                 ) { drawReadPage(i, topPad.toFloat()) }
                             }
                         }
+                        undoHint?.takeIf { !chrome }?.let { hint ->
+                            Surface(
+                                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 40.dp),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.inverseSurface,
+                                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                                shadowElevation = 6.dp,
+                            ) {
+                                Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(hint, style = MaterialTheme.typography.bodyMedium)
+                                    TextButton(onClick = {
+                                        session.undo()
+                                        undoHint = null
+                                    }) { Text("Undo", color = MaterialTheme.colorScheme.inversePrimary) }
+                                }
+                            }
+                        }
                         pinchSize?.let { size ->
                             Surface(
                                 Modifier.align(Alignment.Center),
@@ -709,6 +739,10 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             unsaved = unsaved,
                             onBack = { leave() },
                             onPageView = { toPageView() },
+                            canUndo = session.canUndo,
+                            canRedo = session.canRedo,
+                            onUndo = { session.undo() },
+                            onRedo = { session.redo() },
                             onNotes = { sheet = ReadSheet.Notes },
                             onSave = { saver.save(null) },
                             onStyle = { sheet = ReadSheet.Style },
@@ -882,6 +916,10 @@ private fun ReadingChrome(
     unsaved: Boolean,
     onBack: () -> Unit,
     onPageView: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onNotes: () -> Unit,
     onSave: () -> Unit,
     onStyle: () -> Unit,
@@ -914,11 +952,19 @@ private fun ReadingChrome(
                         onValueChangeFinished = { onSeek(drag.roundToInt()) },
                         valueRange = 0f..(pageCount - 1).coerceAtLeast(1).toFloat(),
                     )
-                    Text(
-                        "Page ${drag.roundToInt() + 1} of $pageCount · from PDF page ${pdfPage + 1}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Page ${drag.roundToInt() + 1} of $pageCount · from PDF page ${pdfPage + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // Take back, or put back, the last highlight, note or removal.
+                        if (canUndo || canRedo) {
+                            IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
+                            IconButton(onClick = onRedo, enabled = canRedo) { Icon(Icons.AutoMirrored.Filled.Redo, "Redo") }
+                        }
+                    }
                 }
             }
         }

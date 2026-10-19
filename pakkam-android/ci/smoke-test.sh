@@ -200,6 +200,16 @@ adb shell input motionevent UP 400 272
 wait_for reading-sel 'content-desc="Yellow"' 15 "choosing several words didn't show the highlight colours"
 shot 06c-reading-select
 tap reading-sel "Yellow"
+# Undo takes it back, and Redo (in the menus) puts it back.
+wait_for reading-hl 'text="Highlighted"' 10 "highlighting didn't offer Undo"
+tap reading-hl "Undo"
+sleep 1
+read -r rw rh < <(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+adb shell input tap $((rw / 2)) $((rh / 2))
+wait_for reading-undone 'content-desc="Redo"[^>]*enabled="true"' 10 "Undo didn't take the highlight back"
+tap reading-undone "Redo"
+sleep 1
+adb shell input tap $((rw / 2)) $((rh / 2))
 sleep 1
 # Hold on "elephant" and add a note to it from the dictionary card.
 adb shell input swipe 240 398 240 398 900
@@ -254,9 +264,15 @@ wait_for define-sheet 'the most interesting or memorable part' 20 "Define didn't
 shot 07b-define
 adb shell input keyevent KEYCODE_BACK
 sleep 2
-# A colour in the selection bar highlights the chosen word in it.
+# A colour in the selection bar highlights the chosen word in it; Undo and Redo work on it.
 dump define-done
 tap define-done "Green"
+sleep 1
+dump green-done
+tap green-done "Undo"
+wait_for green-undone 'content-desc="Redo"[^>]*enabled="true"' 10 "Undo didn't take the green highlight back"
+tap green-undone "Redo"
+sleep 1
 sleep 1
 echo "PASS: define in page view"
 

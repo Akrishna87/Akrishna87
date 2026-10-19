@@ -52,9 +52,41 @@ class DocSession(
 
     var canWriteBack by mutableStateOf(false)
 
-    /** Drawn on the pages but not yet written into the copy. */
+    /** Drawn on the pages but not yet written into the copy. Changed through [change], so it can be undone. */
     val edits = mutableStateListOf<Edit>()
-    val redo = mutableStateListOf<Edit>()
+
+    // What the pending edits were before each change, and after each undo, for Undo and Redo.
+    private val undoSteps = mutableStateListOf<List<Edit>>()
+    private val redoSteps = mutableStateListOf<List<Edit>>()
+    val canUndo get() = undoSteps.isNotEmpty()
+    val canRedo get() = redoSteps.isNotEmpty()
+
+    /**
+     * Changes the pending edits as one step: Undo puts them back as they were before it, so a
+     * highlight that runs over a page break, or a recoloured one, comes and goes as a whole.
+     */
+    fun change(block: MutableList<Edit>.() -> Unit) {
+        val before = edits.toList()
+        edits.block()
+        if (edits.toList() == before) return
+        undoSteps.add(before)
+        if (undoSteps.size > MAX_STEPS) undoSteps.removeAt(0)
+        redoSteps.clear()
+    }
+
+    fun undo() {
+        val previous = undoSteps.removeLastOrNull() ?: return
+        redoSteps.add(edits.toList())
+        edits.clear()
+        edits.addAll(previous)
+    }
+
+    fun redo() {
+        val next = redoSteps.removeLastOrNull() ?: return
+        undoSteps.add(edits.toList())
+        edits.clear()
+        edits.addAll(next)
+    }
 
     /** Annotations already in the file (for the Comments list and the eraser). */
     var annotations by mutableStateOf<List<AnnotInfo>>(emptyList())
@@ -103,8 +135,10 @@ class DocSession(
         val out = Files.newWorkFile(app)
         val list = edits.toList()
         withContext(Dispatchers.IO) { PdfEditor.applyEdits(workFile, password, list, out) }
+        // Written into the file now: there is nothing left to undo.
         edits.clear()
-        redo.clear()
+        undoSteps.clear()
+        redoSteps.clear()
         // Annotations, stamps and white-out leave the text layer as it was.
         replaceWith(out, sameText = true)
     }
@@ -121,6 +155,8 @@ class DocSession(
         bitmaps.clear()
     }
 }
+
+private const val MAX_STEPS = 200
 
 /** Rendered pages kept in memory, a quarter of what the app may use. */
 class PageBitmaps {
