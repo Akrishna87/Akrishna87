@@ -325,7 +325,13 @@ sleep 1
 shot 08-comment
 dump drawn
 grep -Eq 'Draw · 5 changes' "$OUT/drawn.xml" || fail "the highlight and the drawing weren't both recorded"
-tap drawn "Done"
+# The highlighter marker has its own size.
+tap drawn "Marker"
+sleep 1
+dump marker
+grep -q 'Marker size' "$OUT/marker.xml" || fail "the marker has no size setting"
+shot 08b-marker
+tap marker "Done"
 wait_for applied 'text="Comment"' 30 "Done didn't go back to reading"
 grep -q 'Not saved yet' "$OUT/applied.xml" || fail "the document isn't marked as changed"
 echo "PASS: highlight and drawing"

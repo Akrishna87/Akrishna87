@@ -53,6 +53,11 @@ class Settings(context: Context) {
         get() = prefs.getFloat("penWidth", 2f)
         set(v) = prefs.edit().putFloat("penWidth", v).apply()
 
+    /** The highlighter marker's width in points: wide enough to cover a line of text in one stroke. */
+    var markerWidth: Float
+        get() = prefs.getFloat("markerWidth", 18f)
+        set(v) = prefs.edit().putFloat("markerWidth", v).apply()
+
     var highlightColor: Int
         get() = prefs.getInt("hlColor", 0xFFFFEB3B.toInt())
         set(v) = prefs.edit().putInt("hlColor", v).apply()
