@@ -399,25 +399,17 @@ class ViewerState(
 
     // ---- Edits ----
 
-    fun addEdit(e: Edit) {
-        session.edits.add(e)
-        session.redo.clear()
-    }
+    fun addEdit(e: Edit) = session.change { add(e) }
 
-    fun undo() {
-        if (session.edits.isNotEmpty()) session.redo.add(session.edits.removeAt(session.edits.lastIndex))
-    }
+    fun undo() = session.undo()
 
-    fun redo() {
-        if (session.redo.isNotEmpty()) session.edits.add(session.redo.removeAt(session.redo.lastIndex))
-    }
+    fun redo() = session.redo()
 
     /** What the eraser would remove at a point: a pending edit first, then an annotation in the file. */
     fun eraseAt(page: Int, x: Float, y: Float): Boolean {
         val pending = session.edits.lastOrNull { it.page == page && it !is DeleteAnnotEdit && boundsOf(it)?.inset(6f)?.contains(x, y) == true }
         if (pending != null) {
-            session.edits.remove(pending)
-            session.redo.add(pending)
+            session.change { remove(pending) }
             return true
         }
         val gone = session.edits.filterIsInstance<DeleteAnnotEdit>().map { it.annot }.toSet()

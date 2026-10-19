@@ -37,7 +37,8 @@ documents never leave the phone.
 - Highlight, underline, strikethrough
 - Pen and highlighter marker, rectangle, oval, line, arrow, in your choice of colour and thickness
 - Sticky notes and text boxes
-- Erase any mark, including ones made in other apps; undo and redo
+- Erase any mark, including ones made in other apps; undo and redo, also for highlights made while reading
+  (in page view and Reading mode), until the file is saved
 
 **Fill & Sign**
 - Type anywhere on the page, add the date, ticks, crosses and dots

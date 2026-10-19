@@ -214,15 +214,9 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
         vs.placement = null
         vs.selection = null
         vs.rememberPen()
-        if (session.edits.isEmpty()) {
-            vs.mode = ViewerMode.READ
-            vs.tool = Tool.NONE
-            return
-        }
-        vm.task("Adding your changes…", { session.applyEdits() }) {
-            vs.mode = ViewerMode.READ
-            vs.tool = Tool.NONE
-        }
+        // The changes stay as they are until saved, so they can still be undone after Done.
+        vs.mode = ViewerMode.READ
+        vs.tool = Tool.NONE
     }
     fun openTool(t: ToolKind) {
         vm.task("Getting ready…", { session.applyEdits() }) { vm.go(Screen.Tool(t)) }
@@ -396,6 +390,20 @@ fun ViewerScreen(vm: AppViewModel, session: DocSession) {
                         modifier = Modifier.clickable { dialog = ViewerDialog.GoTo },
                     ) {
                         Text("${vs.currentPage + 1} / ${session.doc.pageCount}", Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge)
+                    }
+                    // Undo and Redo for highlights and other marks made while reading, until they're saved.
+                    if (vs.mode == ViewerMode.READ && (session.canUndo || session.canRedo)) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.85f),
+                            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) {
+                            Row {
+                                IconButton(onClick = { vs.undo() }, enabled = session.canUndo, modifier = Modifier.size(40.dp)) { Icon(Icons.Filled.Undo, "Undo") }
+                                IconButton(onClick = { vs.redo() }, enabled = session.canRedo, modifier = Modifier.size(40.dp)) { Icon(Icons.Filled.Redo, "Redo") }
+                            }
+                        }
                     }
                     // How far zoomed in or out; tapping it goes back to the normal size.
                     if (abs(vs.zoom - 1f) > 0.02f) {
@@ -625,8 +633,8 @@ private fun EditTopBar(vs: ViewerState, onDone: () -> Unit) {
             }
         },
         actions = {
-            IconButton(onClick = { vs.undo() }, enabled = session.edits.isNotEmpty()) { Icon(Icons.Filled.Undo, "Undo") }
-            IconButton(onClick = { vs.redo() }, enabled = session.redo.isNotEmpty()) { Icon(Icons.Filled.Redo, "Redo") }
+            IconButton(onClick = { vs.undo() }, enabled = session.canUndo) { Icon(Icons.Filled.Undo, "Undo") }
+            IconButton(onClick = { vs.redo() }, enabled = session.canRedo) { Icon(Icons.Filled.Redo, "Redo") }
         },
     )
 }
