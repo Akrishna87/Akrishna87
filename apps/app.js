@@ -119,6 +119,7 @@
 
     const shots = assets
       .filter(a => /^image\/(png|jpe?g)$/.test(a.content_type))
+      .filter(a => !(app.hideShots || []).some(w => a.name.toLowerCase().includes(w)))     // test screens that don't show the app itself
       .map(a => a.name).sort(natural).slice(0, MAX_SHOTS)
       .map(n => assets.find(a => a.name === n).browser_download_url);
 

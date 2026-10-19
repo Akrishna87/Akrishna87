@@ -52,6 +52,7 @@ Edit [`apps.json`](apps.json) and add an entry:
 | `id` | Name used for the card, deep link (`?app=<id>`) and saved state. Defaults to `repo`. Needed when several apps share one repo. |
 | `tagPrefix` | Use the newest release whose tag starts with this (for apps with versioned tags). |
 | `readme`, `path` | README to build "About this app" from (default `README.md`), and the folder whose commits make up "What's new". For apps that live inside a larger repo. |
+| `hideShots` | Words in screenshot file names to leave out of Details, for test screens that don't show the app itself (for example a test video playing). |
 | `about` | Optional text that replaces the README-derived description. |
 | `note` | Optional line shown at the top of the app's Details, for example which of two APKs to use. |
 

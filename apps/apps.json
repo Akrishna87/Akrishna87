@@ -18,6 +18,7 @@
       "tag": "video-player-latest",
       "apk": "MyVideos.apk",
       "readme": "video-player-android/README.md",
+      "hideShots": ["player", "resumed", "portrait", "picture-in-picture"],
       "path": "video-player-android",
       "group": "Media",
       "name": "My Videos",
