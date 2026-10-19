@@ -45,4 +45,12 @@ for i in range(8):
 for i in range(2):
     picture((1080, 2400), 0.55 + i / 10).save(os.path.join(out, "screenshots", f"Screenshot_smoke_{i + 1}.png"))
 picture((4200, 1200), 0.08).save(os.path.join(out, "panoramas", "PANO_smoke.jpg"), quality=85)
+
+# The screenshots and panorama are a little older, so the newest photo (the one the test opens) is
+# a camera shot with EXIF details. adb push keeps these times.
+for sub in ("screenshots", "panoramas"):
+    for name in os.listdir(os.path.join(out, sub)):
+        path = os.path.join(out, sub, name)
+        t = os.path.getmtime(path) - 600
+        os.utime(path, (t, t))
 print("made test photos in", out)
