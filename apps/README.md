@@ -58,6 +58,15 @@ Edit [`apps.json`](apps.json) and add an entry:
 The page needs the repo's release to contain an `.apk` file. Everything else (version, size, date,
 fingerprint, screenshots) is read from the release itself.
 
+## Icons and saved text
+
+- **Icons** are each app's own launcher icon, drawn from its repository (`icons/<id>.svg`). After an
+  app's icon changes, run `python3 tools/build-icons.py` and commit the result. The emoji in
+  `apps.json` is only shown if an icon can't load.
+- **Description and What's new** appear straight away from `content.json`, then the page asks GitHub
+  and replaces them when it has a newer answer. If GitHub is out of requests, the saved text stays
+  on screen. Refresh it with `python3 tools/build-content.py`.
+
 ## How a new build reaches friends
 
 ```
@@ -157,5 +166,7 @@ Friends can also be offered the update inside the app, without coming back here:
 |---|---|
 | `index.html`, `style.css`, `app.js` | The page |
 | `apps.json` | The list of apps |
+| `icons/` | The app icons (made by `tools/build-icons.py`) |
+| `content.json` | Saved descriptions and changes (made by `tools/build-content.py`) |
 | `vendor/qrcode.js` | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) 1.4.4 (MIT), draws the QR code in the browser |
 | `android/AppUpdater.kt` | Drop-in code for the in-app update check and install |

@@ -97,6 +97,10 @@ h1 { margin: 0; font-size: clamp(2.1rem, 6vw, 3.4rem); line-height: 1.05; letter
   background: linear-gradient(145deg, hsl(var(--h) 70% 58%), hsl(calc(var(--h) + 38) 65% 38%));
   box-shadow: 0 6px 16px hsl(var(--h) 70% 30% / 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
+.tile { position: relative; overflow: hidden; }
+.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.2s; }
+.tile.has-icon img { opacity: 1; }
+.tile.has-icon { background: var(--surface-2); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(128, 128, 128, 0.18); font-size: 0; }
 .tile.lg { width: 84px; height: 84px; border-radius: 24px; font-size: 44px; }
 .card h2, .ps-head h2 { margin: 0; font-size: 1.2rem; line-height: 1.2; }
 .local { color: var(--muted); font-weight: 500; font-size: 0.9em; margin-left: 6px; }

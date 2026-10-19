@@ -206,11 +206,17 @@
     const cached = store.get(key);
     if (cached && Date.now() - cached.t < 6 * 3600 * 1000) return parseReadme(cached.text);
     const path = app.readme || 'README.md';
-    const res = await fetch(`https://raw.githubusercontent.com/${state.owner}/${app.repo}/HEAD/${path}`);
-    if (!res.ok) throw new Error('no README');
-    const text = (await res.text()).slice(0, 14000);
-    store.set(key, { t: Date.now(), text });
-    return parseReadme(text);
+    try {
+      const res = await fetch(`https://raw.githubusercontent.com/${state.owner}/${app.repo}/HEAD/${path}`);
+      if (!res.ok) throw new Error('no README');
+      const text = (await res.text()).slice(0, 14000);
+      store.set(key, { t: Date.now(), text });
+      return parseReadme(text);
+    } catch (err) {
+      const snap = state.content[appId(app)];     // the copy saved in content.json
+      if (snap && snap.about && snap.about.length) return { intro: snap.about, features: snap.features || [] };
+      throw err;
+    }
   }
 
   // "What's new": the plain-English titles of the latest changes in the code this build was made from.
@@ -219,6 +225,17 @@
     const key = 'apphub:w2:' + appId(app) + ':' + (info.sha || 'head');
     const cached = store.get(key);
     if (cached) return cached;
+    const snap = state.content[appId(app)];
+    if (snap && snap.changes && info.sha && snap.sha === info.sha) return snap.changes;    // same build: no need to ask GitHub
+    try {
+      return await liveChanges(app, info, key);
+    } catch (err) {
+      if (snap && snap.changes) return snap.changes;     // GitHub said no: show the saved list
+      throw err;
+    }
+  }
+
+  async function liveChanges(app, info, key) {
     const q = 'per_page=40' + (info.sha ? '&sha=' + info.sha : '') + (app.path ? '&path=' + encodeURIComponent(app.path) : '');
     const list = await ghJson(`/repos/${state.owner}/${app.repo}/commits?${q}`);
     const items = [];
@@ -226,7 +243,7 @@
       const lines = c.commit.message.trim().split('\n');
       let title = lines[0];
       if (/^Merge pull request/i.test(title)) title = (lines.slice(1).find(l => l.trim()) || '').trim();
-      else if (/^Merge (branch|remote)/i.test(title)) title = '';
+      else if (/^Merge\b/i.test(title)) title = '';
       title = title.replace(/\s*\(#\d+\)\s*$/, '').trim();
       if (!title || /^(ci|tests?)\b|smoke test|emulator test|\bci:/i.test(title) || /^move into its own repository/i.test(title)) continue;
       if (items.some(i => i.title === title)) continue;
@@ -240,7 +257,7 @@
   // ---------- what this browser has already downloaded ----------
 
   const installed = store.get('apphub:installed2') || {};
-  const state = { owner: 'Akrishna87', apps: [], data: new Map() };
+  const state = { owner: 'Akrishna87', apps: [], data: new Map(), content: {} };
 
   function standing(app) {
     const entry = state.data.get(appId(app));
@@ -272,7 +289,11 @@
   // ---------- the grid ----------
 
   const grid = document.getElementById('apps');
-  const tile = (app, large) => h('div', { class: 'tile' + (large ? ' lg' : ''), style: `--h:${app.hue ?? 150}`, 'aria-hidden': 'true' }, app.emoji || '📱');
+  // The icon is the app's own launcher icon (icons/<id>.svg, made by tools/build-icons.py); the emoji shows only if it can't load.
+  const tile = (app, large) => h('div', { class: 'tile' + (large ? ' lg' : ''), style: `--h:${app.hue ?? 150}`, 'aria-hidden': 'true' },
+    app.emoji || '📱',
+    h('img', { src: `icons/${encodeURIComponent(appId(app))}.svg`, alt: '', draggable: 'false',
+      onload: e => e.currentTarget.parentNode.classList.add('has-icon'), onerror: e => e.currentTarget.remove() }));
   const nameEl = app => [app.name, app.nameLocal ? h('span', { class: 'local', lang: 'ta' }, app.nameLocal) : null];
 
   function chipsFor(app, info, stale) {
@@ -495,6 +516,7 @@
     const isAndroid = /Android/i.test(navigator.userAgent);
     document.getElementById('desktop-notice').hidden = isAndroid;
 
+    fetch('content.json', { cache: 'no-cache' }).then(r => r.json()).then(c => { state.content = c || {}; }).catch(() => {});   // saved descriptions and changes
     let config;
     try { config = await (await fetch('apps.json', { cache: 'no-cache' })).json(); }
     catch {
