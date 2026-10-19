@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -113,10 +114,16 @@ fun Viewer(
     val scope = rememberCoroutineScope()
 
     // The list as it was when the viewer opened (so un-hearting in Favorites doesn't yank the photo
-    // away), minus anything deleted since.
+    // away), minus anything deleted (or, in Recently Deleted, recovered) since.
     val snapshot = remember(target) { target.album.items(state, favorites) }
-    val present = remember(state) { HashSet<Long>().apply { state.items.forEach { add(it.id) }; state.trash.forEach { add(it.id) } } }
-    val items = remember(snapshot, present) { snapshot.filter { it.id in present } }
+    val present = remember(state, target) {
+        (if (target.album.isTrash) state.trash else state.items).mapTo(HashSet()) { it.id }
+    }
+    // Deleted items leave like in Photos: the photo shrinks and fades, then the next one slides in.
+    var hidden by remember { mutableStateOf(emptySet<Long>()) }
+    var vanish by remember { mutableFloatStateOf(1f) }
+    var arrive by remember { mutableFloatStateOf(1f) }
+    val items = remember(snapshot, present, hidden) { snapshot.filter { it.id in present && it.id !in hidden } }
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
         return
@@ -124,6 +131,7 @@ fun Viewer(
 
     val pager = rememberPagerState(initialPage = snapshot.indexOfFirst { it.id == target.startId }.coerceAtLeast(0)) { items.size }
     val current = items[pager.currentPage.coerceIn(0, items.lastIndex)]
+
     var chrome by remember { mutableStateOf(true) }
     var zoomed by remember { mutableStateOf(false) }
     var dismissY by remember { mutableFloatStateOf(0f) }
@@ -162,6 +170,22 @@ fun Viewer(
     LaunchedEffect(muted) { player.volume = if (muted) 0f else 1f }
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { player.pause() }
 
+    LaunchedEffect(actions.removed) {
+        val gone = actions.removed - hidden
+        if (gone.isEmpty()) return@LaunchedEffect
+        val showingGone = current.id in gone
+        if (showingGone) {
+            player.pause()
+            animate(1f, 0f, animationSpec = tween(220)) { v, _ -> vanish = v }
+        }
+        hidden = hidden + gone
+        vanish = 1f
+        if (showingGone) {
+            arrive = 0f
+            animate(0f, 1f, animationSpec = tween(280)) { v, _ -> arrive = v }
+        }
+    }
+
     val dismissProgress = min(1f, abs(dismissY) / with(density) { 400.dp.toPx() })
     val black = !chrome || apple.dark
     val background by animateColorAsState(if (black) Color.Black else apple.background, label = "viewerBg")
@@ -191,10 +215,22 @@ fun Viewer(
                     else scope.launch { animate(dismissY, 0f) { v, _ -> dismissY = v } }
                 },
             ) {
-                if (item.isVideo) {
-                    VideoPage(item, player, active, firstFrame)
-                } else {
-                    PhotoPage(item)
+                Box(
+                    Modifier.fillMaxSize().graphicsLayer {
+                        if (active) {
+                            alpha = vanish * arrive
+                            scaleX = 0.8f + 0.2f * vanish
+                            scaleY = 0.8f + 0.2f * vanish
+                            translationX = (1f - arrive) * size.width * 0.3f
+                        }
+                    },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (item.isVideo) {
+                        VideoPage(item, player, active, firstFrame)
+                    } else {
+                        PhotoPage(item)
+                    }
                 }
             }
         }

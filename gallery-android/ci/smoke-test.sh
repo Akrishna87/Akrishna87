@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the Android emulator job: installs the APK, puts test photos and a video on the
 # "phone", and checks the welcome screen, the Library (All Photos, Months, Years), the viewer
-# (favourite, info, video playback), Albums, Search and dark mode.
+# (favourite, info, video playback, deleting), Albums, Search and dark mode.
 # Usage: smoke-test.sh <apk> <media dir> <output dir>
 set -euo pipefail
 
@@ -221,6 +221,41 @@ tap search "Library"
 sleep 2
 shot 13-dark-library
 adb shell cmd uimode night no || true
+
+echo "--- Deleting from the viewer"
+sleep 2
+dump library
+tap library "Photo, " last
+sleep 3
+dump viewer
+tap viewer "Info"
+sleep 2
+dump info
+GONE=$(grep -o 'text="PXL_smoke_[0-9]*\.jpg"' "$OUT/info.xml" | head -1 | cut -d'"' -f2)
+[ -n "$GONE" ] || fail "couldn't read which photo is open"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+dump viewer
+tap viewer "Delete"
+sleep 2
+dump allow
+shot 14-delete-confirm
+tap allow "Allow"
+sleep 3
+dump after-delete
+shot 15-after-delete
+has after-delete 'content-desc="Favorite"\|content-desc="Unfavorite"' || fail "the viewer closed after deleting instead of showing the next photo"
+tap after-delete "Info"
+sleep 2
+dump info-next
+grep -q "text=\"$GONE\"" "$OUT/info-next.xml" && fail "the deleted photo ($GONE) is still showing in the viewer"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+dump library
+has library '10 Photos, 1 Video' || fail "the Library still counts the deleted photo"
+echo "PASS: deleting moves on to the next photo and leaves the library"
 
 if crashed; then
   adb logcat -d > "$OUT/logcat.txt"

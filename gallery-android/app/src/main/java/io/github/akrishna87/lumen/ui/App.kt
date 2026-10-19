@@ -119,10 +119,22 @@ data class ViewerTarget(val album: AlbumRef, val startId: Long)
 class GalleryActions(
     private val vm: GalleryViewModel,
     private val activity: Activity?,
-    private val launcher: ActivityResultLauncher<IntentSenderRequest>,
 ) {
+    /** Shows Android's own "Allow Lumen to…?" confirmation; set once the screen is up. */
+    var launcher: ActivityResultLauncher<IntentSenderRequest>? = null
+
     /** Before Android 11 there's no system confirmation, so the app asks itself, like Photos does. */
     var pendingDelete by mutableStateOf<List<MediaItem>?>(null)
+
+    /**
+     * Items just deleted, recovered or deleted for good. The viewer hides them at once (with an
+     * animation) rather than waiting for the library to reload.
+     */
+    var removed by mutableStateOf(emptySet<Long>())
+
+    /** What the confirmation on screen is for, so its result can be acted on. */
+    private var waiting: List<MediaItem> = emptyList()
+    private var retryDelete = false
 
     fun share(items: List<MediaItem>) {
         val activity = activity ?: return
@@ -150,17 +162,49 @@ class GalleryActions(
 
     fun delete(items: List<MediaItem>) {
         if (items.isEmpty()) return
-        if (Build.VERSION.SDK_INT >= 30) launch(vm.deleteRequest(items)) else pendingDelete = items
+        if (Build.VERSION.SDK_INT >= 30) launch(items, vm.deleteRequest(items)) else pendingDelete = items
     }
 
-    fun confirmDelete(items: List<MediaItem>) = launch(runCatching { vm.deleteRequest(items) }.getOrNull())
+    /** After the app's own confirmation (Android 8–10). */
+    fun confirmDelete(items: List<MediaItem>) {
+        val sender = runCatching { vm.deleteRequest(items) }.getOrNull()
+        // Android 10 may still ask for permission for photos other apps made; the delete is retried after.
+        if (sender == null) markRemoved(items) else launch(items, sender, retry = true)
+    }
 
-    fun recover(items: List<MediaItem>) = launch(vm.recoverRequest(items))
+    fun recover(items: List<MediaItem>) = launch(items, vm.recoverRequest(items))
 
-    fun deleteForever(items: List<MediaItem>) = launch(vm.deleteForeverRequest(items))
+    fun deleteForever(items: List<MediaItem>) = launch(items, vm.deleteForeverRequest(items))
 
-    private fun launch(sender: IntentSender?) {
-        if (sender != null) launcher.launch(IntentSenderRequest.Builder(sender).build())
+    /** Called with the answer to Android's confirmation. */
+    fun onResult(allowed: Boolean) {
+        val items = waiting
+        waiting = emptyList()
+        if (!allowed || items.isEmpty()) return
+        if (retryDelete) {
+            retryDelete = false
+            confirmDelete(items)
+        } else {
+            markRemoved(items)
+        }
+    }
+
+    /** Closing the viewer forgets what it hid; the reloaded library has caught up by then. */
+    fun forgetRemoved() {
+        removed = emptySet()
+    }
+
+    private fun markRemoved(items: List<MediaItem>) {
+        removed = removed + items.map { it.id }
+        vm.refresh()
+    }
+
+    private fun launch(items: List<MediaItem>, sender: IntentSender?, retry: Boolean = false) {
+        val launcher = launcher ?: return
+        if (sender == null) return
+        waiting = items
+        retryDelete = retry
+        launcher.launch(IntentSenderRequest.Builder(sender).build())
     }
 }
 
@@ -182,8 +226,11 @@ fun GalleryApp(vm: GalleryViewModel = viewModel()) {
     }
 
     val activity = LocalContext.current as? Activity
-    val changeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { vm.refresh() }
-    val actions = remember(vm, activity, changeLauncher) { GalleryActions(vm, activity, changeLauncher) }
+    val actions = remember(vm, activity) { GalleryActions(vm, activity) }
+    actions.launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        actions.onResult(result.resultCode == Activity.RESULT_OK)
+        vm.refresh()
+    }
 
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val stacks = remember { List(3) { mutableStateListOf<Route>() } }
@@ -287,7 +334,10 @@ fun GalleryApp(vm: GalleryViewModel = viewModel()) {
                     state = state,
                     favorites = favorites,
                     actions = actions,
-                    onClose = { viewer = null },
+                    onClose = {
+                        viewer = null
+                        actions.forgetRemoved()
+                    },
                 )
             }
         }
