@@ -23,6 +23,16 @@
       "hue": 215
     },
     {
+      "repo": "lumen",
+      "tag": "lumen-latest",
+      "apk": "Lumen.apk",
+      "group": "Media",
+      "name": "Lumen",
+      "tagline": "A photo gallery designed like Apple's Photos, for the pictures already on your phone.",
+      "emoji": "🌅",
+      "hue": 320
+    },
+    {
       "repo": "vaanalai",
       "tag": "radio-latest",
       "apk": "Vaanalai.apk",
