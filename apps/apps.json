@@ -197,6 +197,20 @@
       "hue": 4
     },
     {
+      "repo": "Akrishna87",
+      "id": "semippu",
+      "tag": "semippu-latest",
+      "apk": "Semippu.apk",
+      "readme": "semippu-android/README.md",
+      "path": "semippu-android",
+      "group": "Everyday",
+      "name": "Semippu",
+      "nameLocal": "சேமிப்பு",
+      "tagline": "Calculators for PPF, Sukanya Samriddhi, NSC, KVP, SCSS, MIS, FD, RD and SIP at the current government rates, and home, car and personal loan EMIs with part payments.",
+      "emoji": "💰",
+      "hue": 140
+    },
+    {
       "repo": "vaanilai",
       "tag": "weather-latest",
       "apk": "Vaanilai.apk",

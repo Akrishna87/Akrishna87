@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Savings growing: three rising bars with a coin dropping onto the tallest. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,62h11v14h-11zM48.5,52h11v24h-11z" />
+    <path
+        android:fillColor="#A6F4B5"
+        android:pathData="M65,42h11v34h-11z" />
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M70.5,26a6,6 0,1 1,0 12a6,6 0,1 1,0 -12z" />
+</vector>
