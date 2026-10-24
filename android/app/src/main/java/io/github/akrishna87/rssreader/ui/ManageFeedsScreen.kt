@@ -39,7 +39,7 @@ fun ManageFeedsScreen(
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     onRemove: (String) -> Unit,
-    onEdit: (id: String, name: String, folder: String, priority: Boolean) -> Unit,
+    onEdit: (id: String, name: String, folder: String, priority: Boolean, fullText: Boolean) -> Unit,
     onOpen: (String) -> Unit,
 ) {
     val apple = LocalApple.current
@@ -95,6 +95,7 @@ fun ManageFeedsScreen(
         var name by remember(feed.id) { mutableStateOf(feed.name) }
         var folder by remember(feed.id) { mutableStateOf(feed.folder) }
         var priority by remember(feed.id) { mutableStateOf(feed.priority) }
+        var fullText by remember(feed.id) { mutableStateOf(feed.fullText) }
         ModalBottomSheet(
             onDismissRequest = { editing = null },
             sheetState = sheet,
@@ -110,7 +111,7 @@ fun ManageFeedsScreen(
                     Text("Edit Feed", style = AppleType.headline, color = apple.label, modifier = Modifier.align(Alignment.Center))
                     Box(Modifier.align(Alignment.CenterEnd)) {
                         BarText("Save", bold = true) {
-                            onEdit(feed.id, name.ifBlank { feed.title }, folder, priority)
+                            onEdit(feed.id, name.ifBlank { feed.title }, folder, priority, fullText)
                             editing = null
                         }
                     }
@@ -121,7 +122,13 @@ fun ManageFeedsScreen(
                     }
                 }
                 FolderPicker(folder, folders) { folder = it }
-                GroupedSection(footer = "Priority feeds get their own list in the menu.") {
+                GroupedSection(footer = "Priority feeds get their own list in the menu. Full articles are fetched from the website when you open one, for feeds that only send a snippet.") {
+                    AppleRow(
+                        "Always load full article",
+                        chevron = false,
+                        onClick = { fullText = !fullText },
+                        trailing = { AppleSwitch(fullText) { fullText = it } },
+                    )
                     AppleRow(
                         "Priority",
                         leading = { Icon(AppIcons.Bolt, null, tint = apple.tint, modifier = Modifier.size(24.dp)) },

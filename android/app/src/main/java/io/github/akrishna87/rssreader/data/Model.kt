@@ -13,6 +13,8 @@ data class Feed(
     val customTitle: String = "",
     /** Priority feeds get their own list and lead the Today view. */
     val priority: Boolean = false,
+    /** Fetch the full article page whenever an article from this feed is opened. */
+    val fullText: Boolean = false,
     /** When this feed's settings last changed, for syncing (1 = before syncing existed). */
     val ts: Long = 1,
 ) {
@@ -40,6 +42,8 @@ data class Article(
     val highlights: List<Highlight> = emptyList(),
     /** When the reader last changed this article's state (read, saved, boards, highlights); 0 = never. */
     val mod: Long = 0,
+    /** Full article text fetched from the web page; empty = not fetched. */
+    val fullHtml: String = "",
 ) {
     /** Saved by the reader in some way, so it's never cleaned up. */
     val kept: Boolean get() = starred || boards.isNotEmpty() || highlights.isNotEmpty()

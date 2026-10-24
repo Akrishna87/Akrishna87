@@ -38,6 +38,7 @@ class Store(private val file: File) {
                     folder = it.optString("folder"),
                     customTitle = it.optString("customTitle"),
                     priority = it.optBoolean("priority"),
+                    fullText = it.optBoolean("fullText"),
                     ts = it.optLong("ts", 1),
                 )
             }
@@ -56,6 +57,7 @@ class Store(private val file: File) {
                     starred = it.optBoolean("starred"),
                     boards = it.optJSONArray("boards").strings(),
                     mod = it.optLong("mod"),
+                    fullHtml = it.optString("full"),
                     highlights = it.optJSONArray("highlights").objects().map { h ->
                         Highlight(h.optString("text"), h.optString("note"), h.optLong("time"))
                     }.filter { h -> h.text.isNotEmpty() },
@@ -99,7 +101,7 @@ class Store(private val file: File) {
                 put(JSONObject().apply {
                     put("id", f.id); put("url", f.url); put("title", f.title); put("siteUrl", f.siteUrl)
                     put("lastFetched", f.lastFetched); put("error", f.error ?: "")
-                    put("folder", f.folder); put("customTitle", f.customTitle); put("priority", f.priority); put("ts", f.ts)
+                    put("folder", f.folder); put("customTitle", f.customTitle); put("priority", f.priority); put("fullText", f.fullText); put("ts", f.ts)
                 })
             }
         })
@@ -109,7 +111,7 @@ class Store(private val file: File) {
                     put("id", a.id); put("feedId", a.feedId); put("title", a.title); put("link", a.link)
                     put("date", a.date); put("author", a.author); put("content", a.contentHtml)
                     put("snippet", a.snippet); put("thumb", a.thumbnail ?: ""); put("read", a.read); put("starred", a.starred)
-                    put("boards", JSONArray(a.boards)); put("mod", a.mod)
+                    put("boards", JSONArray(a.boards)); put("mod", a.mod); put("full", a.fullHtml)
                     put("highlights", JSONArray().apply {
                         a.highlights.forEach { h -> put(JSONObject().put("text", h.text).put("note", h.note).put("time", h.time)) }
                     })
@@ -160,6 +162,7 @@ fun mergeArticles(existing: List<Article>, feedId: String, parsed: ParsedFeed, n
             boards = old?.boards ?: emptyList(),
             highlights = old?.highlights ?: emptyList(),
             mod = old?.mod ?: 0,
+            fullHtml = old?.fullHtml ?: "",
         )
         if (old == null) added++
         byId[id] = fresh

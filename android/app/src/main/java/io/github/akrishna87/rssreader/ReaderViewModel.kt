@@ -10,6 +10,7 @@ import io.github.akrishna87.rssreader.data.Highlight
 import io.github.akrishna87.rssreader.data.Net
 import io.github.akrishna87.rssreader.data.NotAFeedException
 import io.github.akrishna87.rssreader.data.Opml
+import io.github.akrishna87.rssreader.data.Readability
 import io.github.akrishna87.rssreader.data.Settings
 import io.github.akrishna87.rssreader.data.Snapshot
 import io.github.akrishna87.rssreader.data.Store
@@ -78,6 +79,8 @@ data class UiState(
     val boardTs: Map<String, Long> = emptyMap(),
     val deletedBoards: Map<String, Long> = emptyMap(),
     val prefsTs: Long = 0,
+    /** Articles whose full text is being fetched. */
+    val fullLoading: Set<String> = emptySet(),
     val syncEmail: String? = null,
     val syncStatus: SyncStatus = SyncStatus.Off,
     val syncError: String? = null,
@@ -310,11 +313,37 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         persist()
     }
 
+    /** Fetch the article's web page and keep its full text, for feeds that only send a snippet. */
+    fun loadFullText(id: String, quiet: Boolean = false) {
+        val a = _state.value.articles.firstOrNull { it.id == id } ?: return
+        if (a.link.isEmpty() || a.fullHtml.isNotEmpty() || id in _state.value.fullLoading) return
+        _state.update { it.copy(fullLoading = it.fullLoading + id) }
+        viewModelScope.launch {
+            val html = try {
+                withContext(Dispatchers.IO) { Readability.extract(Net.fetch(a.link), a.link) }
+            } catch (e: Exception) {
+                null
+            }
+            _state.update { s ->
+                s.copy(
+                    fullLoading = s.fullLoading - id,
+                    articles = if (html != null) s.articles.map { if (it.id == id) it.copy(fullHtml = html) else it } else s.articles,
+                )
+            }
+            if (html != null) persist() else if (!quiet) _messages.tryEmit("Couldn't get the full article from that page")
+        }
+    }
+
+    fun setFullText(id: String, on: Boolean) {
+        _state.update { s -> s.copy(feeds = s.feeds.map { if (it.id == id) it.copy(fullText = on, ts = now()) else it }) }
+        persist()
+    }
+
     /** Rename and/or move a feed to a folder (blank folder = no folder). */
-    fun editFeed(id: String, name: String, folder: String, priority: Boolean) {
+    fun editFeed(id: String, name: String, folder: String, priority: Boolean, fullText: Boolean) {
         _state.update { s ->
             val feeds = s.feeds.map {
-                if (it.id == id) it.copy(customTitle = name.trim().takeIf { n -> n != it.title } ?: "", folder = folder.trim(), priority = priority, ts = now()) else it
+                if (it.id == id) it.copy(customTitle = name.trim().takeIf { n -> n != it.title } ?: "", folder = folder.trim(), priority = priority, fullText = fullText, ts = now()) else it
             }
             val view = s.view
             s.copy(feeds = feeds, view = if (view is ReaderView.Folder && feeds.none { it.folder == view.name }) ReaderView.Today else view)

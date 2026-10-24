@@ -21,6 +21,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,9 +33,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +78,8 @@ fun ArticleScreen(
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     textSize: Int,
+    fullLoading: Boolean,
+    onLoadFull: () -> Unit,
     boards: List<String>,
     onToggleStar: () -> Unit,
     onMarkUnread: () -> Unit,
@@ -116,7 +124,7 @@ fun ArticleScreen(
                 ).joinToString(" · ")
                 Text(meta, style = AppleType.subheadline, color = apple.secondaryLabel)
                 Spacer(Modifier.height(18.dp))
-                val hasInlineImages = remember(article.contentHtml) { Regex("<img\\b", RegexOption.IGNORE_CASE).containsMatchIn(article.contentHtml) }
+                val hasInlineImages = remember(article.contentHtml, article.fullHtml) { Regex("<img\\b", RegexOption.IGNORE_CASE).containsMatchIn(article.fullHtml.ifEmpty { article.contentHtml }) }
                 if (article.thumbnail != null && !hasInlineImages) {
                     AsyncImage(
                         model = article.thumbnail,
@@ -126,9 +134,26 @@ fun ArticleScreen(
                     )
                     Spacer(Modifier.height(18.dp))
                 }
-                if (article.contentHtml.isNotBlank()) {
+                // Feeds set to "always load full article" fetch the page as soon as the article opens.
+                LaunchedEffect(article.id, feed?.fullText) {
+                    if (feed?.fullText == true && article.fullHtml.isEmpty()) onLoadFull()
+                }
+                if (article.fullHtml.isEmpty() && article.link.isNotEmpty()) {
+                    Row(
+                        Modifier.padding(bottom = 14.dp).clip(RoundedCornerShape(50)).background(apple.tint.copy(alpha = 0.14f))
+                            .clickable(enabled = !fullLoading, onClick = onLoadFull).padding(horizontal = 14.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (fullLoading) CircularProgressIndicator(Modifier.size(14.dp), color = apple.tint, strokeWidth = 2.dp)
+                        else Icon(AppIcons.ImportDoc, null, tint = apple.tint, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (fullLoading) "Loading full article…" else "Load full article", style = AppleType.subheadline.copy(fontWeight = FontWeight.SemiBold), color = apple.tint)
+                    }
+                }
+                val bodyHtml = article.fullHtml.ifEmpty { article.contentHtml }
+                if (bodyHtml.isNotBlank()) {
                     HtmlText(
-                        article.contentHtml,
+                        bodyHtml,
                         baseUrl = article.link.ifEmpty { feed?.url.orEmpty() },
                         textSize = textSize,
                         highlights = article.highlights.map { it.text },

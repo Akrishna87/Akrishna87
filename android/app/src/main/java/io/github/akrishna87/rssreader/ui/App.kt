@@ -70,6 +70,8 @@ fun ReaderApp(vm: ReaderViewModel) {
                 snackbar = snackbar,
                 onBack = vm::closeArticle,
                 textSize = state.settings.textSize,
+                fullLoading = open.id in state.fullLoading,
+                onLoadFull = { vm.loadFullText(open.id) },
                 boards = state.boards,
                 onToggleStar = { vm.toggleStar(open.id) },
                 onMarkUnread = { vm.setRead(open.id, false); vm.closeArticle() },

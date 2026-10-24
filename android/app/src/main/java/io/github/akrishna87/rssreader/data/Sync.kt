@@ -12,7 +12,7 @@ import org.json.JSONObject
 
 data class DFeed(
     val url: String, val title: String, val customTitle: String, val folder: String, val priority: Boolean,
-    val ts: Long, val deleted: Boolean = false,
+    val ts: Long, val deleted: Boolean = false, val fullText: Boolean = false,
 )
 
 /** Enough about an article to show it on a device that hasn't fetched it. */
@@ -55,10 +55,10 @@ object SyncMerge {
             } else if (lf == null) {
                 if ((tombs[id] ?: 0) >= r.ts) continue
                 tombs.remove(id)
-                feeds[id] = Feed(id, r.url, r.title, customTitle = r.customTitle, folder = r.folder, priority = r.priority, ts = r.ts)
+                feeds[id] = Feed(id, r.url, r.title, customTitle = r.customTitle, folder = r.folder, priority = r.priority, fullText = r.fullText, ts = r.ts)
             } else if (r.ts > lf.ts) {
                 feeds[id] = lf.copy(
-                    customTitle = r.customTitle, folder = r.folder, priority = r.priority, ts = r.ts,
+                    customTitle = r.customTitle, folder = r.folder, priority = r.priority, fullText = r.fullText, ts = r.ts,
                     title = r.title.ifEmpty { lf.title },
                 )
             }
@@ -121,7 +121,7 @@ object SyncMerge {
 
         // ---- what the server should hold: remote entries we have nothing newer for, plus ours ----
         val docFeeds = HashMap<String, DFeed>()
-        feeds.values.forEach { f -> docFeeds[f.id] = DFeed(f.url, f.title, f.customTitle, f.folder, f.priority, f.ts) }
+        feeds.values.forEach { f -> docFeeds[f.id] = DFeed(f.url, f.title, f.customTitle, f.folder, f.priority, f.ts, fullText = f.fullText) }
         tombs.forEach { (id, ts) -> docFeeds[id] = DFeed("", "", "", "", false, ts, deleted = true) }
         remote.feeds.forEach { (id, r) -> if (r.deleted && id !in docFeeds && now - r.ts <= TOMBSTONE_MAX_AGE) docFeeds[id] = r }
 
@@ -161,7 +161,7 @@ object SyncMerge {
             d.feeds.toSortedMap().forEach { (id, f) ->
                 m.put(id, if (f.deleted) JSONObject().put("deleted", true).put("ts", f.ts)
                 else JSONObject().put("url", f.url).put("title", f.title).put("customTitle", f.customTitle)
-                    .put("folder", f.folder).put("priority", f.priority).put("ts", f.ts))
+                    .put("folder", f.folder).put("priority", f.priority).put("fullText", f.fullText).put("ts", f.ts))
             }
         })
         o.put("art", JSONObject().also { m ->
@@ -196,7 +196,7 @@ object SyncMerge {
                     if (ts <= 0) return@forEach
                     if (f.optBoolean("deleted")) feeds[id] = DFeed("", "", "", "", false, ts, deleted = true)
                     else if (f.optString("url").isNotEmpty()) feeds[id] = DFeed(
-                        f.getString("url"), f.optString("title"), f.optString("customTitle"), f.optString("folder"), f.optBoolean("priority"), ts,
+                        f.getString("url"), f.optString("title"), f.optString("customTitle"), f.optString("folder"), f.optBoolean("priority"), ts, fullText = f.optBoolean("fullText"),
                     )
                 }
             }

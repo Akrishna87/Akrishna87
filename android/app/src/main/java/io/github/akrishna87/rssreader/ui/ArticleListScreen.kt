@@ -1,5 +1,6 @@
 package io.github.akrishna87.rssreader.ui
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,7 @@ import io.github.akrishna87.rssreader.ReaderViewModel
 import io.github.akrishna87.rssreader.UiState
 import io.github.akrishna87.rssreader.data.Article
 import io.github.akrishna87.rssreader.data.Feed
+import io.github.akrishna87.rssreader.data.Export
 import io.github.akrishna87.rssreader.data.Filters
 
 private const val DAY = 86_400_000L
@@ -93,6 +95,7 @@ fun ArticleListScreen(
     var query by remember(state.view) { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
     val layout = state.settings.layout
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val inView = remember(matcher, state.articles, state.view, state.unreadOnly) {
         state.articles.filter { a ->
@@ -150,6 +153,21 @@ fun ArticleListScreen(
                                 DropdownMenuItem(
                                     text = { Text(label, style = AppleType.body) },
                                     onClick = { vm.markOlderRead(visible.map { it.id }, System.currentTimeMillis() - age); menu = false },
+                                )
+                            }
+                            if (state.view == ReaderView.Notes || state.view is ReaderView.Board || state.view == ReaderView.Starred) {
+                                DropdownMenuItem(
+                                    text = { Text("Share as Markdown", style = AppleType.body) },
+                                    onClick = {
+                                        menu = false
+                                        val md = Export.markdown(title, visible) { feedsById[it]?.name.orEmpty() }
+                                        val send = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_SUBJECT, title)
+                                            putExtra(Intent.EXTRA_TEXT, md)
+                                        }
+                                        context.startActivity(Intent.createChooser(send, "Share $title"))
+                                    },
                                 )
                             }
                             DropdownMenuItem(
