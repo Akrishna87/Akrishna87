@@ -197,12 +197,9 @@
       "hue": 4
     },
     {
-      "repo": "Akrishna87",
-      "id": "semippu",
+      "repo": "semippu",
       "tag": "semippu-latest",
       "apk": "Semippu.apk",
-      "readme": "semippu-android/README.md",
-      "path": "semippu-android",
       "group": "Everyday",
       "name": "Semippu",
       "nameLocal": "சேமிப்பு",
