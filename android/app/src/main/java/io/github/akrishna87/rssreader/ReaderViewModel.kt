@@ -13,11 +13,14 @@ import io.github.akrishna87.rssreader.data.Opml
 import io.github.akrishna87.rssreader.data.Settings
 import io.github.akrishna87.rssreader.data.Snapshot
 import io.github.akrishna87.rssreader.data.Store
+import io.github.akrishna87.rssreader.data.SyncMerge
 import io.github.akrishna87.rssreader.data.mergeArticles
 import io.github.akrishna87.rssreader.data.normalizeUrl
 import io.github.akrishna87.rssreader.data.rewriteKnownUrl
 import io.github.akrishna87.rssreader.data.stableId
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -71,6 +74,14 @@ data class UiState(
     val settingsOpen: Boolean = false,
     val boards: List<String> = emptyList(),
     val settings: Settings = Settings(),
+    val deletedFeeds: Map<String, Long> = emptyMap(),
+    val boardTs: Map<String, Long> = emptyMap(),
+    val deletedBoards: Map<String, Long> = emptyMap(),
+    val prefsTs: Long = 0,
+    val syncEmail: String? = null,
+    val syncStatus: SyncStatus = SyncStatus.Off,
+    val syncError: String? = null,
+    val lastSync: Long = 0,
     val mute: List<String> = emptyList(),
     val highlight: List<String> = emptyList(),
     val collapsed: Set<String> = emptySet(),
@@ -78,8 +89,24 @@ data class UiState(
     val showMuted: Boolean = false,
 )
 
+enum class SyncStatus { Off, Syncing, Synced, Error }
+
+private fun UiState.toSnapshot() = Snapshot(
+    feeds, articles, unreadOnly, mute, highlight, collapsed, boards, settings, deletedFeeds, boardTs, deletedBoards, prefsTs,
+)
+
+private fun UiState.withSnapshot(s: Snapshot) = copy(
+    feeds = s.feeds, articles = s.articles.sortedByDescending { it.date }, mute = s.mute, highlight = s.highlight, boards = s.boards,
+    settings = s.settings, deletedFeeds = s.deletedFeeds, boardTs = s.boardTs, deletedBoards = s.deletedBoards, prefsTs = s.prefsTs,
+    // A removed feed can't stay selected.
+    view = view.let { v -> if (v is ReaderView.OneFeed && s.feeds.none { it.id == v.feedId }) ReaderView.Today else v },
+)
+
 class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(File(app.filesDir, "reader.json"))
+    private val cloud = Cloud(app.getSharedPreferences("sync", 0))
+    private val syncLock = Mutex()
+    private var syncJob: Job? = null
     private val saveLock = Mutex()
     private var lastRefresh = 0L
 
@@ -100,10 +127,13 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     loaded = true, feeds = snap.feeds, articles = snap.articles.newestFirst(), unreadOnly = snap.unreadOnly,
                     mute = snap.mute, highlight = snap.highlight, collapsed = snap.collapsed,
-                    boards = snap.boards, settings = snap.settings,
+                    boards = snap.boards, settings = snap.settings, deletedFeeds = snap.deletedFeeds, boardTs = snap.boardTs,
+                    deletedBoards = snap.deletedBoards, prefsTs = snap.prefsTs,
+                    syncEmail = cloud.session()?.email, syncStatus = if (cloud.session() != null) SyncStatus.Synced else SyncStatus.Off,
                 )
             }
             refreshIfStale()
+            syncSoon(0)
         }
     }
 
@@ -112,7 +142,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun setView(view: ReaderView) = _state.update { it.copy(view = view, showMuted = false) }
 
     fun openArticle(id: String) {
-        _state.update { s -> s.copy(openArticleId = id, articles = s.articles.map { if (it.id == id) it.copy(read = true) else it }) }
+        val now = System.currentTimeMillis()
+        _state.update { s -> s.copy(openArticleId = id, articles = s.articles.map { if (it.id == id && !it.read) it.copy(read = true, mod = now) else it }) }
         persist()
     }
 
@@ -139,13 +170,13 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Keyword filters ----------------------------------------------------
 
-    fun addMute(input: String) { _state.update { it.copy(mute = Filters.addTerms(it.mute, input)) }; persist() }
-    fun removeMute(term: String) { _state.update { it.copy(mute = it.mute - term) }; persist() }
-    fun addHighlight(input: String) { _state.update { it.copy(highlight = Filters.addTerms(it.highlight, input)) }; persist() }
+    fun addMute(input: String) { _state.update { it.copy(mute = Filters.addTerms(it.mute, input), prefsTs = now()) }; persist() }
+    fun removeMute(term: String) { _state.update { it.copy(mute = it.mute - term, prefsTs = now()) }; persist() }
+    fun addHighlight(input: String) { _state.update { it.copy(highlight = Filters.addTerms(it.highlight, input), prefsTs = now()) }; persist() }
     fun removeHighlight(term: String) {
         _state.update { s ->
             val list = s.highlight - term
-            s.copy(highlight = list, view = if (list.isEmpty() && s.view == ReaderView.Alerts) ReaderView.Today else s.view)
+            s.copy(highlight = list, prefsTs = now(), view = if (list.isEmpty() && s.view == ReaderView.Alerts) ReaderView.Today else s.view)
         }
         persist()
     }
@@ -160,18 +191,13 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Article state ----------------------------------------------------
 
-    fun setRead(id: String, read: Boolean) {
-        _state.update { s -> s.copy(articles = s.articles.map { if (it.id == id) it.copy(read = read) else it }) }
-        persist()
-    }
+    fun setRead(id: String, read: Boolean) = updateArticle(id) { it.copy(read = read) }
 
-    fun toggleStar(id: String) {
-        _state.update { s -> s.copy(articles = s.articles.map { if (it.id == id) it.copy(starred = !it.starred) else it }) }
-        persist()
-    }
+    fun toggleStar(id: String) = updateArticle(id) { it.copy(starred = !it.starred) }
 
     private fun updateArticle(id: String, change: (Article) -> Article) {
-        _state.update { s -> s.copy(articles = s.articles.map { if (it.id == id) change(it) else it }) }
+        val now = now()
+        _state.update { s -> s.copy(articles = s.articles.map { if (it.id == id) change(it).copy(mod = now) else it }) }
         persist()
     }
 
@@ -181,16 +207,19 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun createBoard(name: String): Boolean {
         val n = name.trim()
         if (n.isEmpty() || _state.value.boards.any { it.equals(n, true) }) return false
-        _state.update { it.copy(boards = it.boards + n) }
+        _state.update { it.copy(boards = it.boards + n, boardTs = it.boardTs + (n to now()), deletedBoards = it.deletedBoards - n) }
         persist()
         return true
     }
 
     fun deleteBoard(name: String) {
         _state.update { s ->
+            val now = now()
             s.copy(
                 boards = s.boards - name,
-                articles = s.articles.map { if (name in it.boards) it.copy(boards = it.boards - name) else it },
+                boardTs = s.boardTs - name,
+                deletedBoards = s.deletedBoards + (name to now),
+                articles = s.articles.map { if (name in it.boards) it.copy(boards = it.boards - name, mod = now) else it },
                 view = if (s.view == ReaderView.Board(name)) ReaderView.Today else s.view,
             )
         }
@@ -217,9 +246,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Settings ---------------------------------------------------------------
 
-    fun setLayout(layout: String) { _state.update { it.copy(settings = it.settings.copy(layout = layout)) }; persist() }
-    fun setTextSize(size: Int) { _state.update { it.copy(settings = it.settings.copy(textSize = size.coerceIn(14, 26))) }; persist() }
-    fun setTheme(theme: String) { _state.update { it.copy(settings = it.settings.copy(theme = theme)) }; persist() }
+    fun setLayout(layout: String) { _state.update { it.copy(settings = it.settings.copy(layout = layout), prefsTs = now()) }; persist() }
+    fun setTextSize(size: Int) { _state.update { it.copy(settings = it.settings.copy(textSize = size.coerceIn(14, 26)), prefsTs = now()) }; persist() }
+    fun setTheme(theme: String) { _state.update { it.copy(settings = it.settings.copy(theme = theme), prefsTs = now()) }; persist() }
 
     /** Mark as read the articles in [ids] that are older than [cutoff]. */
     fun markOlderRead(ids: Collection<String>, cutoff: Long) {
@@ -227,7 +256,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         var count = 0
         _state.update { s ->
             count = s.articles.count { it.id in set && !it.read && it.date < cutoff }
-            s.copy(articles = s.articles.map { if (it.id in set && it.date < cutoff) it.copy(read = true) else it })
+            val now = now()
+            s.copy(articles = s.articles.map { if (it.id in set && it.date < cutoff && !it.read) it.copy(read = true, mod = now) else it })
         }
         persist()
         _messages.tryEmit(if (count > 0) "Marked $count as read" else "Nothing older to mark")
@@ -238,7 +268,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         var count = 0
         _state.update { s ->
             count = s.articles.count { it.id in set && !it.read }
-            s.copy(articles = s.articles.map { if (it.id in set) it.copy(read = true) else it })
+            val now = now()
+            s.copy(articles = s.articles.map { if (it.id in set && !it.read) it.copy(read = true, mod = now) else it })
         }
         persist()
         if (count > 0) _messages.tryEmit("Marked $count as read")
@@ -256,7 +287,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             val id = stableId(finalUrl)
             _state.value.feeds.firstOrNull { it.id == id }?.let { return "You're already subscribed to ${it.name}" }
             val now = System.currentTimeMillis()
-            val feed = Feed(id, finalUrl, parsed.title.ifBlank { hostOf(finalUrl) }, parsed.siteUrl, now, folder = folder.trim())
+            val feed = Feed(id, finalUrl, parsed.title.ifBlank { hostOf(finalUrl) }, parsed.siteUrl, now, folder = folder.trim(), ts = now)
             val merged = withContext(Dispatchers.Default) { mergeArticles(_state.value.articles, id, parsed, now).first }
             _state.update { s ->
                 s.copy(
@@ -275,7 +306,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setPriority(id: String, on: Boolean) {
-        _state.update { s -> s.copy(feeds = s.feeds.map { if (it.id == id) it.copy(priority = on) else it }) }
+        _state.update { s -> s.copy(feeds = s.feeds.map { if (it.id == id) it.copy(priority = on, ts = now()) else it }) }
         persist()
     }
 
@@ -283,7 +314,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun editFeed(id: String, name: String, folder: String, priority: Boolean) {
         _state.update { s ->
             val feeds = s.feeds.map {
-                if (it.id == id) it.copy(customTitle = name.trim().takeIf { n -> n != it.title } ?: "", folder = folder.trim(), priority = priority) else it
+                if (it.id == id) it.copy(customTitle = name.trim().takeIf { n -> n != it.title } ?: "", folder = folder.trim(), priority = priority, ts = now()) else it
             }
             val view = s.view
             s.copy(feeds = feeds, view = if (view is ReaderView.Folder && feeds.none { it.folder == view.name }) ReaderView.Today else view)
@@ -296,6 +327,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { s ->
             s.copy(
                 feeds = s.feeds.filter { it.id != id },
+                deletedFeeds = s.deletedFeeds + (id to now()),
                 articles = s.articles.filter { it.feedId != id },
                 view = s.view.let { v ->
                     val remaining = s.feeds.filter { it.id != id }
@@ -308,6 +340,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshIfStale() {
+        syncSoon(500)
         if (System.currentTimeMillis() - lastRefresh > 15 * 60_000) refreshAll(quiet = true)
     }
 
@@ -346,7 +379,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             }.awaitAll()
             lastRefresh = System.currentTimeMillis()
             _state.update { it.copy(refreshing = false) }
-            persist()
+            persist() // also schedules a sync, which applies synced state to the articles just fetched
             val added = results.filter { it > 0 }.sum()
             val failed = results.count { it < 0 }
             if (!quiet || added > 0 || failed > 0) {
@@ -360,7 +393,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun importOpml(text: String) {
         val entries = try { Opml.parse(text) } catch (e: Exception) { emptyList() }
         val existing = _state.value.feeds.map { it.id }.toHashSet()
-        val fresh = entries.distinctBy { it.url }.map { Feed(stableId(it.url), it.url, it.title.ifBlank { hostOf(it.url) }, folder = it.folder) }
+        val fresh = entries.distinctBy { it.url }.map { Feed(stableId(it.url), it.url, it.title.ifBlank { hostOf(it.url) }, folder = it.folder, ts = now()) }
             .filter { it.id !in existing }
         if (fresh.isEmpty()) {
             _messages.tryEmit(if (entries.isEmpty()) "No feeds found in that file" else "You already have all those feeds")
@@ -380,9 +413,84 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             saveLock.withLock {
                 val s = _state.value
-                store.save(Snapshot(s.feeds, s.articles, s.unreadOnly, s.mute, s.highlight, s.collapsed, s.boards, s.settings))
+                store.save(s.toSnapshot())
             }
         }
+        syncSoon(3000)
+    }
+
+    private fun now() = System.currentTimeMillis()
+
+    // ---- Sync -------------------------------------------------------------
+
+    /** Sync a moment from now; further changes inside the delay fold into the same run. */
+    private fun syncSoon(delayMs: Long) {
+        if (cloud.session() == null) return
+        syncJob?.cancel()
+        syncJob = viewModelScope.launch {
+            delay(delayMs)
+            syncNow()
+        }
+    }
+
+    fun syncNow() {
+        if (cloud.session() == null) return
+        viewModelScope.launch(Dispatchers.IO) {
+            syncLock.withLock {
+                _state.update { it.copy(syncStatus = SyncStatus.Syncing, syncError = null) }
+                try {
+                    var attempts = 0
+                    while (true) {
+                        val remote = cloud.pull()
+                        val before = _state.value.feeds.map { it.id }.toHashSet()
+                        var json: String? = null
+                        var needsPush = false
+                        _state.update { s ->
+                            val r = SyncMerge.merge(s.toSnapshot(), remote.json, now())
+                            json = r.json; needsPush = r.needsPush
+                            if (r.changedLocal) s.withSnapshot(r.snapshot) else s
+                        }
+                        val ok = !needsPush || cloud.push(json!!, remote.updateTime)
+                        if (ok) {
+                            val added = _state.value.feeds.any { it.id !in before }
+                            _state.update { it.copy(syncStatus = SyncStatus.Synced, lastSync = now()) }
+                            persistNow()
+                            if (added) refreshAll(quiet = true)
+                            break
+                        }
+                        if (++attempts >= 3) throw SyncException("Another device kept changing the data. Try again in a moment.")
+                    }
+                } catch (e: Exception) {
+                    val msg = if (e is UnknownHostException || e is SocketTimeoutException) "Can't reach the sync service. Are you offline?" else e.message ?: "Sync failed"
+                    _state.update { it.copy(syncStatus = SyncStatus.Error, syncError = msg) }
+                }
+            }
+        }
+    }
+
+    private suspend fun persistNow() = saveLock.withLock { store.save(_state.value.toSnapshot()) }
+
+    /** Called with the Google ID token from the sign-in sheet. */
+    fun signInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(syncStatus = SyncStatus.Syncing, syncError = null) }
+            try {
+                val session = withContext(Dispatchers.IO) { cloud.signIn(idToken) }
+                _state.update { it.copy(syncEmail = session.email) }
+                syncNow()
+            } catch (e: Exception) {
+                _state.update { it.copy(syncStatus = SyncStatus.Error, syncError = e.message ?: "Sign-in failed") }
+            }
+        }
+    }
+
+    fun signInFailed(message: String) = _state.update { it.copy(syncStatus = SyncStatus.Error, syncError = message) }
+
+    fun signOut() {
+        syncJob?.cancel()
+        cloud.signOut()
+        _state.update { it.copy(syncEmail = null, syncStatus = SyncStatus.Off, syncError = null, lastSync = 0) }
+        _messages.tryEmit("Signed out. Your feeds stay on this device.")
     }
 
     private fun List<Article>.newestFirst() = sortedByDescending { it.date }

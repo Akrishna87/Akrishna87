@@ -88,6 +88,21 @@ fun ReaderApp(vm: ReaderViewModel) {
                 onLayout = vm::setLayout,
                 onTextSize = vm::setTextSize,
                 onTheme = vm::setTheme,
+                email = state.syncEmail,
+                status = state.syncStatus,
+                error = state.syncError,
+                lastSync = state.lastSync,
+                onSignIn = {
+                    scope.launch {
+                        try {
+                            googleIdToken(context)?.let(vm::signInWithGoogle)
+                        } catch (e: Exception) {
+                            vm.signInFailed(e.message ?: "Google sign-in failed")
+                        }
+                    }
+                },
+                onSyncNow = vm::syncNow,
+                onSignOut = vm::signOut,
             )
         }
         state.filtersOpen -> {
