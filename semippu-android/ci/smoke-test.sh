@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the Android emulator job: installs the APK, opens the PPF calculator and checks the
-# published figure, types a new deposit, then checks SCSS's quarterly payout.
+# published figure, types a new deposit, checks SCSS's quarterly payout, then on the Loans tab checks a
+# home loan's EMI and what a part payment saves, as a shorter loan and as a lower EMI.
 # Usage: smoke-test.sh <apk> <output dir>
 set -euo pipefail
 
@@ -76,6 +77,45 @@ tap home2 "SCSS"
 wait_for scss 'text="₹30,750 every quarter"' 15 "SCSS doesn't pay ₹30,750 a quarter on ₹15 lakh"
 shot 04-scss
 echo "PASS: SCSS"
+
+adb shell input keyevent KEYCODE_BACK
+wait_for home3 'text="Public Provident Fund"' 15 "Back doesn't return to the list"
+
+echo "--- Loans"
+tap home3 "Loans"
+wait_for loans 'text="Home loan"' 15 "the Loans tab doesn't list the loans"
+shot 05-loans
+tap loans "Home loan"
+wait_for home-loan 'text="₹43,391"' 15 "a ₹50 lakh home loan at 8.5% for 20 years doesn't show an EMI of ₹43,391"
+shot 06-home-loan
+echo "PASS: EMI"
+
+echo "--- Part payment"
+swipe_up() { adb shell input swipe 540 1800 540 800 600; sleep 1; }
+swipe_up
+dump part
+tap part "Part payment (₹)"
+adb shell input keyevent KEYCODE_MOVE_END
+adb shell input keyevent KEYCODE_DEL
+adb shell input text 100000
+sleep 1
+adb shell input keyevent KEYCODE_BACK   # hides the keyboard
+sleep 1
+swipe_up
+wait_for saved 'text="11 months sooner"' 15 "₹1 lakh paid after the first EMI doesn't end the loan 11 months sooner"
+grep -q 'text="₹4,19,612"' "$OUT/saved.xml" || fail "the interest saved isn't ₹4,19,612"
+shot 07-part-payment
+echo "PASS: part payment, shorter loan"
+
+adb shell input swipe 540 900 540 1400 600
+sleep 1
+dump choice
+tap choice "Lower EMI"
+sleep 1
+swipe_up
+wait_for lower 'text="₹42,522"' 15 "the lower EMI isn't ₹42,522"
+shot 08-lower-emi
+echo "PASS: part payment, lower EMI"
 
 adb logcat -d | grep -q "FATAL EXCEPTION" && fail "the app crashed"
 echo "Smoke test passed."
