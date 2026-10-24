@@ -6,9 +6,11 @@ import androidx.lifecycle.viewModelScope
 import io.github.akrishna87.rssreader.data.Article
 import io.github.akrishna87.rssreader.data.Feed
 import io.github.akrishna87.rssreader.data.Filters
+import io.github.akrishna87.rssreader.data.Highlight
 import io.github.akrishna87.rssreader.data.Net
 import io.github.akrishna87.rssreader.data.NotAFeedException
 import io.github.akrishna87.rssreader.data.Opml
+import io.github.akrishna87.rssreader.data.Settings
 import io.github.akrishna87.rssreader.data.Snapshot
 import io.github.akrishna87.rssreader.data.Store
 import io.github.akrishna87.rssreader.data.mergeArticles
@@ -38,11 +40,20 @@ import java.net.URI
 import java.net.UnknownHostException
 
 sealed interface ReaderView {
+    /** Articles from the last day. */
+    data object Today : ReaderView
     data object All : ReaderView
+    /** Read Later. */
     data object Starred : ReaderView
+    /** Everything from feeds marked as priority. */
+    data object Priority : ReaderView
     data class OneFeed(val feedId: String) : ReaderView
     data class Folder(val name: String) : ReaderView
-    data object Highlights : ReaderView
+    data class Board(val name: String) : ReaderView
+    /** Articles with passages the reader highlighted. */
+    data object Notes : ReaderView
+    /** Articles matching the keyword alerts. */
+    data object Alerts : ReaderView
 }
 
 data class UiState(
@@ -50,15 +61,16 @@ data class UiState(
     val feeds: List<Feed> = emptyList(),
     /** Newest first. */
     val articles: List<Article> = emptyList(),
-    val view: ReaderView = ReaderView.All,
+    val view: ReaderView = ReaderView.Today,
     val unreadOnly: Boolean = false,
     val refreshing: Boolean = false,
     val openArticleId: String? = null,
     val discoverOpen: Boolean = false,
     val manageOpen: Boolean = false,
     val filtersOpen: Boolean = false,
-    /** The article list for [view] is showing (otherwise the Feeds home screen). */
-    val listOpen: Boolean = false,
+    val settingsOpen: Boolean = false,
+    val boards: List<String> = emptyList(),
+    val settings: Settings = Settings(),
     val mute: List<String> = emptyList(),
     val highlight: List<String> = emptyList(),
     val collapsed: Set<String> = emptySet(),
@@ -88,6 +100,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     loaded = true, feeds = snap.feeds, articles = snap.articles.newestFirst(), unreadOnly = snap.unreadOnly,
                     mute = snap.mute, highlight = snap.highlight, collapsed = snap.collapsed,
+                    boards = snap.boards, settings = snap.settings,
                 )
             }
             refreshIfStale()
@@ -96,10 +109,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Navigation -------------------------------------------------------
 
-    /** Open the article list for [view]. */
-    fun setView(view: ReaderView) = _state.update { it.copy(view = view, showMuted = false, listOpen = true) }
-
-    fun closeList() = _state.update { it.copy(listOpen = false) }
+    fun setView(view: ReaderView) = _state.update { it.copy(view = view, showMuted = false) }
 
     fun openArticle(id: String) {
         _state.update { s -> s.copy(openArticleId = id, articles = s.articles.map { if (it.id == id) it.copy(read = true) else it }) }
@@ -113,6 +123,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openManage() = _state.update { it.copy(manageOpen = true) }
     fun closeManage() = _state.update { it.copy(manageOpen = false) }
+
+    fun openSettings() = _state.update { it.copy(settingsOpen = true) }
+    fun closeSettings() = _state.update { it.copy(settingsOpen = false) }
 
     fun openFilters() = _state.update { it.copy(filtersOpen = true) }
     fun closeFilters() = _state.update { it.copy(filtersOpen = false) }
@@ -132,7 +145,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun removeHighlight(term: String) {
         _state.update { s ->
             val list = s.highlight - term
-            s.copy(highlight = list, view = if (list.isEmpty() && s.view == ReaderView.Highlights) ReaderView.All else s.view)
+            s.copy(highlight = list, view = if (list.isEmpty() && s.view == ReaderView.Alerts) ReaderView.Today else s.view)
         }
         persist()
     }
@@ -155,6 +168,69 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleStar(id: String) {
         _state.update { s -> s.copy(articles = s.articles.map { if (it.id == id) it.copy(starred = !it.starred) else it }) }
         persist()
+    }
+
+    private fun updateArticle(id: String, change: (Article) -> Article) {
+        _state.update { s -> s.copy(articles = s.articles.map { if (it.id == id) change(it) else it }) }
+        persist()
+    }
+
+    // ---- Boards ---------------------------------------------------------------
+
+    /** Create a board; returns false if the name is blank or already used. */
+    fun createBoard(name: String): Boolean {
+        val n = name.trim()
+        if (n.isEmpty() || _state.value.boards.any { it.equals(n, true) }) return false
+        _state.update { it.copy(boards = it.boards + n) }
+        persist()
+        return true
+    }
+
+    fun deleteBoard(name: String) {
+        _state.update { s ->
+            s.copy(
+                boards = s.boards - name,
+                articles = s.articles.map { if (name in it.boards) it.copy(boards = it.boards - name) else it },
+                view = if (s.view == ReaderView.Board(name)) ReaderView.Today else s.view,
+            )
+        }
+        persist()
+        _messages.tryEmit("Deleted board $name")
+    }
+
+    fun toggleBoard(articleId: String, board: String) =
+        updateArticle(articleId) { a -> a.copy(boards = if (board in a.boards) a.boards - board else a.boards + board) }
+
+    // ---- Highlights and notes -------------------------------------------------
+
+    fun addTextHighlight(articleId: String, text: String, note: String = "") {
+        val t = text.trim()
+        if (t.isEmpty()) return
+        updateArticle(articleId) { a ->
+            val rest = a.highlights.filter { it.text != t }
+            a.copy(highlights = rest + Highlight(t, note.trim(), System.currentTimeMillis()))
+        }
+    }
+
+    fun removeTextHighlight(articleId: String, text: String) =
+        updateArticle(articleId) { a -> a.copy(highlights = a.highlights.filter { it.text != text }) }
+
+    // ---- Settings ---------------------------------------------------------------
+
+    fun setLayout(layout: String) { _state.update { it.copy(settings = it.settings.copy(layout = layout)) }; persist() }
+    fun setTextSize(size: Int) { _state.update { it.copy(settings = it.settings.copy(textSize = size.coerceIn(14, 26))) }; persist() }
+    fun setTheme(theme: String) { _state.update { it.copy(settings = it.settings.copy(theme = theme)) }; persist() }
+
+    /** Mark as read the articles in [ids] that are older than [cutoff]. */
+    fun markOlderRead(ids: Collection<String>, cutoff: Long) {
+        val set = ids.toHashSet()
+        var count = 0
+        _state.update { s ->
+            count = s.articles.count { it.id in set && !it.read && it.date < cutoff }
+            s.copy(articles = s.articles.map { if (it.id in set && it.date < cutoff) it.copy(read = true) else it })
+        }
+        persist()
+        _messages.tryEmit(if (count > 0) "Marked $count as read" else "Nothing older to mark")
     }
 
     fun markAllRead(ids: Collection<String>) {
@@ -188,7 +264,6 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     // Keep anything that changed while we were merging.
                     articles = (merged.filter { it.feedId == id } + s.articles.filter { it.feedId != id }).newestFirst(),
                     view = if (showFeed) ReaderView.OneFeed(id) else s.view,
-                    listOpen = showFeed || s.listOpen,
                 )
             }
             persist()
@@ -199,14 +274,19 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setPriority(id: String, on: Boolean) {
+        _state.update { s -> s.copy(feeds = s.feeds.map { if (it.id == id) it.copy(priority = on) else it }) }
+        persist()
+    }
+
     /** Rename and/or move a feed to a folder (blank folder = no folder). */
-    fun editFeed(id: String, name: String, folder: String) {
+    fun editFeed(id: String, name: String, folder: String, priority: Boolean) {
         _state.update { s ->
             val feeds = s.feeds.map {
-                if (it.id == id) it.copy(customTitle = name.trim().takeIf { n -> n != it.title } ?: "", folder = folder.trim()) else it
+                if (it.id == id) it.copy(customTitle = name.trim().takeIf { n -> n != it.title } ?: "", folder = folder.trim(), priority = priority) else it
             }
             val view = s.view
-            s.copy(feeds = feeds, view = if (view is ReaderView.Folder && feeds.none { it.folder == view.name }) ReaderView.All else view)
+            s.copy(feeds = feeds, view = if (view is ReaderView.Folder && feeds.none { it.folder == view.name }) ReaderView.Today else view)
         }
         persist()
     }
@@ -219,7 +299,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 articles = s.articles.filter { it.feedId != id },
                 view = s.view.let { v ->
                     val remaining = s.feeds.filter { it.id != id }
-                    if (v == ReaderView.OneFeed(id) || (v is ReaderView.Folder && remaining.none { it.folder == v.name })) ReaderView.All else v
+                    if (v == ReaderView.OneFeed(id) || (v is ReaderView.Folder && remaining.none { it.folder == v.name })) ReaderView.Today else v
                 },
             )
         }
@@ -300,7 +380,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             saveLock.withLock {
                 val s = _state.value
-                store.save(Snapshot(s.feeds, s.articles, s.unreadOnly, s.mute, s.highlight, s.collapsed))
+                store.save(Snapshot(s.feeds, s.articles, s.unreadOnly, s.mute, s.highlight, s.collapsed, s.boards, s.settings))
             }
         }
     }

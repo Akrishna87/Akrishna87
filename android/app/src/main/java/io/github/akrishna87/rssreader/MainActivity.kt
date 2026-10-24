@@ -1,10 +1,16 @@
 package io.github.akrishna87.rssreader
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.viewModels
 import io.github.akrishna87.rssreader.ui.ReaderApp
 import io.github.akrishna87.rssreader.ui.ReaderTheme
@@ -14,10 +20,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         if (savedInstanceState == null) handleShare(intent)
         setContent {
-            ReaderTheme {
+            val state by vm.state.collectAsStateWithLifecycle()
+            val mode = state.settings.theme
+            val dark = when (mode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
+            // Bar icons follow the app's theme, not just the phone's.
+            LaunchedEffect(dark) {
+                val bar = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = bar, navigationBarStyle = bar)
+            }
+            ReaderTheme(mode) {
                 ReaderApp(vm)
             }
         }

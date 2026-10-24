@@ -42,6 +42,18 @@ object AppIcons {
     val Close = stroke("Close", 2.2f, "M6.5,6.5L17.5,17.5M17.5,6.5L6.5,17.5")
     val Muted = stroke("Muted", 1.8f, "M4,9.5H7.5L12,5.5V18.5L7.5,14.5H4Z", "M16,9.5L20,13.5M20,9.5L16,13.5")
 
+    val Menu = stroke("Menu", 2f, "M4,7H20", "M4,12H20", "M4,17H20")
+    private const val BOOKMARK = "M7,4.5H17A1,1 0 0 1 18,5.5V20L12,16L6,20V5.5A1,1 0 0 1 7,4.5Z"
+    val Bookmark = stroke("Bookmark", 1.8f, BOOKMARK)
+    val BookmarkFill = fill("BookmarkFill", BOOKMARK)
+    val Grid = stroke("Grid", 1.8f, "M4,4.5H10.5V10.5H4Z", "M13.5,4.5H20V10.5H13.5Z", "M4,13.5H10.5V19.5H4Z", "M13.5,13.5H20V19.5H13.5Z")
+    val Sun = stroke("Sun", 1.8f, "M12,8A4,4 0 1 1 11.99,8Z", "M12,2.5V4.5M12,19.5V21.5M2.5,12H4.5M19.5,12H21.5M5.3,5.3L6.7,6.7M17.3,17.3L18.7,18.7M18.7,5.3L17.3,6.7M6.7,17.3L5.3,18.7")
+    val Highlighter = stroke("Highlighter", 1.8f, "M15,4.5L19.5,9L10,18.5H5.5V14Z", "M5,21H19")
+    val Sliders = stroke("Sliders", 1.8f, "M4,8H20", "M4,16H20", "M9,5.5V10.5", "M15,13.5V18.5")
+    val Bolt = stroke("Bolt", 1.8f, "M13,3L5.5,13.5H11.5L10.5,21L18.5,10H12.5Z")
+    val Layout = stroke("Layout", 1.8f, "M4,5H20V19H4Z", "M4,10H20", "M10,10V19")
+    val DotsVertical = stroke("DotsVertical", 3f, "M12,5h0.01M12,12h0.01M12,19h0.01")
+
     private const val STAR = "M12,3.6L14.5,8.9L20.3,9.6L16,13.6L17.1,19.4L12,16.6L6.9,19.4L8,13.6L3.7,9.6L9.5,8.9Z"
 
     private fun builder(name: String) =

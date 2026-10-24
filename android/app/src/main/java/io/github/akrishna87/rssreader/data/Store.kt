@@ -11,6 +11,8 @@ data class Snapshot(
     val mute: List<String> = emptyList(),
     val highlight: List<String> = emptyList(),
     val collapsed: Set<String> = emptySet(),
+    val boards: List<String> = emptyList(),
+    val settings: Settings = Settings(),
 )
 
 /** Everything lives in one JSON file in the app's private storage. */
@@ -30,6 +32,7 @@ class Store(private val file: File) {
                     error = it.optString("error").ifEmpty { null },
                     folder = it.optString("folder"),
                     customTitle = it.optString("customTitle"),
+                    priority = it.optBoolean("priority"),
                 )
             }
             val articles = o.optJSONArray("articles").objects().map {
@@ -45,6 +48,10 @@ class Store(private val file: File) {
                     thumbnail = it.optString("thumb").ifEmpty { null },
                     read = it.optBoolean("read"),
                     starred = it.optBoolean("starred"),
+                    boards = it.optJSONArray("boards").strings(),
+                    highlights = it.optJSONArray("highlights").objects().map { h ->
+                        Highlight(h.optString("text"), h.optString("note"), h.optLong("time"))
+                    }.filter { h -> h.text.isNotEmpty() },
                 )
             }
             Snapshot(
@@ -52,6 +59,10 @@ class Store(private val file: File) {
                 mute = o.optJSONArray("mute").strings(),
                 highlight = o.optJSONArray("highlight").strings(),
                 collapsed = o.optJSONArray("collapsed").strings().toSet(),
+                boards = o.optJSONArray("boards").strings(),
+                settings = o.optJSONObject("settings")?.let {
+                    Settings(it.optString("layout", "magazine"), it.optInt("textSize", 18).coerceIn(14, 26), it.optString("theme", "system"))
+                } ?: Settings(),
             )
         } catch (e: Exception) {
             Snapshot()
@@ -66,12 +77,14 @@ class Store(private val file: File) {
         o.put("mute", JSONArray(s.mute))
         o.put("highlight", JSONArray(s.highlight))
         o.put("collapsed", JSONArray(s.collapsed.sorted()))
+        o.put("boards", JSONArray(s.boards))
+        o.put("settings", JSONObject().put("layout", s.settings.layout).put("textSize", s.settings.textSize).put("theme", s.settings.theme))
         o.put("feeds", JSONArray().apply {
             s.feeds.forEach { f ->
                 put(JSONObject().apply {
                     put("id", f.id); put("url", f.url); put("title", f.title); put("siteUrl", f.siteUrl)
                     put("lastFetched", f.lastFetched); put("error", f.error ?: "")
-                    put("folder", f.folder); put("customTitle", f.customTitle)
+                    put("folder", f.folder); put("customTitle", f.customTitle); put("priority", f.priority)
                 })
             }
         })
@@ -81,6 +94,10 @@ class Store(private val file: File) {
                     put("id", a.id); put("feedId", a.feedId); put("title", a.title); put("link", a.link)
                     put("date", a.date); put("author", a.author); put("content", a.contentHtml)
                     put("snippet", a.snippet); put("thumb", a.thumbnail ?: ""); put("read", a.read); put("starred", a.starred)
+                    put("boards", JSONArray(a.boards))
+                    put("highlights", JSONArray().apply {
+                        a.highlights.forEach { h -> put(JSONObject().put("text", h.text).put("note", h.note).put("time", h.time)) }
+                    })
                 })
             }
         })
@@ -122,12 +139,14 @@ fun mergeArticles(existing: List<Article>, feedId: String, parsed: ParsedFeed, n
             thumbnail = p.thumbnail,
             read = old?.read ?: false,
             starred = old?.starred ?: false,
+            boards = old?.boards ?: emptyList(),
+            highlights = old?.highlights ?: emptyList(),
         )
         if (old == null) added++
         byId[id] = fresh
     }
-    // Keep the newest [maxPerFeed] per feed, but never drop unread or starred ones.
+    // Keep the newest [maxPerFeed] per feed, but never drop unread or saved ones.
     val mine = byId.values.filter { it.feedId == feedId }.sortedByDescending { it.date }
-    mine.drop(maxPerFeed).forEach { if (it.read && !it.starred) byId.remove(it.id) }
+    mine.drop(maxPerFeed).forEach { if (it.read && !it.kept) byId.remove(it.id) }
     return byId.values.toList() to added
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -38,7 +39,7 @@ fun ManageFeedsScreen(
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     onRemove: (String) -> Unit,
-    onEdit: (id: String, name: String, folder: String) -> Unit,
+    onEdit: (id: String, name: String, folder: String, priority: Boolean) -> Unit,
     onOpen: (String) -> Unit,
 ) {
     val apple = LocalApple.current
@@ -93,6 +94,7 @@ fun ManageFeedsScreen(
         val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var name by remember(feed.id) { mutableStateOf(feed.name) }
         var folder by remember(feed.id) { mutableStateOf(feed.folder) }
+        var priority by remember(feed.id) { mutableStateOf(feed.priority) }
         ModalBottomSheet(
             onDismissRequest = { editing = null },
             sheetState = sheet,
@@ -108,7 +110,7 @@ fun ManageFeedsScreen(
                     Text("Edit Feed", style = AppleType.headline, color = apple.label, modifier = Modifier.align(Alignment.Center))
                     Box(Modifier.align(Alignment.CenterEnd)) {
                         BarText("Save", bold = true) {
-                            onEdit(feed.id, name.ifBlank { feed.title }, folder)
+                            onEdit(feed.id, name.ifBlank { feed.title }, folder, priority)
                             editing = null
                         }
                     }
@@ -119,6 +121,16 @@ fun ManageFeedsScreen(
                     }
                 }
                 FolderPicker(folder, folders) { folder = it }
+                GroupedSection(footer = "Priority feeds get their own list in the menu.") {
+                    AppleRow(
+                        "Priority",
+                        leading = { Icon(AppIcons.Bolt, null, tint = apple.tint, modifier = Modifier.size(24.dp)) },
+                        chevron = false,
+                        showDivider = false,
+                        onClick = { priority = !priority },
+                        trailing = { AppleSwitch(priority) { priority = it } },
+                    )
+                }
             }
         }
     }

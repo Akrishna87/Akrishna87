@@ -36,7 +36,7 @@ data class AppleColors(
     val fill: Color,                // tertiarySystemFill (search fields, segmented control)
     val selectedSegment: Color,
     val bar: Color,                 // translucent navigation bar
-    val tint: Color,                // app accent (systemOrange)
+    val tint: Color,                // app accent (Feedly green)
     val blue: Color,
     val red: Color,
     val green: Color,
@@ -48,7 +48,7 @@ data class AppleColors(
 
 val LightApple = AppleColors(
     background = Color(0xFFFFFFFF),
-    groupedBackground = Color(0xFFF2F2F7),
+    groupedBackground = Color(0xFFF3F4F6),
     cell = Color(0xFFFFFFFF),
     label = Color(0xFF000000),
     secondaryLabel = Color(0x993C3C43),
@@ -57,7 +57,7 @@ val LightApple = AppleColors(
     fill = Color(0x1F767680),
     selectedSegment = Color(0xFFFFFFFF),
     bar = Color(0xF2F9F9F9),
-    tint = Color(0xFFFF9500),
+    tint = Color(0xFF2BB24C),
     blue = Color(0xFF007AFF),
     red = Color(0xFFFF3B30),
     green = Color(0xFF34C759),
@@ -78,7 +78,7 @@ val DarkApple = AppleColors(
     fill = Color(0x3D767680),
     selectedSegment = Color(0xFF636366),
     bar = Color(0xF0161618),
-    tint = Color(0xFFFF9F0A),
+    tint = Color(0xFF3FCF63),
     blue = Color(0xFF0A84FF),
     red = Color(0xFFFF453A),
     green = Color(0xFF30D158),
@@ -117,8 +117,9 @@ object AppleType {
 }
 
 @Composable
-fun ReaderTheme(content: @Composable () -> Unit) {
-    val apple = if (isSystemInDarkTheme()) DarkApple else LightApple
+fun ReaderTheme(mode: String = "system", content: @Composable () -> Unit) {
+    val dark = when (mode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
+    val apple = if (dark) DarkApple else LightApple
     val scheme = if (apple.dark) {
         darkColorScheme(
             primary = apple.tint, onPrimary = Color.Black, background = apple.background, onBackground = apple.label,

@@ -44,7 +44,7 @@ fun FiltersScreen(
         termSection(
             key = "highlight",
             header = "Highlight",
-            footer = "Articles mentioning these get a ★ tag and appear under Highlights. Matching uses titles and opening text, whole words, ignoring capitals. Separate several words with commas.",
+            footer = "Articles mentioning these get a ★ tag and appear under Keyword Alerts. Matching uses titles and opening text, whole words, ignoring capitals. Separate several words with commas.",
             placeholder = "Add a word, e.g. Azure",
             terms = highlight,
             onAdd = onAddHighlight,

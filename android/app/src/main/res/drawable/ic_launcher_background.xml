@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Warm orange gradient, top to bottom. -->
+<!-- Feedly-style green gradient, top to bottom. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -14,8 +14,8 @@
                 android:startY="0"
                 android:endX="0"
                 android:endY="108">
-                <item android:offset="0" android:color="#FFFFB240" />
-                <item android:offset="1" android:color="#FFFF5A2E" />
+                <item android:offset="0" android:color="#FF5FD67F" />
+                <item android:offset="1" android:color="#FF1F9D45" />
             </gradient>
         </aapt:attr>
     </path>

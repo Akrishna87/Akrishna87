@@ -66,6 +66,7 @@ object Directory {
         REDDIT("Subreddit", "r/programming", "A subreddit (r/name) or a user (u/name)."),
         GITHUB("GitHub releases", "microsoft/vscode", "Get new releases of a GitHub project."),
         MASTODON("Mastodon account", "@user@mastodon.social", "A Mastodon (or other fediverse) account."),
+        NEWS("News search", "electric cars, or site:bbc.com", "Follow any topic, company or phrase across the news. site:example.com limits it to one site."),
         MEDIUM("Medium / Substack", "@username or name.substack.com", "A Medium writer, or any Substack newsletter."),
     }
 
@@ -100,6 +101,8 @@ object Directory {
                     "https://${it.groupValues[1]}/@${it.groupValues[2]}.rss"
                 }
             }
+            Source.NEWS ->
+                "https://news.google.com/rss/search?q=" + java.net.URLEncoder.encode(v, "UTF-8") + "&hl=en-US&gl=US&ceid=US:en"
             Source.MEDIUM -> {
                 Regex("^@([\\w.-]+)$").find(v)?.let { return "https://medium.com/feed/@${it.groupValues[1]}" }
                 Regex("medium\\.com/@([\\w.-]+)").find(v)?.let { return "https://medium.com/feed/@${it.groupValues[1]}" }

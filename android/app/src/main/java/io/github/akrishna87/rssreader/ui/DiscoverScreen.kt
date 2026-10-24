@@ -1,16 +1,21 @@
 package io.github.akrishna87.rssreader.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -18,10 +23,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,12 +45,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.akrishna87.rssreader.data.Directory
 import io.github.akrishna87.rssreader.data.Feed
+import io.github.akrishna87.rssreader.data.Net
+import io.github.akrishna87.rssreader.data.ParsedFeed
 import io.github.akrishna87.rssreader.data.stableId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+private val TopicColors = listOf(0xFF2BB24C, 0xFF3478F6, 0xFFE8590C, 0xFF8E44AD, 0xFFD6336C, 0xFF0CA678, 0xFFF08C00, 0xFF495057)
+
+private class Suggestion(val name: String, val url: String, val description: String, val topic: String)
+
+/** Feedly-style Discover: search anything, browse topics, preview a feed, then Follow. */
 @Composable
 fun DiscoverScreen(
     feeds: List<Feed>,
@@ -51,13 +70,18 @@ fun DiscoverScreen(
 ) {
     val apple = LocalApple.current
     val scope = rememberCoroutineScope()
-    var topic by rememberSaveable { mutableStateOf(Directory.topics.first().name) }
+    var topic by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
-    var useFolders by rememberSaveable { mutableStateOf(true) }
+    var previewing by remember { mutableStateOf<Suggestion?>(null) }
     val busy = remember { mutableStateListOf<String>() }
     val subscribed = remember(feeds) { feeds.map { it.id }.toHashSet() }
 
-    fun add(url: String, folder: String = "", after: () -> Unit = {}) {
+    BackHandler(enabled = topic != null || query.isNotEmpty()) {
+        if (query.isNotEmpty()) query = "" else topic = null
+    }
+
+    /** Follow [url]; feeds from the directory go into a folder named after their topic. */
+    fun follow(url: String, folder: String = "", after: () -> Unit = {}) {
         if (url in busy) return
         busy.add(url)
         scope.launch {
@@ -67,83 +91,220 @@ fun DiscoverScreen(
         }
     }
 
-    val q = query.trim().lowercase()
-    val rows = remember(q, topic) {
-        Directory.topics.flatMap { t ->
-            t.feeds.filter { e ->
-                if (q.isEmpty()) t.name == topic else "${e.name} ${e.description} ${t.name}".lowercase().contains(q)
-            }.map { t.name to it }
-        }
+    val q = query.trim()
+    val all = remember { Directory.topics.flatMap { t -> t.feeds.map { Suggestion(it.name, it.url, it.description, t.name) } } }
+    val results = remember(q) {
+        if (q.isEmpty()) emptyList() else all.filter { "${it.name} ${it.description} ${it.topic}".contains(q, ignoreCase = true) }
+    }
+    val looksLikeAddress = q.isNotEmpty() && ' ' !in q && '.' in q
+
+    @Composable
+    fun card(s: Suggestion) {
+        FeedCard(
+            s,
+            following = stableId(s.url) in subscribed,
+            busy = s.url in busy,
+            onOpen = { previewing = s },
+            onFollow = { follow(s.url, folder = s.topic) },
+        )
     }
 
+    val title = topic ?: "Discover"
     AppleScreen(
-        title = "Discover",
+        title = title,
         snackbar = snackbar,
-        backLabel = "Feeds",
-        onBack = onBack,
+        backLabel = if (topic != null) "Discover" else "Back",
+        onBack = { if (topic != null) topic = null else onBack() },
+        grouped = false,
         belowTitle = {
             item(key = "search") {
-                SearchField(query, { query = it }, "Search feeds", Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                SearchField(query, { query = it }, "Search topics, sites or paste a feed link", Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
         },
     ) {
-        item(key = "quick") { QuickAdd(busy = busy.isNotEmpty()) { url, clear -> add(url, after = clear) } }
-
-        if (q.isEmpty()) {
-            item(key = "topics") {
-                LazyRow(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 22.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(Directory.topics, key = { it.name }) { t ->
-                        val selected = t.name == topic
-                        Text(
-                            t.name,
-                            style = AppleType.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                            color = if (selected) Color.White else apple.label,
-                            modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) apple.tint else apple.cell)
-                                .clickable { topic = t.name }.padding(horizontal = 14.dp, vertical = 7.dp),
-                        )
+        when {
+            q.isNotEmpty() -> {
+                if (looksLikeAddress) {
+                    item(key = "address") {
+                        ActionCard(
+                            "Follow “$q”", "Add this website or feed link",
+                            following = false, busy = q in busy,
+                        ) { follow(q, after = { query = "" }) }
                     }
                 }
+                item(key = "news") {
+                    val url = Directory.feedUrlFor(Directory.Source.NEWS, q).orEmpty()
+                    ActionCard(
+                        "News about “$q”", "Follow articles from news sites across the web",
+                        following = url.isNotEmpty() && stableId(url) in subscribed, busy = url in busy,
+                    ) { follow(url, after = { query = "" }) }
+                }
+                if (results.isNotEmpty()) item(key = "rh") { SectionTitle("From our directory") }
+                items(results.size, key = { "r-" + results[it].url }) { card(results[it]) }
+            }
+            topic != null -> {
+                val list = all.filter { it.topic == topic }
+                items(list.size, key = { "t-" + list[it].url }) { card(list[it]) }
+            }
+            else -> {
+                item(key = "topics-h") { SectionTitle("Explore topics") }
+                val rows = Directory.topics.chunked(2)
+                items(rows.size, key = { "tr-$it" }) { r ->
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        rows[r].forEach { t ->
+                            val index = Directory.topics.indexOf(t)
+                            TopicTile(t.name, t.feeds.size, Color(TopicColors[index % TopicColors.size]), Modifier.weight(1f)) { topic = t.name }
+                        }
+                        if (rows[r].size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+                item(key = "featured-h") { SectionTitle("Popular feeds") }
+                val featured = Directory.topics.flatMap { t -> t.feeds.take(2).map { Suggestion(it.name, it.url, it.description, t.name) } }
+                items(featured.size, key = { "f-" + featured[it].url }) { card(featured[it]) }
+                item(key = "quick") { QuickAdd(busy = busy.isNotEmpty()) { url, clear -> follow(url, after = clear) } }
             }
         }
+    }
 
-        item(key = "list") {
-            GroupedSection(header = if (q.isEmpty()) topic else "Results") {
-                AppleRow(
-                    "Put in topic folders",
-                    chevron = false,
-                    onClick = { useFolders = !useFolders },
-                    trailing = { AppleSwitch(useFolders) { useFolders = it } },
-                )
-                if (rows.isEmpty()) {
-                    Text(
-                        "No feeds match “${query.trim()}”. You can add any site with +.",
-                        style = AppleType.subheadline,
-                        color = apple.secondaryLabel,
-                        modifier = Modifier.padding(16.dp),
-                    )
+    previewing?.let { s ->
+        FeedPreviewSheet(
+            s,
+            following = stableId(s.url) in subscribed,
+            busy = s.url in busy,
+            onFollow = { follow(s.url, folder = s.topic, after = { previewing = null }) },
+            onDismiss = { previewing = null },
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = AppleType.title3,
+        color = LocalApple.current.label,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun TopicTile(name: String, count: Int, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.height(84.dp).clip(RoundedCornerShape(12.dp)).background(color).clickable(onClick = onClick).padding(14.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(name, style = AppleType.headline.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text("$count feeds", style = AppleType.footnote, color = Color.White.copy(alpha = 0.85f))
+    }
+}
+
+@Composable
+private fun FollowButton(following: Boolean, busy: Boolean, onClick: () -> Unit) {
+    val apple = LocalApple.current
+    Box(
+        Modifier.width(92.dp).height(34.dp).clip(RoundedCornerShape(8.dp))
+            .then(if (following) Modifier.background(apple.tint) else Modifier.border(1.5.dp, apple.tint, RoundedCornerShape(8.dp)))
+            .clickable(enabled = !following && !busy, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            busy -> CircularProgressIndicator(Modifier.size(18.dp), color = apple.tint, strokeWidth = 2.dp)
+            following -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(AppIcons.Checkmark, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Text("Following", style = AppleType.footnote.copy(fontWeight = FontWeight.Bold), color = Color.White)
+            }
+            else -> Text("+ Follow", style = AppleType.subheadline.copy(fontWeight = FontWeight.Bold), color = apple.tint)
+        }
+    }
+}
+
+@Composable
+private fun FeedCard(s: Suggestion, following: Boolean, busy: Boolean, onOpen: () -> Unit, onFollow: () -> Unit) {
+    val apple = LocalApple.current
+    Column(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            FeedBadge(Feed(stableId(s.url), s.url, s.name), size = 48.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(s.name, style = AppleType.headline, color = apple.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(s.description, style = AppleType.subheadline, color = apple.secondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(s.topic.uppercase(), style = AppleType.caption2.copy(fontWeight = FontWeight.Bold), color = apple.tint, modifier = Modifier.padding(top = 3.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            FollowButton(following, busy, onFollow)
+        }
+        Hairline(start = 78.dp)
+    }
+}
+
+/** A row for "follow this address" and "follow news about this search". */
+@Composable
+private fun ActionCard(title: String, subtitle: String, following: Boolean, busy: Boolean, onFollow: () -> Unit) {
+    val apple = LocalApple.current
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(apple.tint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                Icon(AppIcons.Magnifier, null, tint = apple.tint, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = AppleType.headline, color = apple.label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = AppleType.subheadline, color = apple.secondaryLabel, maxLines = 2)
+            }
+            Spacer(Modifier.width(12.dp))
+            FollowButton(following, busy, onFollow)
+        }
+        Hairline(start = 78.dp)
+    }
+}
+
+/** Shows the latest headlines of a feed before you follow it. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FeedPreviewSheet(s: Suggestion, following: Boolean, busy: Boolean, onFollow: () -> Unit, onDismiss: () -> Unit) {
+    val apple = LocalApple.current
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var preview by remember(s.url) { mutableStateOf<ParsedFeed?>(null) }
+    var failed by remember(s.url) { mutableStateOf(false) }
+    LaunchedEffect(s.url) {
+        preview = null
+        failed = false
+        runCatching { withContext(Dispatchers.IO) { Net.loadFeed(s.url).second } }
+            .onSuccess { preview = it }
+            .onFailure { failed = true }
+    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheet,
+        containerColor = apple.background,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FeedBadge(Feed(stableId(s.url), s.url, s.name), size = 52.dp)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(s.name, style = AppleType.title3, color = apple.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(s.description, style = AppleType.subheadline, color = apple.secondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                rows.forEachIndexed { i, (topicName, entry) ->
-                    val added = stableId(entry.url) in subscribed
-                    AppleRow(
-                        entry.name,
-                        subtitle = entry.description + if (q.isNotEmpty()) " · $topicName" else "",
-                        leading = { FeedBadge(Feed(stableId(entry.url), entry.url, entry.name), size = 40.dp) },
-                        chevron = false,
-                        showDivider = i != rows.lastIndex,
-                        dividerStart = 72.dp,
-                        trailing = {
-                            Box(Modifier.padding(start = 8.dp), contentAlignment = Alignment.Center) {
-                                when {
-                                    added -> Icon(AppIcons.Checkmark, "Added", tint = apple.green, modifier = Modifier.padding(horizontal = 18.dp).size(22.dp))
-                                    entry.url in busy -> CircularProgressIndicator(Modifier.padding(horizontal = 22.dp).size(20.dp), color = apple.tint, strokeWidth = 2.dp)
-                                    else -> CapsuleButton("Add") { add(entry.url, folder = if (useFolders) topicName else "") }
-                                }
-                            }
-                        },
-                    )
+                Spacer(Modifier.width(12.dp))
+                FollowButton(following, busy, onFollow)
+            }
+            Hairline(Modifier.padding(top = 8.dp))
+            Text("LATEST", style = AppleType.caption1.copy(fontWeight = FontWeight.Bold), color = apple.secondaryLabel, modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp))
+            when {
+                failed -> Text("Couldn't load a preview, but you can still follow it.", style = AppleType.subheadline, color = apple.secondaryLabel, modifier = Modifier.padding(16.dp))
+                preview == null -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp), color = apple.tint, strokeWidth = 2.dp)
+                }
+                else -> preview?.items?.take(8)?.forEach { item ->
+                    Column(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                            Text(item.title, style = AppleType.body.copy(fontWeight = FontWeight.SemiBold), color = apple.label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (item.date > 0) Text(relativeTime(item.date), style = AppleType.footnote, color = apple.secondaryLabel)
+                        }
+                        Hairline(start = 16.dp)
+                    }
                 }
             }
         }
