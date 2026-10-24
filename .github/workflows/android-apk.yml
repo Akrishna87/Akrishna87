@@ -63,7 +63,7 @@ jobs:
         run: |
           pw="$(printf '%s' "$ANDROID_KEYSTORE_PASSWORD" | tr -d '[:space:]')"
           # Public certificate fingerprint (not secret); Firebase needs the SHA-1 for Google sign-in.
-          sha1="$(keytool -list -v -storetype pkcs12 -keystore android/app/release.p12 -storepass "$pw" -alias rssreader | sed -n 's/^ *SHA1: *//p')"
+          sha1="$(keytool -list -v -storetype pkcs12 -keystore android/app/release.p12 -storepass "$pw" -alias rssreader | sed -n 's/^[[:space:]]*SHA1:[[:space:]]*//p')"
           echo "sha1=$sha1" >> "$GITHUB_OUTPUT"
           echo "Signing certificate SHA-1: $sha1" >> "$GITHUB_STEP_SUMMARY"
 
