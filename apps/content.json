@@ -58,8 +58,12 @@
    "Open with My Videos: file managers, Downloads and chat apps can open videos in the player.",
    "Details in a video's ⋮ menu shows its file name, folder, resolution, size and date."
   ],
-  "sha": "dd4b9042da8de7ea2e2c5717e9bbcf852ceff985",
+  "sha": "f2bb2ca4ab7021dc7131015b1b3498b0be5e95f7",
   "changes": [
+   {
+    "title": "My Videos test: use landscape clips instead of the colour-bar test pattern",
+    "date": "2026-10-19T17:01:23Z"
+   },
    {
     "title": "My Videos: route the player's media keys straight to its session",
     "date": "2026-10-17T14:36:23Z"
@@ -630,8 +634,12 @@
    "Opens password-protected PDFs; \"Open with Pakkam\" from Files, Gmail, WhatsApp…",
    "Share, print, save a copy, document properties"
   ],
-  "sha": "d770fbf7a4667aa32e7e5c0096ffd8c2e3e6ccac",
+  "sha": "f1f53295885177dfd7a028028f3465f475d3d095",
   "changes": [
+   {
+    "title": "Pakkam: a size setting for the highlighter marker",
+    "date": "2026-10-19T15:46:59Z"
+   },
    {
     "title": "Pakkam Reading mode: quick actions at the top, with read aloud and share",
     "date": "2026-10-19T14:42:25Z"
@@ -651,10 +659,6 @@
    {
     "title": "Pakkam: pad the pages by the toolbars, so a fitted last page sits between them",
     "date": "2026-10-17T08:04:11Z"
-   },
-   {
-    "title": "Pakkam: fit a page between the toolbars, not under them",
-    "date": "2026-10-17T07:52:14Z"
    }
   ]
  },
