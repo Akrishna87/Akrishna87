@@ -110,6 +110,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val cloud = Cloud(app.getSharedPreferences("sync", 0))
     private val syncLock = Mutex()
     private var syncJob: Job? = null
+    /** An article to open once the data has loaded (from a notification or the widget). */
+    private var pendingOpen: String? = null
     private val saveLock = Mutex()
     private var lastRefresh = 0L
 
@@ -135,6 +137,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     syncEmail = cloud.session()?.email, syncStatus = if (cloud.session() != null) SyncStatus.Synced else SyncStatus.Off,
                 )
             }
+            RefreshWorker.schedule(app, snap.settings.refreshHours)
+            pendingOpen?.let { openFromOutside(it) }
+            pendingOpen = null
             refreshIfStale()
             syncSoon(0)
         }
@@ -149,6 +154,34 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { s -> s.copy(openArticleId = id, articles = s.articles.map { if (it.id == id && !it.read) it.copy(read = true, mod = now) else it }) }
         persist()
     }
+
+    fun openFromOutside(id: String) {
+        if (!_state.value.loaded) { pendingOpen = id; return }
+        if (_state.value.articles.any { it.id == id }) openArticle(id)
+    }
+
+    /** Pick up articles the background worker fetched while the app was closed. */
+    fun reloadFromDisk() {
+        if (!_state.value.loaded) return
+        viewModelScope.launch {
+            val disk = withContext(Dispatchers.IO) { store.load() }
+            _state.update { s ->
+                val have = s.articles.map { it.id }.toHashSet()
+                val feedIds = s.feeds.map { it.id }.toHashSet()
+                val extra = disk.articles.filter { it.id !in have && it.feedId in feedIds }
+                if (extra.isEmpty()) s else s.copy(articles = (s.articles + extra).newestFirst())
+            }
+        }
+    }
+
+    fun setRefreshHours(hours: Int) {
+        _state.update { it.copy(settings = it.settings.copy(refreshHours = hours)) }
+        RefreshWorker.schedule(getApplication(), hours)
+        persist()
+    }
+
+    fun setNotify(mode: String) { _state.update { it.copy(settings = it.settings.copy(notify = mode)) }; persist() }
+    fun setOffline(on: Boolean) { _state.update { it.copy(settings = it.settings.copy(offline = on)) }; persist() }
 
     fun closeArticle() = _state.update { it.copy(openArticleId = null) }
 
@@ -378,6 +411,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val feeds = _state.value.feeds
         if (feeds.isEmpty()) return
         _state.update { it.copy(refreshing = true) }
+        val beforeIds = _state.value.articles.map { it.id }.toHashSet()
         viewModelScope.launch {
             val gate = Semaphore(4)
             val results = feeds.map { feed ->
@@ -416,6 +450,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 if (failed > 0) msg += " · $failed feed${if (failed == 1) "" else "s"} failed"
                 _messages.tryEmit(msg)
             }
+            val s = _state.value
+            if (s.settings.offline) {
+                val fresh = s.articles.filter { it.id !in beforeIds && !it.read }
+                if (fresh.isNotEmpty()) withContext(Dispatchers.IO) { Prefetch.images(getApplication(), fresh) }
+            }
         }
     }
 
@@ -444,6 +483,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val s = _state.value
                 store.save(s.toSnapshot())
             }
+            HeadlinesWidget.updateAll(getApplication())
         }
         syncSoon(3000)
     }

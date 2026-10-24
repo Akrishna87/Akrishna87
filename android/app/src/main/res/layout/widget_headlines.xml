@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/w_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="6dp"
+        android:text="Vellum"
+        android:textColor="@color/widget_header"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/w_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="You're all caught up"
+        android:textColor="@color/widget_secondary"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <TextView android:id="@+id/w_item1" style="@style/WidgetRow" />
+    <TextView android:id="@+id/w_item2" style="@style/WidgetRow" />
+    <TextView android:id="@+id/w_item3" style="@style/WidgetRow" />
+    <TextView android:id="@+id/w_item4" style="@style/WidgetRow" />
+    <TextView android:id="@+id/w_item5" style="@style/WidgetRow" />
+</LinearLayout>

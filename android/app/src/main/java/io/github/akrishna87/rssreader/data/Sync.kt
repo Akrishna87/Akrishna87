@@ -109,7 +109,8 @@ object SyncMerge {
         remote.prefs?.let { p ->
             if (p.ts > prefsTs) {
                 mute = p.mute; highlight = p.highlight; prefsTs = p.ts
-                settings = Settings(p.layout, p.textSize.coerceIn(14, 26), p.theme)
+                // Refresh, notification and offline choices belong to each device, so they stay as they are.
+                settings = local.settings.copy(layout = p.layout, textSize = p.textSize.coerceIn(14, 26), theme = p.theme)
             }
         }
 

@@ -50,7 +50,17 @@ data class Article(
 }
 
 /** Reader preferences. [layout] is magazine, cards or title; [theme] is system, light or dark. */
-data class Settings(val layout: String = "magazine", val textSize: Int = 18, val theme: String = "system")
+data class Settings(
+    val layout: String = "magazine",
+    val textSize: Int = 18,
+    val theme: String = "system",
+    /** Background refresh every N hours; 0 = only when the app is open. Device-local (not synced). */
+    val refreshHours: Int = 0,
+    /** Notifications for new articles: off, priority (priority feeds and keyword alerts) or all. Device-local. */
+    val notify: String = "priority",
+    /** Download images (and full text for feeds that use it) ahead of time for offline reading. Device-local. */
+    val offline: Boolean = false,
+)
 
 /** What a feed fetch produced, before it's merged into stored articles. */
 data class ParsedFeed(val title: String, val siteUrl: String, val items: List<ParsedItem>)
