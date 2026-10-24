@@ -49,16 +49,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.akrishna87.rssreader.data.Directory
 import io.github.akrishna87.rssreader.data.Feed
+import io.github.akrishna87.rssreader.data.FeedSearch
 import io.github.akrishna87.rssreader.data.Net
 import io.github.akrishna87.rssreader.data.ParsedFeed
 import io.github.akrishna87.rssreader.data.stableId
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val TopicColors = listOf(0xFF2BB24C, 0xFF3478F6, 0xFFE8590C, 0xFF8E44AD, 0xFFD6336C, 0xFF0CA678, 0xFFF08C00, 0xFF495057)
 
-private class Suggestion(val name: String, val url: String, val description: String, val topic: String)
+private class Suggestion(
+    val name: String, val url: String, val description: String, val topic: String,
+    /** Small caption on the card (topic, or follower count for search results). */
+    val label: String = topic,
+    /** Folder a followed feed goes into. */
+    val folder: String = topic,
+)
 
 /** Feedly-style Discover: search anything, browse topics, preview a feed, then Follow. */
 @Composable
@@ -96,6 +104,21 @@ fun DiscoverScreen(
     val results = remember(q) {
         if (q.isEmpty()) emptyList() else all.filter { "${it.name} ${it.description} ${it.topic}".contains(q, ignoreCase = true) }
     }
+    // Feeds for the typed topic, from the online directory (after a short pause in typing).
+    var found by remember { mutableStateOf<List<Suggestion>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var searchFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(q) {
+        found = emptyList()
+        searchFailed = false
+        if (q.length < 2) { searching = false; return@LaunchedEffect }
+        searching = true
+        delay(450)
+        runCatching { withContext(Dispatchers.IO) { FeedSearch.search(q) } }
+            .onSuccess { list -> found = list.map { Suggestion(it.name, it.url, it.description, "", FeedSearch.followersLabel(it.followers), "") } }
+            .onFailure { searchFailed = true }
+        searching = false
+    }
     val looksLikeAddress = q.isNotEmpty() && ' ' !in q && '.' in q
 
     @Composable
@@ -105,7 +128,7 @@ fun DiscoverScreen(
             following = stableId(s.url) in subscribed,
             busy = s.url in busy,
             onOpen = { previewing = s },
-            onFollow = { follow(s.url, folder = s.topic) },
+            onFollow = { follow(s.url, folder = s.folder) },
         )
     }
 
@@ -139,6 +162,22 @@ fun DiscoverScreen(
                         following = url.isNotEmpty() && stableId(url) in subscribed, busy = url in busy,
                     ) { follow(url, after = { query = "" }) }
                 }
+                if (searching) {
+                    item(key = "searching") {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(18.dp), color = apple.tint, strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Finding feeds about “$q”…", style = AppleType.subheadline, color = apple.secondaryLabel)
+                        }
+                    }
+                }
+                if (found.isNotEmpty()) item(key = "fh") { SectionTitle("Feeds about “$q”") }
+                items(found.size, key = { "s-" + found[it].url }) { card(found[it]) }
+                if (searchFailed && found.isEmpty()) {
+                    item(key = "sf") {
+                        Text("Couldn't search online right now. Showing matches from our directory.", style = AppleType.footnote, color = apple.secondaryLabel, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }
+                }
                 if (results.isNotEmpty()) item(key = "rh") { SectionTitle("From our directory") }
                 items(results.size, key = { "r-" + results[it].url }) { card(results[it]) }
             }
@@ -171,7 +210,7 @@ fun DiscoverScreen(
             s,
             following = stableId(s.url) in subscribed,
             busy = s.url in busy,
-            onFollow = { follow(s.url, folder = s.topic, after = { previewing = null }) },
+            onFollow = { follow(s.url, folder = s.folder, after = { previewing = null }) },
             onDismiss = { previewing = null },
         )
     }
@@ -228,7 +267,7 @@ private fun FeedCard(s: Suggestion, following: Boolean, busy: Boolean, onOpen: (
             Column(Modifier.weight(1f)) {
                 Text(s.name, style = AppleType.headline, color = apple.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(s.description, style = AppleType.subheadline, color = apple.secondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(s.topic.uppercase(), style = AppleType.caption2.copy(fontWeight = FontWeight.Bold), color = apple.tint, modifier = Modifier.padding(top = 3.dp))
+                if (s.label.isNotEmpty()) Text(s.label.uppercase(), style = AppleType.caption2.copy(fontWeight = FontWeight.Bold), color = apple.tint, modifier = Modifier.padding(top = 3.dp))
             }
             Spacer(Modifier.width(12.dp))
             FollowButton(following, busy, onFollow)
