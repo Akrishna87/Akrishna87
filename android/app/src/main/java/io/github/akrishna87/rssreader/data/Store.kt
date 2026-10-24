@@ -13,6 +13,11 @@ data class Snapshot(
     val collapsed: Set<String> = emptySet(),
     val boards: List<String> = emptyList(),
     val settings: Settings = Settings(),
+    /** Sync bookkeeping: when feeds/boards were removed, when boards were made, when preferences last changed. */
+    val deletedFeeds: Map<String, Long> = emptyMap(),
+    val boardTs: Map<String, Long> = emptyMap(),
+    val deletedBoards: Map<String, Long> = emptyMap(),
+    val prefsTs: Long = 0,
 )
 
 /** Everything lives in one JSON file in the app's private storage. */
@@ -33,6 +38,7 @@ class Store(private val file: File) {
                     folder = it.optString("folder"),
                     customTitle = it.optString("customTitle"),
                     priority = it.optBoolean("priority"),
+                    ts = it.optLong("ts", 1),
                 )
             }
             val articles = o.optJSONArray("articles").objects().map {
@@ -49,6 +55,7 @@ class Store(private val file: File) {
                     read = it.optBoolean("read"),
                     starred = it.optBoolean("starred"),
                     boards = it.optJSONArray("boards").strings(),
+                    mod = it.optLong("mod"),
                     highlights = it.optJSONArray("highlights").objects().map { h ->
                         Highlight(h.optString("text"), h.optString("note"), h.optLong("time"))
                     }.filter { h -> h.text.isNotEmpty() },
@@ -63,6 +70,10 @@ class Store(private val file: File) {
                 settings = o.optJSONObject("settings")?.let {
                     Settings(it.optString("layout", "magazine"), it.optInt("textSize", 18).coerceIn(14, 26), it.optString("theme", "system"))
                 } ?: Settings(),
+                deletedFeeds = o.optJSONObject("deletedFeeds").longs(),
+                boardTs = o.optJSONObject("boardTs").longs(),
+                deletedBoards = o.optJSONObject("deletedBoards").longs(),
+                prefsTs = o.optLong("prefsTs"),
             )
         } catch (e: Exception) {
             Snapshot()
@@ -78,13 +89,17 @@ class Store(private val file: File) {
         o.put("highlight", JSONArray(s.highlight))
         o.put("collapsed", JSONArray(s.collapsed.sorted()))
         o.put("boards", JSONArray(s.boards))
+        o.put("deletedFeeds", JSONObject(s.deletedFeeds))
+        o.put("boardTs", JSONObject(s.boardTs))
+        o.put("deletedBoards", JSONObject(s.deletedBoards))
+        o.put("prefsTs", s.prefsTs)
         o.put("settings", JSONObject().put("layout", s.settings.layout).put("textSize", s.settings.textSize).put("theme", s.settings.theme))
         o.put("feeds", JSONArray().apply {
             s.feeds.forEach { f ->
                 put(JSONObject().apply {
                     put("id", f.id); put("url", f.url); put("title", f.title); put("siteUrl", f.siteUrl)
                     put("lastFetched", f.lastFetched); put("error", f.error ?: "")
-                    put("folder", f.folder); put("customTitle", f.customTitle); put("priority", f.priority)
+                    put("folder", f.folder); put("customTitle", f.customTitle); put("priority", f.priority); put("ts", f.ts)
                 })
             }
         })
@@ -94,7 +109,7 @@ class Store(private val file: File) {
                     put("id", a.id); put("feedId", a.feedId); put("title", a.title); put("link", a.link)
                     put("date", a.date); put("author", a.author); put("content", a.contentHtml)
                     put("snippet", a.snippet); put("thumb", a.thumbnail ?: ""); put("read", a.read); put("starred", a.starred)
-                    put("boards", JSONArray(a.boards))
+                    put("boards", JSONArray(a.boards)); put("mod", a.mod)
                     put("highlights", JSONArray().apply {
                         a.highlights.forEach { h -> put(JSONObject().put("text", h.text).put("note", h.note).put("time", h.time)) }
                     })
@@ -112,6 +127,9 @@ class Store(private val file: File) {
 
     private fun JSONArray?.strings(): List<String> =
         if (this == null) emptyList() else (0 until length()).mapNotNull { optString(it).ifEmpty { null } }
+
+    private fun JSONObject?.longs(): Map<String, Long> =
+        if (this == null) emptyMap() else keys().asSequence().associateWith { optLong(it) }
 
     private fun JSONArray?.objects(): List<JSONObject> =
         if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
@@ -141,6 +159,7 @@ fun mergeArticles(existing: List<Article>, feedId: String, parsed: ParsedFeed, n
             starred = old?.starred ?: false,
             boards = old?.boards ?: emptyList(),
             highlights = old?.highlights ?: emptyList(),
+            mod = old?.mod ?: 0,
         )
         if (old == null) added++
         byId[id] = fresh

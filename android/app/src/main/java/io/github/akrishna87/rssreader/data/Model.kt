@@ -13,6 +13,8 @@ data class Feed(
     val customTitle: String = "",
     /** Priority feeds get their own list and lead the Today view. */
     val priority: Boolean = false,
+    /** When this feed's settings last changed, for syncing (1 = before syncing existed). */
+    val ts: Long = 1,
 ) {
     val name: String get() = customTitle.ifBlank { title }
 }
@@ -36,6 +38,8 @@ data class Article(
     /** Names of the boards this article was saved to. */
     val boards: List<String> = emptyList(),
     val highlights: List<Highlight> = emptyList(),
+    /** When the reader last changed this article's state (read, saved, boards, highlights); 0 = never. */
+    val mod: Long = 0,
 ) {
     /** Saved by the reader in some way, so it's never cleaned up. */
     val kept: Boolean get() = starred || boards.isNotEmpty() || highlights.isNotEmpty()
