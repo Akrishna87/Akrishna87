@@ -56,6 +56,17 @@ jobs:
           gradle -p android assembleRelease --no-daemon
           cp android/app/build/outputs/apk/release/app-release.apk rss-reader.apk
 
+      - name: Read signing fingerprint
+        id: fp
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          pw="$(printf '%s' "$ANDROID_KEYSTORE_PASSWORD" | tr -d '[:space:]')"
+          # Public certificate fingerprint (not secret); Firebase needs the SHA-1 for Google sign-in.
+          sha1="$(keytool -list -v -storetype pkcs12 -keystore android/app/release.p12 -storepass "$pw" -alias rssreader | sed -n 's/^ *SHA1: *//p')"
+          echo "sha1=$sha1" >> "$GITHUB_OUTPUT"
+          echo "Signing certificate SHA-1: $sha1" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         with:
           name: rss-reader-apk
@@ -71,4 +82,5 @@ jobs:
           files: rss-reader.apk
           body: |
             Install on Android: download **rss-reader.apk** below on your phone, open it, and allow installing from your browser when asked.
+            Signing certificate SHA-1 (for Firebase / Google sign-in): `${{ steps.fp.outputs.sha1 }}`
             A native Android app: it fetches and stores feeds itself and doesn't need Chrome. Updates install over the previous version and keep your feeds.
