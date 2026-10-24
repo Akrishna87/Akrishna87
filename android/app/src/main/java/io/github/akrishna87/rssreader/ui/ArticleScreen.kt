@@ -9,6 +9,12 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.text.Html
+import android.text.Spannable
+import android.text.Spanned
+import android.text.style.BackgroundColorSpan
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import androidx.compose.foundation.background
@@ -27,7 +33,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,12 +71,22 @@ fun ArticleScreen(
     backLabel: String,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
+    textSize: Int,
+    boards: List<String>,
     onToggleStar: () -> Unit,
     onMarkUnread: () -> Unit,
+    onToggleBoard: (String) -> Unit,
+    onCreateBoard: (String) -> Boolean,
+    onHighlight: (text: String, note: String) -> Unit,
+    onRemoveHighlight: (String) -> Unit,
 ) {
     val apple = LocalApple.current
     val context = LocalContext.current
     val scroll = rememberScrollState()
+    var showBoards by remember { mutableStateOf(false) }
+    var newBoard by remember { mutableStateOf(false) }
+    // Text selected for "Add note" while the note sheet is open.
+    var noteFor by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize().background(apple.background)) {
         Column(Modifier.fillMaxSize()) {
             NavBar(
@@ -107,13 +127,39 @@ fun ArticleScreen(
                     Spacer(Modifier.height(18.dp))
                 }
                 if (article.contentHtml.isNotBlank()) {
-                    HtmlText(article.contentHtml, baseUrl = article.link.ifEmpty { feed?.url.orEmpty() })
+                    HtmlText(
+                        article.contentHtml,
+                        baseUrl = article.link.ifEmpty { feed?.url.orEmpty() },
+                        textSize = textSize,
+                        highlights = article.highlights.map { it.text },
+                        onSelection = { text, wantNote -> if (wantNote) noteFor = text else onHighlight(text, "") },
+                    )
                 } else {
                     Text(
                         "This feed only includes a headline. Open the original to read the full article.",
                         style = AppleType.body,
                         color = apple.secondaryLabel,
                     )
+                }
+                if (article.highlights.isNotEmpty()) {
+                    Spacer(Modifier.height(28.dp))
+                    Text("YOUR HIGHLIGHTS", style = AppleType.footnote.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp), color = apple.secondaryLabel)
+                    article.highlights.forEach { h ->
+                        Spacer(Modifier.height(10.dp))
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(apple.yellow.copy(alpha = 0.22f)).padding(12.dp)) {
+                            Text(h.text, style = AppleType.subheadline, color = apple.label)
+                            if (h.note.isNotEmpty()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(h.note, style = AppleType.subheadline.copy(fontWeight = FontWeight.SemiBold), color = apple.label)
+                            }
+                            Text(
+                                "Remove",
+                                style = AppleType.footnote.copy(fontWeight = FontWeight.SemiBold),
+                                color = apple.red,
+                                modifier = Modifier.padding(top = 6.dp).clickable { onRemoveHighlight(h.text) },
+                            )
+                        }
+                    }
                 }
                 if (article.link.isNotEmpty()) {
                     Spacer(Modifier.height(28.dp))
@@ -130,23 +176,56 @@ fun ArticleScreen(
             BottomToolbar {
                 BarIcon(AppIcons.EnvelopeBadge, "Mark as unread", onClick = onMarkUnread)
                 BarIcon(
-                    if (article.starred) AppIcons.StarFill else AppIcons.Star,
-                    if (article.starred) "Unstar" else "Star",
-                    tint = if (article.starred) apple.yellow else null,
+                    if (article.starred) AppIcons.BookmarkFill else AppIcons.Bookmark,
+                    if (article.starred) "Remove from Read Later" else "Read later",
                     onClick = onToggleStar,
                 )
+                BarIcon(AppIcons.Grid, "Save to board", tint = if (article.boards.isNotEmpty()) null else apple.secondaryLabel) { showBoards = true }
                 BarIcon(AppIcons.Share, "Share", enabled = article.link.isNotEmpty()) { share(context, article) }
                 BarIcon(AppIcons.Safari, "Open in browser", enabled = article.link.isNotEmpty()) { openLink(context, article.link) }
             }
         }
         AppleSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 56.dp))
     }
+
+    if (showBoards) {
+        BoardSheet(
+            boards = boards,
+            selected = article.boards,
+            onToggle = onToggleBoard,
+            onNewBoard = { showBoards = false; newBoard = true },
+            onDismiss = { showBoards = false },
+        )
+    }
+    if (newBoard) {
+        TextEntrySheet(
+            title = "New Board",
+            placeholder = "Board name",
+            confirm = "Create",
+            onDismiss = { newBoard = false },
+            onSubmit = { name ->
+                if (onCreateBoard(name)) { onToggleBoard(name.trim()); null } else "That name is already used"
+            },
+        )
+    }
+    noteFor?.let { text ->
+        TextEntrySheet(
+            title = "Add Note",
+            placeholder = "Your note",
+            confirm = "Save",
+            footer = "“${text.take(120)}${if (text.length > 120) "…" else ""}”",
+            onDismiss = { noteFor = null },
+            onSubmit = { note -> onHighlight(text, note); null },
+        )
+    }
 }
 
 /** Renders feed HTML natively in a TextView, with links and inline images. */
 @Composable
-private fun HtmlText(html: String, baseUrl: String) {
+private fun HtmlText(html: String, baseUrl: String, textSize: Int, highlights: List<String>, onSelection: (String, Boolean) -> Unit) {
     val apple = LocalApple.current
+    val latestSelection by rememberUpdatedState(onSelection)
+    val highlightColor = apple.yellow.copy(alpha = 0.45f).toArgb()
     val textColor = apple.label.toArgb()
     val linkColor = apple.tint.toArgb()
     val scope = rememberCoroutineScope()
@@ -157,20 +236,61 @@ private fun HtmlText(html: String, baseUrl: String) {
             TextView(ctx).apply {
                 movementMethod = LinkMovementMethod.getInstance()
                 typeface = ResourcesCompat.getFont(ctx, R.font.inter)
-                textSize = 18f
                 letterSpacing = -0.012f
                 setLineSpacing(0f, 1.42f)
+                // Selectable so the reader can highlight; keep links tappable.
+                setTextIsSelectable(true)
+                movementMethod = LinkMovementMethod.getInstance()
+                val tv = this
+                customSelectionActionModeCallback = object : ActionMode.Callback {
+                    override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                        menu.add(Menu.NONE, MENU_HIGHLIGHT, 0, "Highlight")
+                        menu.add(Menu.NONE, MENU_NOTE, 1, "Add note")
+                        return true
+                    }
+                    override fun onPrepareActionMode(mode: ActionMode, menu: Menu) = false
+                    override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                        if (item.itemId != MENU_HIGHLIGHT && item.itemId != MENU_NOTE) return false
+                        val start = minOf(tv.selectionStart, tv.selectionEnd)
+                        val end = maxOf(tv.selectionStart, tv.selectionEnd)
+                        if (start >= 0 && end > start) latestSelection(tv.text.subSequence(start, end).toString(), item.itemId == MENU_NOTE)
+                        mode.finish()
+                        return true
+                    }
+                    override fun onDestroyActionMode(mode: ActionMode) {}
+                }
             }
         },
         update = { tv ->
+            tv.textSize = textSize.toFloat()
             tv.setTextColor(textColor)
             tv.setLinkTextColor(linkColor)
             if (tv.tag != cleaned) {
                 tv.tag = cleaned
                 tv.text = Html.fromHtml(cleaned, Html.FROM_HTML_MODE_LEGACY, ImageGetter(tv, baseUrl, scope), null).trimEnd()
             }
+            applyHighlights(tv, highlights, highlightColor)
         },
     )
+}
+
+private const val MENU_HIGHLIGHT = 9001
+private const val MENU_NOTE = 9002
+
+private class HighlightSpan(color: Int) : BackgroundColorSpan(color)
+
+/** Paint every saved highlight (all of its occurrences) in the text, replacing earlier paint. */
+private fun applyHighlights(tv: TextView, highlights: List<String>, color: Int) {
+    val text = tv.text as? Spannable ?: return
+    text.getSpans(0, text.length, HighlightSpan::class.java).forEach { text.removeSpan(it) }
+    val plain = text.toString()
+    highlights.forEach { h ->
+        var i = plain.indexOf(h)
+        while (h.isNotEmpty() && i >= 0) {
+            text.setSpan(HighlightSpan(color), i, i + h.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            i = plain.indexOf(h, i + h.length)
+        }
+    }
 }
 
 private val DROP_BLOCKS = Regex("(?is)<(script|style|iframe|noscript|svg|form)\\b.*?</\\1>")

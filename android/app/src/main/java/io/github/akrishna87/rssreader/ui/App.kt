@@ -3,6 +3,9 @@ package io.github.akrishna87.rssreader.ui
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,7 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material3.SnackbarHostState
 
-/** Screen routing: Feeds (home) → article list → article, plus Discover / Manage / Filters. */
+/** Screen routing: article list with a side menu → article, plus Discover / Manage / Filters / Settings. */
 @Composable
 fun ReaderApp(vm: ReaderViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -52,6 +55,10 @@ fun ReaderApp(vm: ReaderViewModel) {
         }
     }
 
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    var newBoard by remember { mutableStateOf(false) }
+    var deleteBoard by remember { mutableStateOf<String?>(null) }
+
     val open = state.openArticleId?.let { id -> state.articles.firstOrNull { it.id == id } }
     when {
         open != null -> {
@@ -62,8 +69,25 @@ fun ReaderApp(vm: ReaderViewModel) {
                 backLabel = viewTitle(state, short = true),
                 snackbar = snackbar,
                 onBack = vm::closeArticle,
+                textSize = state.settings.textSize,
+                boards = state.boards,
                 onToggleStar = { vm.toggleStar(open.id) },
                 onMarkUnread = { vm.setRead(open.id, false); vm.closeArticle() },
+                onToggleBoard = { vm.toggleBoard(open.id, it) },
+                onCreateBoard = vm::createBoard,
+                onHighlight = { text, note -> vm.addTextHighlight(open.id, text, note) },
+                onRemoveHighlight = { vm.removeTextHighlight(open.id, it) },
+            )
+        }
+        state.settingsOpen -> {
+            BackHandler { vm.closeSettings() }
+            SettingsScreen(
+                settings = state.settings,
+                snackbar = snackbar,
+                onBack = vm::closeSettings,
+                onLayout = vm::setLayout,
+                onTextSize = vm::setTextSize,
+                onTheme = vm::setTheme,
             )
         }
         state.filtersOpen -> {
@@ -100,30 +124,61 @@ fun ReaderApp(vm: ReaderViewModel) {
                 onAdd = { url, folder -> vm.addFeed(url, showFeed = false, folder = folder) },
             )
         }
-        state.listOpen -> {
-            BackHandler { vm.closeList() }
-            ArticleListScreen(
-                state = state,
-                vm = vm,
-                title = viewTitle(state, short = false),
-                snackbar = snackbar,
-                onBack = vm::closeList,
-            )
+        else -> {
+            BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
+            ModalNavigationDrawer(
+                drawerState = drawer,
+                drawerContent = {
+                    AppDrawer(
+                        state = state,
+                        vm = vm,
+                        onClose = { scope.launch { drawer.close() } },
+                        onAdd = { showAdd = true },
+                        onNewBoard = { newBoard = true },
+                        onDeleteBoard = { deleteBoard = it },
+                        onImport = { importLauncher.launch(arrayOf("*/*")) },
+                        onExport = {
+                            if (state.feeds.isEmpty()) scope.launch { snackbar.showSnackbar("No feeds to export yet") } else exportLauncher.launch("subscriptions.opml")
+                        },
+                    )
+                },
+            ) {
+                ArticleListScreen(
+                    state = state,
+                    vm = vm,
+                    title = viewTitle(state, short = false),
+                    snackbar = snackbar,
+                    onMenu = { scope.launch { drawer.open() } },
+                    onAdd = { showAdd = true },
+                )
+            }
         }
-        else -> FeedsScreen(
-            state = state,
-            vm = vm,
-            snackbar = snackbar,
-            onAdd = { showAdd = true },
-            onImport = { importLauncher.launch(arrayOf("*/*")) },
-            onExport = { exportLauncher.launch("subscriptions.opml") },
+    }
+
+    if (newBoard) {
+        TextEntrySheet(
+            title = "New Board",
+            placeholder = "Board name",
+            confirm = "Create",
+            onDismiss = { newBoard = false },
+            onSubmit = { if (vm.createBoard(it)) null else "That name is already used" },
+        )
+    }
+    deleteBoard?.let { name ->
+        AppleAlert(
+            title = "Delete board “$name”?",
+            message = "The articles stay in your feeds, they're just removed from this board.",
+            confirm = "Delete",
+            destructive = true,
+            onConfirm = { vm.deleteBoard(name); deleteBoard = null },
+            onDismiss = { deleteBoard = null },
         )
     }
 
     if (showAdd) {
         AddFeedSheet(
             initial = shared ?: "",
-            initialFolder = (state.view as? ReaderView.Folder)?.takeIf { state.listOpen }?.name ?: "",
+            initialFolder = (state.view as? ReaderView.Folder)?.name ?: "",
             folders = state.feeds.map(Feed::folder).filter { it.isNotEmpty() }.distinct().sorted(),
             onDismiss = { showAdd = false; vm.clearShared() },
             onAdd = { url, folder -> vm.addFeed(url, folder = folder) },
@@ -133,9 +188,13 @@ fun ReaderApp(vm: ReaderViewModel) {
 }
 
 fun viewTitle(state: UiState, short: Boolean): String = when (val v = state.view) {
+    ReaderView.Today -> "Today"
     ReaderView.All -> if (short) "All" else "All Articles"
-    ReaderView.Starred -> "Starred"
-    ReaderView.Highlights -> "Highlights"
+    ReaderView.Starred -> "Read Later"
+    ReaderView.Priority -> "Priority"
+    ReaderView.Notes -> "Highlights & Notes"
+    ReaderView.Alerts -> "Keyword Alerts"
     is ReaderView.OneFeed -> state.feeds.firstOrNull { it.id == v.feedId }?.name ?: "Feed"
     is ReaderView.Folder -> v.name
+    is ReaderView.Board -> v.name
 }
