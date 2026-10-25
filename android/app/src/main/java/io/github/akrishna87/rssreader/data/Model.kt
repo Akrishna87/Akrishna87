@@ -13,6 +13,8 @@ data class Feed(
     val customTitle: String = "",
     /** Priority feeds get their own list and lead the Today view. */
     val priority: Boolean = false,
+    /** Fetch the full article page whenever an article from this feed is opened. */
+    val fullText: Boolean = false,
     /** When this feed's settings last changed, for syncing (1 = before syncing existed). */
     val ts: Long = 1,
 ) {
@@ -40,13 +42,25 @@ data class Article(
     val highlights: List<Highlight> = emptyList(),
     /** When the reader last changed this article's state (read, saved, boards, highlights); 0 = never. */
     val mod: Long = 0,
+    /** Full article text fetched from the web page; empty = not fetched. */
+    val fullHtml: String = "",
 ) {
     /** Saved by the reader in some way, so it's never cleaned up. */
     val kept: Boolean get() = starred || boards.isNotEmpty() || highlights.isNotEmpty()
 }
 
 /** Reader preferences. [layout] is magazine, cards or title; [theme] is system, light or dark. */
-data class Settings(val layout: String = "magazine", val textSize: Int = 18, val theme: String = "system")
+data class Settings(
+    val layout: String = "magazine",
+    val textSize: Int = 18,
+    val theme: String = "system",
+    /** Background refresh every N hours; 0 = only when the app is open. Device-local (not synced). */
+    val refreshHours: Int = 0,
+    /** Notifications for new articles: off, priority (priority feeds and keyword alerts) or all. Device-local. */
+    val notify: String = "priority",
+    /** Download images (and full text for feeds that use it) ahead of time for offline reading. Device-local. */
+    val offline: Boolean = false,
+)
 
 /** What a feed fetch produced, before it's merged into stored articles. */
 data class ParsedFeed(val title: String, val siteUrl: String, val items: List<ParsedItem>)

@@ -1,6 +1,10 @@
 package io.github.akrishna87.rssreader.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.DrawerValue
@@ -55,6 +59,14 @@ fun ReaderApp(vm: ReaderViewModel) {
         }
     }
 
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    // Android 13+ asks before an app may post notifications.
+    fun askNotifications() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     val drawer = rememberDrawerState(DrawerValue.Closed)
     var newBoard by remember { mutableStateOf(false) }
     var deleteBoard by remember { mutableStateOf<String?>(null) }
@@ -70,6 +82,8 @@ fun ReaderApp(vm: ReaderViewModel) {
                 snackbar = snackbar,
                 onBack = vm::closeArticle,
                 textSize = state.settings.textSize,
+                fullLoading = open.id in state.fullLoading,
+                onLoadFull = { vm.loadFullText(open.id) },
                 boards = state.boards,
                 onToggleStar = { vm.toggleStar(open.id) },
                 onMarkUnread = { vm.setRead(open.id, false); vm.closeArticle() },
@@ -92,6 +106,15 @@ fun ReaderApp(vm: ReaderViewModel) {
                 status = state.syncStatus,
                 error = state.syncError,
                 lastSync = state.lastSync,
+                onRefreshHours = { hours ->
+                    vm.setRefreshHours(hours)
+                    if (hours > 0 && state.settings.notify != "off") askNotifications()
+                },
+                onNotify = { mode ->
+                    vm.setNotify(mode)
+                    if (mode != "off") askNotifications()
+                },
+                onOffline = vm::setOffline,
                 onSignIn = {
                     scope.launch {
                         try {

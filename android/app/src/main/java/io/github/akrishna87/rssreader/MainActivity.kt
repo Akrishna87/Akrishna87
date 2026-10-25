@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) handleShare(intent)
+        if (savedInstanceState == null) { handleShare(intent); handleOpen(intent) }
         setContent {
             val state by vm.state.collectAsStateWithLifecycle()
             val mode = state.settings.theme
@@ -39,11 +39,32 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleShare(intent)
+        handleOpen(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AppState.foreground = true
+    }
+
+    override fun onStop() {
+        AppState.foreground = false
+        super.onStop()
     }
 
     override fun onResume() {
         super.onResume()
+        vm.reloadFromDisk()
         vm.refreshIfStale()
+    }
+
+    /** A notification or the widget asked for a particular article. */
+    private fun handleOpen(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_ARTICLE)?.let { vm.openFromOutside(it) }
+    }
+
+    companion object {
+        const val EXTRA_ARTICLE = "articleId"
     }
 
     /** "Share → Reader" from a browser, YouTube, etc. */

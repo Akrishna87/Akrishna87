@@ -25,6 +25,9 @@ fun SettingsScreen(
     status: SyncStatus,
     error: String?,
     lastSync: Long,
+    onRefreshHours: (Int) -> Unit,
+    onNotify: (String) -> Unit,
+    onOffline: (Boolean) -> Unit,
     onSignIn: () -> Unit,
     onSyncNow: () -> Unit,
     onSignOut: () -> Unit,
@@ -71,6 +74,30 @@ fun SettingsScreen(
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                     SegmentedControl(themes.map { it.second }, themes.indexOfFirst { it.first == settings.theme }.coerceAtLeast(0)) { onTheme(themes[it].first) }
                 }
+            }
+        }
+        item(key = "background") {
+            val hours = listOf(0 to "Off", 1 to "1 h", 3 to "3 h", 6 to "6 h")
+            val notify = listOf("off" to "Off", "priority" to "Priority", "all" to "All new")
+            GroupedSection(
+                header = "Background",
+                footer = "Vellum can fetch new articles while it's closed and notify you. “Priority” only notifies for priority feeds and keyword alerts.",
+            ) {
+                AppleRow("Refresh in background", chevron = false)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    SegmentedControl(hours.map { it.second }, hours.indexOfFirst { it.first == settings.refreshHours }.coerceAtLeast(0)) { onRefreshHours(hours[it].first) }
+                }
+                AppleRow("Notifications", chevron = false)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    SegmentedControl(notify.map { it.second }, notify.indexOfFirst { it.first == settings.notify }.coerceAtLeast(0)) { onNotify(notify[it].first) }
+                }
+                AppleRow(
+                    "Save images for offline",
+                    chevron = false,
+                    showDivider = false,
+                    onClick = { onOffline(!settings.offline) },
+                    trailing = { AppleSwitch(settings.offline) { onOffline(it) } },
+                )
             }
         }
         item(key = "text") {

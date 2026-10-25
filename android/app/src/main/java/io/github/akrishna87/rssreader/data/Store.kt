@@ -23,7 +23,9 @@ data class Snapshot(
 /** Everything lives in one JSON file in the app's private storage. */
 class Store(private val file: File) {
 
-    fun load(): Snapshot {
+    fun load(): Snapshot = synchronized(LOCK) { loadLocked() }
+
+    private fun loadLocked(): Snapshot {
         if (!file.exists()) return Snapshot()
         return try {
             val o = JSONObject(file.readText())
@@ -38,6 +40,7 @@ class Store(private val file: File) {
                     folder = it.optString("folder"),
                     customTitle = it.optString("customTitle"),
                     priority = it.optBoolean("priority"),
+                    fullText = it.optBoolean("fullText"),
                     ts = it.optLong("ts", 1),
                 )
             }
@@ -56,6 +59,7 @@ class Store(private val file: File) {
                     starred = it.optBoolean("starred"),
                     boards = it.optJSONArray("boards").strings(),
                     mod = it.optLong("mod"),
+                    fullHtml = it.optString("full"),
                     highlights = it.optJSONArray("highlights").objects().map { h ->
                         Highlight(h.optString("text"), h.optString("note"), h.optLong("time"))
                     }.filter { h -> h.text.isNotEmpty() },
@@ -68,7 +72,10 @@ class Store(private val file: File) {
                 collapsed = o.optJSONArray("collapsed").strings().toSet(),
                 boards = o.optJSONArray("boards").strings(),
                 settings = o.optJSONObject("settings")?.let {
-                    Settings(it.optString("layout", "magazine"), it.optInt("textSize", 18).coerceIn(14, 26), it.optString("theme", "system"))
+                    Settings(
+                        it.optString("layout", "magazine"), it.optInt("textSize", 18).coerceIn(14, 26), it.optString("theme", "system"),
+                        it.optInt("refreshHours"), it.optString("notify", "priority"), it.optBoolean("offline"),
+                    )
                 } ?: Settings(),
                 deletedFeeds = o.optJSONObject("deletedFeeds").longs(),
                 boardTs = o.optJSONObject("boardTs").longs(),
@@ -80,8 +87,12 @@ class Store(private val file: File) {
         }
     }
 
-    @Synchronized
-    fun save(s: Snapshot) {
+    fun save(s: Snapshot) = synchronized(LOCK) { saveLocked(s) }
+
+    /** Read, change and write back as one step, so a concurrent writer can't be overwritten. */
+    fun update(change: (Snapshot) -> Snapshot) = synchronized(LOCK) { saveLocked(change(loadLocked())) }
+
+    private fun saveLocked(s: Snapshot) {
         val o = JSONObject()
         o.put("version", 1)
         o.put("unreadOnly", s.unreadOnly)
@@ -93,13 +104,17 @@ class Store(private val file: File) {
         o.put("boardTs", JSONObject(s.boardTs))
         o.put("deletedBoards", JSONObject(s.deletedBoards))
         o.put("prefsTs", s.prefsTs)
-        o.put("settings", JSONObject().put("layout", s.settings.layout).put("textSize", s.settings.textSize).put("theme", s.settings.theme))
+        o.put(
+            "settings",
+            JSONObject().put("layout", s.settings.layout).put("textSize", s.settings.textSize).put("theme", s.settings.theme)
+                .put("refreshHours", s.settings.refreshHours).put("notify", s.settings.notify).put("offline", s.settings.offline),
+        )
         o.put("feeds", JSONArray().apply {
             s.feeds.forEach { f ->
                 put(JSONObject().apply {
                     put("id", f.id); put("url", f.url); put("title", f.title); put("siteUrl", f.siteUrl)
                     put("lastFetched", f.lastFetched); put("error", f.error ?: "")
-                    put("folder", f.folder); put("customTitle", f.customTitle); put("priority", f.priority); put("ts", f.ts)
+                    put("folder", f.folder); put("customTitle", f.customTitle); put("priority", f.priority); put("fullText", f.fullText); put("ts", f.ts)
                 })
             }
         })
@@ -109,7 +124,7 @@ class Store(private val file: File) {
                     put("id", a.id); put("feedId", a.feedId); put("title", a.title); put("link", a.link)
                     put("date", a.date); put("author", a.author); put("content", a.contentHtml)
                     put("snippet", a.snippet); put("thumb", a.thumbnail ?: ""); put("read", a.read); put("starred", a.starred)
-                    put("boards", JSONArray(a.boards)); put("mod", a.mod)
+                    put("boards", JSONArray(a.boards)); put("mod", a.mod); put("full", a.fullHtml)
                     put("highlights", JSONArray().apply {
                         a.highlights.forEach { h -> put(JSONObject().put("text", h.text).put("note", h.note).put("time", h.time)) }
                     })
@@ -127,6 +142,11 @@ class Store(private val file: File) {
 
     private fun JSONArray?.strings(): List<String> =
         if (this == null) emptyList() else (0 until length()).mapNotNull { optString(it).ifEmpty { null } }
+
+    private companion object {
+        /** The app and the background worker share one file, so every read and write takes the same lock. */
+        val LOCK = Any()
+    }
 
     private fun JSONObject?.longs(): Map<String, Long> =
         if (this == null) emptyMap() else keys().asSequence().associateWith { optLong(it) }
@@ -160,6 +180,7 @@ fun mergeArticles(existing: List<Article>, feedId: String, parsed: ParsedFeed, n
             boards = old?.boards ?: emptyList(),
             highlights = old?.highlights ?: emptyList(),
             mod = old?.mod ?: 0,
+            fullHtml = old?.fullHtml ?: "",
         )
         if (old == null) added++
         byId[id] = fresh
