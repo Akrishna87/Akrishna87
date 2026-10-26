@@ -2,7 +2,7 @@
  "isaialai": {
   "about": [
    "Isaialai means \"music wave\" in Tamil: isai (music) + alai (wave). The app was first called \"My Music\". Its internal ID is unchanged, so new builds install over the old one and keep your playlists and settings.",
-   "A native Android music player that plays the songs already saved on your phone straight from storage. There's nothing to pick or import and no copies, uploads, ads or account. (It goes online only when you tap Check for updates in Settings.) New songs you download show up by themselves."
+   "A native Android music player that plays the songs already saved on your phone straight from storage. There's nothing to pick or import and no copies, uploads, ads or account. (It goes online only when you tap Check for updates in Settings, or cast to a TV on your Wi-Fi.) New songs you download show up by themselves."
   ],
   "features": [
    "Home · Search · Library along the bottom, with a mini player above them tinted in the current song's cover colour.",
@@ -16,8 +16,12 @@
    "Your recap (Home, or Library ⋮ → Your recap): how much you listened this month, last month, this year or ever; your top songs, artists, music…",
    "Make it yours (Settings): pick an accent colour (coral, rose, red, amber, green, teal, blue or violet), switch Home's rows on or off and put them in…"
   ],
-  "sha": "0b60507ff0022fbe2fe93b8954c097e1bc9c86da",
+  "sha": "d0066daf2b0d81e7eafaff8e00819733bf8f4131",
   "changes": [
+   {
+    "title": "Cast music to a TV (Google Cast)",
+    "date": "2026-10-25T13:13:06Z"
+   },
    {
     "title": "Add Check for updates in Settings",
     "date": "2026-10-17T05:51:30Z"
@@ -37,10 +41,6 @@
    {
     "title": "Settings: Home screen card after Playback; crossfade test scrolls to its buttons",
     "date": "2026-10-11T11:06:16Z"
-   },
-   {
-    "title": "Rename setStartSection (clashed with the property's setter)",
-    "date": "2026-10-11T10:52:12Z"
    }
   ]
  },
@@ -58,7 +58,7 @@
    "Open with My Videos: file managers, Downloads and chat apps can open videos in the player.",
    "Details in a video's ⋮ menu shows its file name, folder, resolution, size and date."
   ],
-  "sha": "f2bb2ca4ab7021dc7131015b1b3498b0be5e95f7",
+  "sha": "8206b77dbbb5be5e403955634162c176ece6e25e",
   "changes": [
    {
     "title": "My Videos test: use landscape clips instead of the colour-bar test pattern",
@@ -80,15 +80,34 @@
   ],
   "features": [
    "Library: every photo and video in one grid, oldest at the top and newest at the bottom, where it opens.",
-   "Select: tap Select (or long-press a photo) to pick several, then share, favourite or delete them from the toolbar.",
-   "The viewer: swipe between photos, pinch or double-tap to zoom, and drag down to close.",
-   "Albums: My Albums (Recents, Favorites, then each folder like Camera, Screenshots or WhatsApp Images) as two rows of covers that scroll sideways, with…",
-   "Search: albums, months (\"October\", \"2025\") and file names, with suggestions for albums and recent months before you type.",
-   "Limited access (Android 14+): if you let Lumen see only some photos, Albums says so and Manage… lets you change the selection.",
-   "Light and dark mode follow the phone's setting."
+   "Filter: the button next to Select shows only Favorites, Photos, Videos, Edited (copies saved by Lumen's editor) or Screenshots.",
+   "Undo: after hiding or unhiding, favouriting several photos, or adding to or removing from an album, a banner offers Undo for a few seconds.",
+   "Select: tap Select, then tap photos, or drag your finger sideways across the grid to pick a whole run of them (it scrolls when you reach the top or…",
+   "Press and hold a photo for a larger preview over the blurred app, with a menu: Copy, Share, Favorite, Add to Album, Hide and Delete.",
+   "Your own albums: tap + on Albums to make one, then add photos from ••• (in Select mode, in the viewer, or in the press-and-hold menu) → Add to Album.",
+   "Duplicates (under Utilities): photos that are exact copies of each other (same size and same picture).",
+   "Hidden: ••• → Hide takes photos out of Lumen's Library, albums and Search into the Hidden album under Utilities, which opens only after your…",
+   "The viewer: a photo grows out of its thumbnail when you open it, and shrinks back into its place in the grid when you close it (the grid scrolls to…",
+   "For You: Memories, made from your photos: On This Day (this date in years past) and each recent month with at least six photos."
   ],
-  "sha": "81071de65254dc47eaf0de1c5c65607f70912200",
+  "sha": "f948c495cd6e7a64b3a453f795c08699aba6977f",
   "changes": [
+   {
+    "title": "Hidden: lock again in the background after an in-app unlock prompt",
+    "date": "2026-10-24T07:24:28Z"
+   },
+   {
+    "title": "Viewer: don't skip photos hidden or unhidden from Select mode",
+    "date": "2026-10-24T06:55:38Z"
+   },
+   {
+    "title": "Your own albums and a locked Hidden album",
+    "date": "2026-10-24T06:29:43Z"
+   },
+   {
+    "title": "Open photos from their thumbnails, drag to select, press-and-hold previews",
+    "date": "2026-10-24T05:36:06Z"
+   },
    {
     "title": "Lumen, a photo gallery for Android in Apple's Photos style",
     "date": "2026-10-19T09:35:58Z"
@@ -186,31 +205,31 @@
    "Built-in ebook reader with pages you turn by tapping the right or left edge (or swiping), a tap in the middle for the menu, a table of contents, text…",
    "Your shelf lists every book you've played, read, downloaded or saved, with your progress and how much space downloads use."
   ],
-  "sha": "45ff6b70d8836006b7ff90ccdd51456131379d22",
+  "sha": "0dcde293d36240c821c574a44901755899f3e979",
   "changes": [
    {
-    "title": "Reader: size pages from the measured screen, so a page never holds one line",
-    "date": "2026-10-07T12:17:22Z"
+    "title": "Ebooks from Standard Ebooks as well as Project Gutenberg",
+    "date": "2026-10-26T00:38:54Z"
    },
    {
-    "title": "Temporary: print the contents of Gutenberg's text-only EPUB in CI",
-    "date": "2026-10-07T12:06:38Z"
+    "title": "Temporary: probe Standard Ebooks markup and Internet Archive texts",
+    "date": "2026-10-25T17:18:39Z"
    },
    {
-    "title": "Ebooks: download progress, resume dropped downloads, skip huge editions",
-    "date": "2026-10-07T12:02:12Z"
+    "title": "Temporary: probe public-domain catalogs from CI",
+    "date": "2026-10-25T17:15:24Z"
    },
    {
-    "title": "Ebooks: show download progress, resume dropped downloads, skip huge editions",
-    "date": "2026-10-07T11:26:43Z"
+    "title": "Reading, audiobook and library features; trust gutenberg.org's new certificate",
+    "date": "2026-10-25T14:13:25Z"
    },
    {
-    "title": "Books: rename the app to Folio",
-    "date": "2026-10-02T23:26:51Z"
+    "title": "Reader: Apple Books-style page curl, now the default page turn",
+    "date": "2026-10-25T13:53:25Z"
    },
    {
-    "title": "Books: new launcher icon, an open book wearing headphones",
-    "date": "2026-10-02T23:26:05Z"
+    "title": "Reader: turn into the next chapter like any other page",
+    "date": "2026-10-25T13:22:33Z"
    }
   ]
  },
@@ -231,31 +250,31 @@
    "Swipe an article right to mark it read/unread, left to star it.",
    "Pull to refresh; refreshes automatically when opened (if older than 15 minutes)."
   ],
-  "sha": "dd4b9042da8de7ea2e2c5717e9bbcf852ceff985",
+  "sha": "554782f64c8e771468aa3f9831f2502ab0ee28f6",
   "changes": [
    {
-    "title": "Android app: fade the nav-bar title with an alpha animation",
-    "date": "2026-10-18T09:31:12Z"
+    "title": "Android app: background refresh with notifications, home-screen widget, offline images",
+    "date": "2026-10-24T15:04:39Z"
    },
    {
-    "title": "Android app: Apple-style redesign, new name (Vellum) and icon",
-    "date": "2026-10-18T09:26:51Z"
+    "title": "Android app: load full article text, per-feed auto full text, share highlights and boards as Markdown",
+    "date": "2026-10-24T15:02:05Z"
    },
    {
-    "title": "Android app: proper icons for Keyword filters, Discover and Highlights",
-    "date": "2026-10-17T11:47:25Z"
+    "title": "Android app: search a topic in Discover to find relevant feeds",
+    "date": "2026-10-24T14:22:44Z"
    },
    {
-    "title": "Android app: folders, rename/move feeds, and keyword filters",
-    "date": "2026-10-17T11:26:52Z"
+    "title": "Android app: sync across devices with Google sign-in",
+    "date": "2026-10-24T08:52:54Z"
    },
    {
-    "title": "Android app: add a Manage feeds screen for removing subscriptions",
-    "date": "2026-10-17T11:19:01Z"
+    "title": "Android app: Feedly-style Discover with topic tiles, search, feed preview and Follow buttons",
+    "date": "2026-10-24T08:15:54Z"
    },
    {
-    "title": "Android app: add Discover feeds",
-    "date": "2026-10-17T11:11:13Z"
+    "title": "Android app: recolour legacy launcher icons to green",
+    "date": "2026-10-24T08:06:34Z"
    }
   ]
  },
@@ -615,6 +634,39 @@
    {
     "title": "Selavu: show per-day amounts in whole rupees",
     "date": "2026-10-17T17:03:51Z"
+   }
+  ]
+ },
+ "semippu": {
+  "about": [
+   "Selvam means \"wealth\" in Tamil. It works out what India's popular savings schemes pay, at the government's current rates, with a year-by-year table. A Loans tab works out the EMI on a home, car or personal loan, and how many months and how much interest a part payment saves. The app has no INTERNET permission: nothing you type leaves the phone."
+  ],
+  "features": [],
+  "sha": "7e36d6ef157471e77dfd93a25975eb96d117a7b9",
+  "changes": [
+   {
+    "title": "EPF calculator, with optional VPF",
+    "date": "2026-10-26T00:38:21Z"
+   },
+   {
+    "title": "Accounts already open: start from today's balance",
+    "date": "2026-10-25T17:23:59Z"
+   },
+   {
+    "title": "Rename the app to Selvam",
+    "date": "2026-10-24T11:54:24Z"
+   },
+   {
+    "title": "Build numbers start above the old repo's builds",
+    "date": "2026-10-24T11:08:47Z"
+   },
+   {
+    "title": "Build from this repo's root",
+    "date": "2026-10-24T11:01:14Z"
+   },
+   {
+    "title": "Semippu: a Loans tab with EMI and part payments",
+    "date": "2026-10-24T08:54:15Z"
    }
   ]
  },
