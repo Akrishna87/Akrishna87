@@ -548,8 +548,12 @@
    "History with filters (type, category, month, note search) and edit/delete, with Undo on every delete.",
    "Recurring expenses (rent, subscriptions, etc.): configure a fixed monthly cost once, and it's auto-logged as a real expense on its due day every…"
   ],
-  "sha": "603a6044797889f57b796f453090f73d0ff04a00",
+  "sha": "ac6dad6df09193552c3856d4b3295b9dc67685eb",
   "changes": [
+   {
+    "title": "Add multiple accounts (cash/UPI/bank/credit card) and a per-entry currency",
+    "date": "2026-10-27T16:00:17Z"
+   },
    {
     "title": "Checklist: per-subcategory checkboxes with auto-checked master; fix recurring entries not updating/clearing on edit",
     "date": "2026-10-11T02:46:24Z"
@@ -569,10 +573,6 @@
    {
     "title": "Loans: type in months remaining directly instead of calculating it",
     "date": "2026-10-10T07:38:14Z"
-   },
-   {
-    "title": "Dashboard: simplify - drop repeat-last-expense card and the three by-category panels",
-    "date": "2026-10-10T07:28:10Z"
    }
   ]
  },
@@ -605,12 +605,28 @@
    "Amount, category (the last one you used is already picked), date (Today, Yesterday or any day), and a note",
    "Repeat every day, week, month or year: rent, salary, subscriptions and EMIs are then logged on their own when they come due.",
    "Long-press the app icon for Add expense and Add income shortcuts",
-   "One spending budget, weekly or monthly",
-   "Home shows how much is left, a bar that turns amber then red, and how much you can spend a day for the rest of the period",
-   "A donut chart of spending (or income) by category, with each category's amount and share"
+   "Bank accounts, credit cards, cash and wallets, each with its own currency and opening balance (a card's is what's owed).",
+   "Currency groups: when accounts are in more than one currency, a switcher (₹ · $ · …) shows one group at a time.",
+   "Transfers between your own accounts aren't spending or income."
   ],
-  "sha": "4431e1d0c423ae1a210bf875b6bcc65555bc98b5",
+  "sha": "a6a1af79561b0672a68b590f8e55ca930cb8ab7d",
   "changes": [
+   {
+    "title": "Add accounts from Home and while logging an entry",
+    "date": "2026-10-28T13:52:46Z"
+   },
+   {
+    "title": "Label the fields in the account dialog, and leave Other symbol empty unless used",
+    "date": "2026-10-28T02:40:42Z"
+   },
+   {
+    "title": "Credit card bills, Pay bill and reminders",
+    "date": "2026-10-28T02:30:31Z"
+   },
+   {
+    "title": "Accounts, currency groups and transfers",
+    "date": "2026-10-27T16:30:16Z"
+   },
    {
     "title": "Keep the currency symbol next to the amount as it's typed",
     "date": "2026-10-18T11:23:05Z"
@@ -618,55 +634,6 @@
    {
     "title": "Redesign the screens after iOS",
     "date": "2026-10-18T11:14:28Z"
-   },
-   {
-    "title": "Softer colours: muted terracotta, sage and dusty rose",
-    "date": "2026-10-18T04:48:10Z"
-   },
-   {
-    "title": "Number this repo's builds from 101, so they update the earlier ones",
-    "date": "2026-10-17T17:30:13Z"
-   },
-   {
-    "title": "Build, test and publish from this repo",
-    "date": "2026-10-17T17:18:38Z"
-   },
-   {
-    "title": "Selavu: show per-day amounts in whole rupees",
-    "date": "2026-10-17T17:03:51Z"
-   }
-  ]
- },
- "semippu": {
-  "about": [
-   "Selvam means \"wealth\" in Tamil. It works out what India's popular savings schemes pay, at the government's current rates, with a year-by-year table. A Loans tab works out the EMI on a home, car or personal loan, and how many months and how much interest a part payment saves. The app has no INTERNET permission: nothing you type leaves the phone."
-  ],
-  "features": [],
-  "sha": "7e36d6ef157471e77dfd93a25975eb96d117a7b9",
-  "changes": [
-   {
-    "title": "EPF calculator, with optional VPF",
-    "date": "2026-10-26T00:38:21Z"
-   },
-   {
-    "title": "Accounts already open: start from today's balance",
-    "date": "2026-10-25T17:23:59Z"
-   },
-   {
-    "title": "Rename the app to Selvam",
-    "date": "2026-10-24T11:54:24Z"
-   },
-   {
-    "title": "Build numbers start above the old repo's builds",
-    "date": "2026-10-24T11:08:47Z"
-   },
-   {
-    "title": "Build from this repo's root",
-    "date": "2026-10-24T11:01:14Z"
-   },
-   {
-    "title": "Semippu: a Loans tab with EMI and part payments",
-    "date": "2026-10-24T08:54:15Z"
    }
   ]
  },
@@ -711,6 +678,39 @@
    {
     "title": "Pakkam: pad the pages by the toolbars, so a fitted last page sits between them",
     "date": "2026-10-17T08:04:11Z"
+   }
+  ]
+ },
+ "semippu": {
+  "about": [
+   "Selvam means \"wealth\" in Tamil. It works out what India's popular savings schemes pay, at the government's current rates, with a year-by-year table. A Loans tab works out the EMI on a home, car or personal loan, and how many months and how much interest a part payment saves. The app has no INTERNET permission: nothing you type leaves the phone."
+  ],
+  "features": [],
+  "sha": "7e36d6ef157471e77dfd93a25975eb96d117a7b9",
+  "changes": [
+   {
+    "title": "EPF calculator, with optional VPF",
+    "date": "2026-10-26T00:38:21Z"
+   },
+   {
+    "title": "Accounts already open: start from today's balance",
+    "date": "2026-10-25T17:23:59Z"
+   },
+   {
+    "title": "Rename the app to Selvam",
+    "date": "2026-10-24T11:54:24Z"
+   },
+   {
+    "title": "Build numbers start above the old repo's builds",
+    "date": "2026-10-24T11:08:47Z"
+   },
+   {
+    "title": "Build from this repo's root",
+    "date": "2026-10-24T11:01:14Z"
+   },
+   {
+    "title": "Semippu: a Loans tab with EMI and part payments",
+    "date": "2026-10-24T08:54:15Z"
    }
   ]
  },
