@@ -29,11 +29,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Cyclone
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +76,7 @@ import io.github.akrishna87.weather.data.GeoBox
 import io.github.akrishna87.weather.data.LatLon
 import io.github.akrishna87.weather.data.MapLabel
 import io.github.akrishna87.weather.data.Storm
+import io.github.akrishna87.weather.data.TrackPoint
 import io.github.akrishna87.weather.data.Units
 import io.github.akrishna87.weather.data.WindField
 import io.github.akrishna87.weather.data.WorldOutline
@@ -136,6 +139,8 @@ fun WindMapScreen(vm: WeatherViewModel) {
     var world by remember { mutableStateOf<WorldOutline?>(null) }
     var selected by remember { mutableStateOf<String?>(null) }
     var probe by remember { mutableStateOf<Pair<LatLon, FloatArray?>?>(null) }
+    // A storm's path being replayed: its key and the frame time the replay started.
+    var replay by remember { mutableStateOf<Pair<String, Long>?>(null) }
     val frame = remember { mutableLongStateOf(0L) }
     val particles = remember { Particles(density) }
     val painter = remember { MapPainter(density) }
@@ -191,6 +196,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
                     particles.step(f, hourIndex(cam, f), cam.gusts, viewBox(cam, size), cam.ppd, size, dt / 16f)
                 }
                 frame.longValue = t
+                replay?.let { (_, start) -> if (t - start > REPLAY_MS + 1_500) replay = null }
             }
         }
     }
@@ -241,7 +247,7 @@ fun WindMapScreen(vm: WeatherViewModel) {
             painter.drawCoasts(this, cam, world)
             particles.draw(this, cam)
             painter.drawLabels(this, cam, world, place?.let { LatLon(it.lat, it.lon) }, place?.name)
-            painter.drawStorms(this, cam, storms, selected)
+            painter.drawStorms(this, cam, storms, selected, frame.longValue, replay)
             place?.let { painter.drawPlace(this, cam, LatLon(it.lat, it.lon), it.name) }
             myLocation?.let { painter.drawMe(this, cam, it) }
             probe?.let { painter.drawProbe(this, cam, it.first) }
@@ -301,7 +307,28 @@ fun WindMapScreen(vm: WeatherViewModel) {
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)) {
             val s = storms.firstOrNull { it.key == selected }
-            if (s != null) StormSheet(s, units, place?.let { LatLon(it.lat, it.lon) }) { selected = null }
+            if (s != null) {
+                StormSheet(
+                    s, units, place?.let { LatLon(it.lat, it.lon) },
+                    replaying = replay?.first == s.key,
+                    onPlay = {
+                        // Frame the whole path, then replay it.
+                        val pts = replayPath(s)
+                        if (pts.size >= 2 && size.width > 0) {
+                            val lons = pts.map { it.lon }
+                            val lats = pts.map { it.lat }
+                            val spanLon = (lons.max() - lons.min()) * 1.4 + 4
+                            val spanLat = (lats.max() - lats.min()) * 1.4 + 4
+                            cam.lon = (lons.max() + lons.min()) / 2
+                            cam.ppd = minOf(size.width / spanLon, size.height * 0.55 / spanLat).toFloat()
+                                .coerceIn(size.width / 360f, size.width / 3f)
+                            cam.lat = clampLat((lats.max() + lats.min()) / 2 - 0.15 * size.height / cam.ppd, cam.ppd, size)
+                            particles.clear()
+                        }
+                        replay = s.key to frame.longValue
+                    },
+                ) { selected = null }
+            }
             if (field != null && field.times.size > 1) TimeSlider(cam, field)
             Legend(units, cam.gusts)
         }
@@ -309,6 +336,15 @@ fun WindMapScreen(vm: WeatherViewModel) {
 }
 
 private val TIME = DateTimeFormatter.ofPattern("EEE HH:mm")
+
+/** How long a storm's path replay takes. */
+private const val REPLAY_MS = 7_000L
+
+/** The positions a replay moves through: the observed track, then the forecast, ending at the latest position. */
+private fun replayPath(s: Storm): List<TrackPoint> {
+    val pts = s.track?.points.orEmpty()
+    return pts.filterNot { it.forecast } + pts.filter { it.forecast }
+}
 
 @Composable
 private fun TimeSlider(cam: MapCamera, field: WindField) {
@@ -369,16 +405,24 @@ private fun Legend(units: Units, gusts: Boolean) {
 }
 
 @Composable
-private fun StormSheet(s: Storm, units: Units, you: LatLon?, onClose: () -> Unit) {
+private fun StormSheet(s: Storm, units: Units, you: LatLon?, replaying: Boolean, onPlay: () -> Unit, onClose: () -> Unit) {
     val ctx = LocalContext.current
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             StormHeader(s) { IconButton(onClick = onClose) { Icon(Icons.Outlined.Close, "Close") } }
             StormMetrics(s, units, you, Modifier.padding(top = 12.dp))
             StormFacts(s, units)
-            s.link?.let { url ->
-                TextButton(onClick = { openLink(ctx, url) }, contentPadding = PaddingValues(0.dp)) {
-                    Text("Official advisory (${s.sources.joinToString(" + ")}) →")
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                if (replayPath(s).size >= 2) {
+                    FilledTonalButton(onClick = onPlay, enabled = !replaying) {
+                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(if (replaying) "Playing…" else "Play path")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+                s.link?.let { url ->
+                    TextButton(onClick = { openLink(ctx, url) }) { Text("Advisory (${s.sources.joinToString(" + ")}) →") }
                 }
             }
         }
@@ -795,7 +839,7 @@ private class MapPainter(private val density: Float) {
         return Math.round((viewMid - boxMid) / 360.0) * 360.0
     }
 
-    fun drawStorms(s: DrawScope, cam: MapCamera, storms: List<Storm>, selected: String?) {
+    fun drawStorms(s: DrawScope, cam: MapCamera, storms: List<Storm>, selected: String?, timeMs: Long, replay: Pair<String, Long>?) {
         val c = s.drawContext.canvas.nativeCanvas
         val view = viewOf(s, cam)
         for (storm in storms) {
@@ -819,8 +863,106 @@ private class MapPainter(private val density: Float) {
                         c.drawCircle(x(cam, s, lon), y(cam, s, p.lat), 2.5f * density, dot)
                     }
                 }
-                drawStormMarker(c, x(cam, s, storm.lon + shift), y(cam, s, storm.lat), storm, storm.key == selected)
+                val replaying = replay?.first == storm.key
+                if (replaying) {
+                    drawReplay(c, cam, s, storm, shift, ((timeMs - replay!!.second).toFloat() / REPLAY_MS).coerceIn(0f, 1f), timeMs)
+                } else {
+                    val cx = x(cam, s, storm.lon + shift)
+                    val cy = y(cam, s, storm.lat)
+                    drawSwirl(c, cx, cy, swirlRadius(cam), storm, timeMs)
+                    drawStormMarker(c, cx, cy, storm, storm.key == selected)
+                }
             }
+        }
+    }
+
+    /** How big a storm's cloud swirl is drawn: about 3.5° across its arms, within sensible limits. */
+    private fun swirlRadius(cam: MapCamera) = (3.5f * cam.ppd).coerceIn(30f * density, 150f * density)
+
+    private val armPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    /**
+     * A spinning cyclone: cloud bands spiralling into a clear eye, turning anticlockwise north of
+     * the equator and clockwise south of it (as real ones do), faster for stronger storms, with a
+     * pulsing glow in the storm's strength colour.
+     */
+    private fun drawSwirl(c: android.graphics.Canvas, cx: Float, cy: Float, radius: Float, storm: Storm, timeMs: Long) {
+        val color = stormColor(storm.category)
+        val north = storm.lat >= 0
+        val dir = if (north) -1.0 else 1.0 // screen y points down, so negative is anticlockwise
+        val turnsPerSecond = 0.12 + 0.05 * ((storm.category ?: 0).coerceAtLeast(0))
+        val angle0 = dir * (timeMs / 1000.0) * turnsPerSecond * 2 * Math.PI
+
+        // Pulsing glow.
+        val pulse = (0.5 + 0.5 * sin(timeMs / 600.0)).toFloat()
+        haloPaint.color = color
+        haloPaint.alpha = (40 + 40 * pulse).toInt()
+        c.drawCircle(cx, cy, radius * (0.55f + 0.1f * pulse), haloPaint)
+
+        // Four cloud bands, each a logarithmic spiral that fades and thins towards its outer end.
+        val segments = 14
+        for (arm in 0 until 4) {
+            val start = angle0 + arm * Math.PI / 2
+            var px = 0f
+            var py = 0f
+            for (k in 0..segments) {
+                val f = k / segments.toFloat() // 0 at the eye wall, 1 at the outer end
+                val r = radius * (0.16f + 0.84f * f * f)
+                // Bands trail behind the spin: the further out, the further round.
+                val a = start - dir * f * 2.6
+                val qx = cx + (r * cos(a)).toFloat()
+                val qy = cy + (r * sin(a)).toFloat()
+                if (k > 0) {
+                    armPaint.color = 0xFFFFFFFF.toInt()
+                    armPaint.alpha = (210 * (1 - f) + 25).toInt()
+                    armPaint.strokeWidth = radius * (0.16f * (1 - f) + 0.03f)
+                    c.drawLine(px, py, qx, qy, armPaint)
+                }
+                px = qx; py = qy
+            }
+        }
+        // The eye: a dark centre ringed in the storm's colour.
+        dot.color = 0xCC0B1220.toInt()
+        c.drawCircle(cx, cy, radius * 0.11f, dot)
+    }
+
+    /** A storm's path replayed: the track so far, and the storm moving along it with its date. */
+    private fun drawReplay(c: android.graphics.Canvas, cam: MapCamera, s: DrawScope, storm: Storm, shift: Double, progress: Float, timeMs: Long) {
+        val pts = replayPath(storm)
+        if (pts.size < 2) return
+        val pos = progress * (pts.size - 1)
+        val i = pos.toInt().coerceAtMost(pts.size - 2)
+        val t = pos - i
+        var prevLon = Double.NaN
+        val lons = pts.map { p -> (if (prevLon.isNaN()) unwrapNear(p.lon, storm.lon) else unwrapNear(p.lon, prevLon)).also { prevLon = it } }
+        val lon = lons[i] + (lons[i + 1] - lons[i]) * t + shift
+        val lat = pts[i].lat + (pts[i + 1].lat - pts[i].lat) * t
+        // The path travelled so far.
+        path.reset()
+        for (k in 0..i) {
+            val px = x(cam, s, lons[k] + shift)
+            val py = y(cam, s, pts[k].lat)
+            if (k == 0) path.moveTo(px, py) else path.lineTo(px, py)
+        }
+        val cx = x(cam, s, lon)
+        val cy = y(cam, s, lat)
+        path.lineTo(cx, cy)
+        trackPaint.color = 0xFFFFFFFF.toInt()
+        c.drawPath(path, trackPaint)
+        // The storm, at its strength then: the swirl grows as it moves along.
+        drawSwirl(c, cx, cy, swirlRadius(cam) * (0.6f + 0.4f * progress), storm, timeMs)
+        drawStormMarker(c, cx, cy, storm, selected = true)
+        // When it was there.
+        val nearest = pts[if (t < 0.5f) i else i + 1]
+        val whenText = (nearest.label?.let { feedTime(it) ?: it } ?: "") + if (nearest.forecast) " (forecast)" else ""
+        if (whenText.isNotBlank()) {
+            val tw = small.measureText(whenText)
+            rect.set(cx - tw / 2 - 8 * density, cy + 18 * density, cx + tw / 2 + 8 * density, cy + 18 * density + small.textSize + 10 * density)
+            c.drawRoundRect(rect, 8 * density, 8 * density, labelBg)
+            small.textAlign = Paint.Align.CENTER
+            c.drawText(whenText, cx, cy + 18 * density + small.textSize + 4 * density, small)
+            small.textAlign = Paint.Align.LEFT
         }
     }
 
@@ -845,26 +987,15 @@ private class MapPainter(private val density: Float) {
         return l
     }
 
-    /** A cyclone symbol: a ring with two curling arms, spun the right way for the hemisphere. */
+    /** A storm's eye wall and its name label (the spinning bands come from [drawSwirl]). */
     private fun drawStormMarker(c: android.graphics.Canvas, cx: Float, cy: Float, storm: Storm, selected: Boolean) {
         val r = (if (selected) 14f else 11f) * density
         val color = stormColor(storm.category)
         stormStroke.color = color
         dot.color = color
-        c.drawCircle(cx, cy, r * 0.45f, dot)
-        c.drawCircle(cx, cy, r * 0.8f, stormStroke)
-        val spin = if (storm.lat >= 0) -1f else 1f // anticlockwise in the north
-        for (arm in 0..1) {
-            path.reset()
-            val a0 = arm * Math.PI
-            path.moveTo(cx + (r * 0.8f * cos(a0)).toFloat(), cy + (r * 0.8f * sin(a0)).toFloat())
-            for (step in 1..6) {
-                val a = a0 + spin * step * 0.35
-                val rr = r * (0.8f + step * 0.18f)
-                path.lineTo(cx + (rr * cos(a)).toFloat(), cy + (rr * sin(a)).toFloat())
-            }
-            c.drawPath(path, stormStroke)
-        }
+        // The spinning cloud bands are drawn by drawSwirl; this is the eye wall in the storm's colour.
+        c.drawCircle(cx, cy, r * 0.3f, dot)
+        c.drawCircle(cx, cy, r * 0.65f, stormStroke)
         if (selected) {
             stormStroke.alpha = 120
             c.drawCircle(cx, cy, r * 2.2f, stormStroke)

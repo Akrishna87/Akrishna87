@@ -216,6 +216,18 @@ if on_screen storms "Show on wind map"; then
   sleep 12
   dump storm-map
   shot 9-storm-on-map
+  # Replay the storm's path (the card shows a Play path button when GDACS has its track).
+  if on_screen storm-map "Play path"; then
+    tap storm-map "Play path"
+    sleep 2
+    shot 9b-path-replay-start
+    sleep 3
+    shot 9c-path-replay-later
+    crashed && fail "the app crashed replaying a storm's path (see logcat.txt)"
+    echo "Replayed the storm's path"
+  else
+    echo "(no Play path button on screen to try)"
+  fi
   crashed && fail "the app crashed showing a storm on the map (see logcat.txt)"
   dump tabs2
   tab tabs2 "Sources"

@@ -4,6 +4,11 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -170,7 +176,15 @@ fun StormHeader(s: Storm, trailing: @Composable () -> Unit = {}) {
     val color = Color(stormColor(s.category))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(46.dp).clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.18f)), Alignment.Center) {
-            Icon(Icons.Outlined.Cyclone, null, tint = color, modifier = Modifier.size(30.dp))
+            // Spins the way the storm does: anticlockwise north of the equator, clockwise south.
+            val spin = rememberInfiniteTransition(label = "spin")
+            val turn by spin.animateFloat(
+                initialValue = 0f,
+                targetValue = if (s.lat >= 0) -360f else 360f,
+                animationSpec = infiniteRepeatable(tween(durationMillis = 4_000, easing = LinearEasing)),
+                label = "turn",
+            )
+            Icon(Icons.Outlined.Cyclone, null, tint = color, modifier = Modifier.size(30.dp).rotate(turn))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
