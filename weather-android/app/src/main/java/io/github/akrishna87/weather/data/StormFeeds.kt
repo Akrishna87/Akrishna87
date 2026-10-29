@@ -6,6 +6,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlin.math.abs
 
 /**
  * Named tropical cyclones, from two feeds:
@@ -92,16 +93,11 @@ object StormFeeds {
         val lines = ArrayList<List<LatLon>>()
         val points = ArrayList<TrackPoint>()
         val areas = ArrayList<List<LatLon>>()
-        val logged = HashSet<String>()
         for (i in 0 until features.length()) {
             val f = features.optJSONObject(i) ?: continue
             val g = f.optJSONObject("geometry") ?: continue
             val c = g.optJSONArray("coordinates") ?: continue
             val props = f.optJSONObject("properties")
-            // What GDACS sends with each kind of shape (logged once per kind, to read the timeline from).
-            if (logged.add(g.optString("type"))) {
-                android.util.Log.i("Vaanilai", "GDACS ${g.optString("type")} #$i of ${features.length()}: ${props.toString().take(400)}")
-            }
             when (g.optString("type")) {
                 "Point" -> {
                     val lon = c.optDouble(0); val lat = c.optDouble(1)
@@ -133,6 +129,32 @@ object StormFeeds {
             }
         }
         return StormTrack(lines.filter { it.size > 1 }, points, areas.filter { it.size > 2 })
+    }
+
+    /**
+     * Puts a track's undated points (the centres of GDACS wind areas) in time order. GDACS doesn't
+     * say which way they run, so the storm's current position picks the starting end: the points
+     * lead away from it ahead of the storm (its forecast) or up to it from behind (its past), going
+     * by the way the storm is moving. When that isn't known they're taken as the forecast, which is
+     * what GDACS's wind areas usually show.
+     */
+    fun inTimeOrder(track: StormTrack, now: LatLon, movingTowardDeg: Double?): StormTrack {
+        val pts = track.points
+        if (pts.size < 2 || pts.any { it.label != null || it.forecast }) return track
+        val first = LatLon(pts.first().lat, pts.first().lon)
+        val last = LatLon(pts.last().lat, pts.last().lon)
+        val fromNow = if (distanceKm(now, first) <= distanceKm(now, last)) pts else pts.reversed()
+        val ahead = movingTowardDeg?.let { heading ->
+            val away = bearingDeg(LatLon(fromNow.first().lat, fromNow.first().lon), LatLon(fromNow.last().lat, fromNow.last().lon))
+            val turn = abs(((away - heading) % 360 + 540) % 360 - 180)
+            turn <= 90
+        } ?: true
+        val ordered = if (ahead) {
+            fromNow.mapIndexed { i, p -> if (i == 0) p else p.copy(forecast = true) }
+        } else {
+            fromNow.reversed()
+        }
+        return track.copy(points = ordered)
     }
 
     private fun ring(c: JSONArray, maxPoints: Int = 2000): List<LatLon> {

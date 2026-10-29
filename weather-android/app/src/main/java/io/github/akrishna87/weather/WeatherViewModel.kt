@@ -352,7 +352,7 @@ class WeatherViewModel(app: Application) : AndroidViewModel(app) {
                 async {
                     val url = s.geometryUrl ?: return@async s
                     try {
-                        s.copy(track = StormFeeds.track(url))
+                        s.copy(track = StormFeeds.inTimeOrder(StormFeeds.track(url), LatLon(s.lat, s.lon), s.movingTowardDeg))
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

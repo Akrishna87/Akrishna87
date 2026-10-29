@@ -94,6 +94,13 @@ open_until() { # open_until <dump name> <text to tap> <text expected after>: ret
   dump "$1"
   on_screen "$1" "$3" || fail "tapping '$2' didn't show '$3'"
 }
+in_app() { adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" | grep -q "$PKG"; }
+back_to_app() { # a blind tap can hit a link that opens the browser; come back to the app
+  in_app && return 0
+  echo "(a tap left the app; going back to it)"
+  adb shell am start -n "$PKG/.MainActivity" > /dev/null
+  sleep 3
+}
 crashed() {
   adb logcat -d > "$OUT/logcat.txt"
   grep -A3 "FATAL EXCEPTION" "$OUT/logcat.txt" | grep -q "$PKG"
@@ -225,6 +232,10 @@ if on_screen storms "Show on wind map"; then
     read -r W H < <(adb shell wm size | grep -o "[0-9]*x[0-9]*" | tail -1 | tr x ' ')
     adb shell input tap $((W * 24 / 100)) $((H * 690 / 1000)); PLAYED=1
   fi
+  if [ -n "$PLAYED" ] && { sleep 2; ! in_app; }; then
+    # No Play path button (a storm without a GDACS track): the tap hit the Advisory link instead.
+    back_to_app; PLAYED=""
+  fi
   if [ -n "$PLAYED" ]; then
     sleep 2
     shot 9b-path-replay-start
@@ -236,6 +247,7 @@ if on_screen storms "Show on wind map"; then
     echo "(no Play path button on screen to try)"
   fi
   crashed && fail "the app crashed showing a storm on the map (see logcat.txt)"
+  back_to_app
   dump tabs2
   tab tabs2 "Sources"
 else
