@@ -217,8 +217,15 @@ if on_screen storms "Show on wind map"; then
   dump storm-map
   shot 9-storm-on-map
   # Replay the storm's path (the card shows a Play path button when GDACS has its track).
+  PLAYED=""
   if on_screen storm-map "Play path"; then
-    tap storm-map "Play path"
+    tap storm-map "Play path"; PLAYED=1
+  elif [ ! -s "$OUT/storm-map.xml" ]; then
+    # The animated map often can't be dumped; on a phone this size the button sits here on the storm card.
+    read -r W H < <(adb shell wm size | grep -o "[0-9]*x[0-9]*" | tail -1 | tr x ' ')
+    adb shell input tap $((W * 24 / 100)) $((H * 690 / 1000)); PLAYED=1
+  fi
+  if [ -n "$PLAYED" ]; then
     sleep 2
     shot 9b-path-replay-start
     sleep 3
