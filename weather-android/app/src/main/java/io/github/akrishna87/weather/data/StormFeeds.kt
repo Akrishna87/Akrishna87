@@ -92,11 +92,16 @@ object StormFeeds {
         val lines = ArrayList<List<LatLon>>()
         val points = ArrayList<TrackPoint>()
         val areas = ArrayList<List<LatLon>>()
+        val logged = HashSet<String>()
         for (i in 0 until features.length()) {
             val f = features.optJSONObject(i) ?: continue
             val g = f.optJSONObject("geometry") ?: continue
             val c = g.optJSONArray("coordinates") ?: continue
             val props = f.optJSONObject("properties")
+            // What GDACS sends with each kind of shape (logged once per kind, to read the timeline from).
+            if (logged.add(g.optString("type"))) {
+                android.util.Log.i("Vaanilai", "GDACS ${g.optString("type")} #$i of ${features.length()}: ${props.toString().take(400)}")
+            }
             when (g.optString("type")) {
                 "Point" -> {
                     val lon = c.optDouble(0); val lat = c.optDouble(1)
