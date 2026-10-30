@@ -99,7 +99,7 @@ fun HomeScreen(vm: AppViewModel) {
     val tools = listOf(
         HomeTool("Combine files", Icons.Filled.MergeType, Color(0xFF1565C0)) { vm.go(Screen.Merge) },
         HomeTool("Photos to PDF", Icons.Filled.Image, Color(0xFF2E7D32)) { vm.go(Screen.Images(camera = false)) },
-        HomeTool("Scan", Icons.Filled.PhotoCamera, Color(0xFF00838F)) { vm.go(Screen.Images(camera = true)) },
+        HomeTool("Scan", Icons.Filled.PhotoCamera, Color(0xFF00838F)) { vm.go(Screen.Scan) },
         HomeTool("Fill & Sign", Icons.Filled.Draw, Color(0xFF6A1B9A)) { pick(sign = true) },
         HomeTool("Organize pages", Icons.Filled.ViewModule, Color(0xFFEF6C00)) { pick(ToolKind.ORGANIZE) },
         HomeTool("Compress", Icons.Filled.Compress, Color(0xFF5D4037)) { pick(ToolKind.COMPRESS) },

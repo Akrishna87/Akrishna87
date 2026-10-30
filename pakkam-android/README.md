@@ -59,7 +59,12 @@ documents never leave the phone.
 - Protect with a password (AES-256) and limit printing, copying or changes; remove a password
 - Add a watermark or page numbers
 - Export to Word (.docx, text in paragraphs), plain text, or JPEG/PNG pictures of each page
-- Create a PDF from photos, or scan paper with the camera (greyscale and black-and-white filters)
+- Create a PDF from photos
+- **Document scanner**: its own camera outlines the page live and can take it by itself once it's held steady
+  (with a light for dark rooms); each page is found in the photo, flattened from the angle it was shot at, and
+  cleaned up (shadows and grey paper evened out) in auto colour, greyscale or black and white. Drag the corners
+  with a magnifier to adjust, rotate, retake, reorder or delete pages, add photos you already have, and save them
+  as one PDF in Downloads › Pakkam. Plain geometry on the phone (`scan/`), no AI and no Google services.
 - Flatten comments and form entries into the page; edit title, author and keywords
 
 Every change is made on a private copy first. The file you opened is only touched when you tap

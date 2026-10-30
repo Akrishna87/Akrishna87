@@ -61,6 +61,7 @@ sealed interface Screen {
     data class Tool(val tool: ToolKind) : Screen
     data object Merge : Screen
     data class Images(val camera: Boolean) : Screen
+    data object Scan : Screen
 }
 
 /** The document tools, each with its own screen. */
@@ -85,6 +86,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val settings = Settings(app)
     val signatures = Signatures(app)
     val dictionary by lazy { io.github.akrishna87.pakkam.data.Dictionary(app) }
+    /** The document scanner's pages, kept here so they survive the screen turning. */
+    val scan = ScanSession()
 
     val stack = mutableStateListOf<Screen>(Screen.Home)
     var recents by mutableStateOf(recentsStore.all())
@@ -245,6 +248,7 @@ fun PakkamRoot(vm: AppViewModel) {
             is Screen.Tool -> if (session != null) ToolScreen(vm, session, screen.tool) else LaunchedEffect(Unit) { vm.back() }
             Screen.Merge -> MergeScreen(vm)
             is Screen.Images -> ImagesToPdfScreen(vm, screen.camera)
+            Screen.Scan -> ScanScreen(vm)
         }
 
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp))
