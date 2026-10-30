@@ -91,6 +91,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
+    // CameraX hands back its camera as a ListenableFuture; await() turns that into a suspend call.
+    implementation("com.google.guava:guava:33.3.1-android")
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
 
     // PDFium (the engine inside Chrome) draws the pages, including annotations and form fields.
     implementation("io.legere:pdfiumandroid:1.0.35")

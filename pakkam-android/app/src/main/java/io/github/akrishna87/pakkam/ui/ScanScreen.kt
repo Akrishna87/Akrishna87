@@ -28,6 +28,7 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.concurrent.futures.await
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -428,7 +429,7 @@ private fun LiveCamera(
     LaunchedEffect(lifecycleOwner) {
         val main = ContextCompat.getMainExecutor(context)
             try {
-                val cameras = ProcessCameraProvider.awaitInstance(context)
+                val cameras = ProcessCameraProvider.getInstance(context).await()
                 provider = cameras
                 val preview = Preview.Builder().setResolutionSelector(fourThree).build()
                 preview.setSurfaceProvider(previewView.surfaceProvider)
