@@ -89,7 +89,7 @@ object ScanImage {
         // A hair inside the edges, so no sliver of the table shows along them.
         val cx = q.points.sumOf { it.x.toDouble() }.toFloat() / 4
         val cy = q.points.sumOf { it.y.toDouble() }.toFloat() / 4
-        val p = q.map { Pt((it.x + (cx - it.x) * 0.008f) * (src.width - 1), (it.y + (cy - it.y) * 0.008f) * (src.height - 1)) }
+        val p = q.map { Pt((it.x + (cx - it.x) * 0.02f) * (src.width - 1), (it.y + (cy - it.y) * 0.02f) * (src.height - 1)) }
         val m = homography(
             listOf(Pt(0f, 0f), Pt(w - 1f, 0f), Pt(w - 1f, h - 1f), Pt(0f, h - 1f)),
             p.points,
