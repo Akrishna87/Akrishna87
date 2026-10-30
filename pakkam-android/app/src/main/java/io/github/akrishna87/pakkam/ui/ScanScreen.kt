@@ -414,13 +414,22 @@ private fun LiveCamera(
     var busy by remember { mutableStateOf(false) }
     var flash by remember { mutableStateOf(false) }
 
-    DisposableEffect(lifecycleOwner) {
-        val executor = Executors.newSingleThreadExecutor()
-        val main = ContextCompat.getMainExecutor(context)
-        val future = ProcessCameraProvider.getInstance(context)
-        future.addListener({
+    val executor = remember { Executors.newSingleThreadExecutor() }
+    var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    DisposableEffect(Unit) {
+        onDispose {
             try {
-                val provider = future.get()
+                provider?.unbindAll()
+            } catch (_: Exception) {
+            }
+            executor.shutdown()
+        }
+    }
+    LaunchedEffect(lifecycleOwner) {
+        val main = ContextCompat.getMainExecutor(context)
+            try {
+                val cameras = ProcessCameraProvider.awaitInstance(context)
+                provider = cameras
                 val preview = Preview.Builder().setResolutionSelector(fourThree).build()
                 preview.setSurfaceProvider(previewView.surfaceProvider)
                 val analysis = ImageAnalysis.Builder()
@@ -458,22 +467,17 @@ private fun LiveCamera(
                         }
                     }
                 }
-                provider.unbindAll()
-                camera = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture, analysis)
+                cameras.unbindAll()
+                camera = cameras.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture, analysis)
             } catch (e: Exception) {
                 android.util.Log.w("Pakkam", "Camera couldn't start", e)
                 failed = true
             }
-        }, main)
-        onDispose {
-            try {
-                if (future.isDone) future.get().unbindAll()
-            } catch (_: Exception) {
-            }
-            executor.shutdown()
-        }
     }
-    LaunchedEffect(torch, camera) { camera?.cameraControl?.enableTorch(torch) }
+    LaunchedEffect(torch, camera) {
+        camera?.cameraControl?.enableTorch(torch)
+        Unit
+    }
 
     fun shoot() {
         if (busy || camera == null) return

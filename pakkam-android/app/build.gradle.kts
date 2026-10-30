@@ -91,8 +91,6 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
-    // CameraX hands back its camera as a ListenableFuture, whose type lives here.
-    implementation("com.google.guava:listenablefuture:1.0")
 
     // PDFium (the engine inside Chrome) draws the pages, including annotations and form fields.
     implementation("io.legere:pdfiumandroid:1.0.35")
