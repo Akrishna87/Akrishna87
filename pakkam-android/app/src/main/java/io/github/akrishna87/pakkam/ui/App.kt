@@ -61,6 +61,7 @@ sealed interface Screen {
     data class Tool(val tool: ToolKind) : Screen
     data object Merge : Screen
     data class Images(val camera: Boolean) : Screen
+    data object Scan : Screen
 }
 
 /** The document tools, each with its own screen. */
@@ -85,6 +86,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val settings = Settings(app)
     val signatures = Signatures(app)
     val dictionary by lazy { io.github.akrishna87.pakkam.data.Dictionary(app) }
+    /** The document scanner's pages, kept here so they survive the screen turning. */
+    val scan = ScanSession()
 
     val stack = mutableStateListOf<Screen>(Screen.Home)
     var recents by mutableStateOf(recentsStore.all())
@@ -131,14 +134,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Opens a document, asking for its password when needed, then shows it (or a tool for it). */
-    fun open(uri: Uri, tool: ToolKind? = null, password: String? = null, picked: Boolean = false) {
+    fun open(uri: Uri, tool: ToolKind? = null, password: String? = null, picked: Boolean = false, shared: Boolean = false) {
         viewModelScope.launch {
             busy = "Opening…"
             var work: File? = null
+            var uri = uri
             try {
                 if (picked) Files.keepAccess(context, uri)
                 val name = withContext(Dispatchers.IO) { Files.displayName(context, uri) }
                 work = withContext(Dispatchers.IO) { Files.copyToWork(context, uri) }
+                // A file shared from another app can be read only now: keep a copy, so Recent can open it again.
+                if (shared && !Files.keepsAccess(context, uri)) {
+                    val sharedUri = uri
+                    uri = withContext(Dispatchers.IO) { Files.keepReceived(context, work!!, name) }
+                    recentsStore.remove(sharedUri.toString())
+                }
                 val doc = try {
                     PdfDoc.open(work, password)
                 } catch (e: WrongPasswordException) {
@@ -177,7 +187,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 work?.delete()
                 android.util.Log.w("Pakkam", "Couldn't open $uri", e)
-                say(e.message ?: "This file couldn't be opened")
+                val old = recentsStore.get(uri.toString())
+                if (old != null && uri.scheme == "content" && (e is SecurityException || e is java.io.FileNotFoundException || e.message.orEmpty().contains("content provider", ignoreCase = true))) {
+                    // A link from another app that has run out: say so plainly and take it off the list.
+                    recentsStore.remove(uri.toString())
+                    refreshRecents()
+                    say("“${old.name}” came from another app and can't be opened from here any more. Open it again from that app.")
+                } else {
+                    say(e.message ?: "This file couldn't be opened")
+                }
             } finally {
                 busy = null
             }
@@ -245,6 +263,7 @@ fun PakkamRoot(vm: AppViewModel) {
             is Screen.Tool -> if (session != null) ToolScreen(vm, session, screen.tool) else LaunchedEffect(Unit) { vm.back() }
             Screen.Merge -> MergeScreen(vm)
             is Screen.Images -> ImagesToPdfScreen(vm, screen.camera)
+            Screen.Scan -> ScanScreen(vm)
         }
 
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp))

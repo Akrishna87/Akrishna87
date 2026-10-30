@@ -74,6 +74,8 @@ open_doc() {
 
 adb wait-for-device
 adb install -r "$APK"
+# The document scanner's camera, allowed up front so no permission prompt gets in the way.
+adb shell pm grant io.github.akrishna87.pakkam android.permission.CAMERA || true
 adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c
 
@@ -437,6 +439,52 @@ wait_for reopened-pages 'text="[0-9] / 5"' 20 "Page view didn't open from Readin
 adb shell input keyevent KEYCODE_BACK
 wait_for home-4 'text="Combine files"' 20 "leaving the document didn't return Home"
 echo "PASS: Reading mode remembered for each file"
+
+echo "--- Scanning a document"
+# The newest photo in the library: a page shot at an angle on a wooden table, with a shadow over it.
+adb push "$HERE/document-photo.jpg" /sdcard/Pictures/document-photo.jpg > /dev/null
+adb shell touch /sdcard/Pictures/document-photo.jpg
+adb shell content call --method scan_volume --uri content://media --arg external_primary > /dev/null 2>&1 || true
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/document-photo.jpg > /dev/null 2>&1 || true
+sleep 3
+dump home-5
+tap home-5 "Scan"
+wait_for scan-camera 'Scan document' 20 "the scanner didn't open"
+sleep 3
+shot 15-scan-camera
+show scan-camera
+tap scan-camera "Choose photos"
+wait_for scan-picker 'content-desc="[^"]*(Photo|photo|Image|image) taken' 30 "the photo picker didn't open"
+tap scan-picker "taken"
+sleep 1
+dump scan-picked
+show scan-picked
+tap scan-picked "Add"
+wait_for scan-review 'Page 1 of 1' 40 "the scanned page didn't come up for review"
+sleep 4
+shot 16-scan-review
+grep -q 'Auto colour' "$OUT/scan-review.xml" || fail "the scan has no clean-up choices"
+tap scan-review "Crop"
+wait_for scan-crop 'Drag the corners' 20 "the corners couldn't be adjusted"
+sleep 2
+shot 17-scan-crop
+tap scan-crop "Done"
+sleep 1
+dump scan-review2
+tap scan-review2 "Black & white"
+sleep 4
+shot 18-scan-bw
+dump scan-review3
+tap scan-review3 "Save PDF"
+wait_for scan-save 'Save as PDF' 10 "saving the scan didn't ask for a name"
+tap scan-save "Save"
+wait_for scanned 'text="1 / 1"' 60 "the scan wasn't saved and opened as a PDF"
+sleep 2
+shot 19-scan-pdf
+adb shell ls /sdcard/Download/Pakkam/ | grep -q '\.pdf' || fail "the scanned PDF isn't in Downloads/Pakkam"
+adb shell input keyevent KEYCODE_BACK
+wait_for home-6 'text="Combine files"' 20 "leaving the scanned PDF didn't return Home"
+echo "PASS: document scanner"
 
 if crashed; then
   adb logcat -d > "$OUT/logcat.txt"

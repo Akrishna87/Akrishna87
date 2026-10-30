@@ -98,6 +98,28 @@ object Files {
         }
     }
 
+    /** Whether the app may still open [uri] later, after this visit (Files, Drive, its own files). */
+    fun keepsAccess(context: Context, uri: Uri): Boolean =
+        uri.scheme != "content" || context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+
+    /**
+     * A copy of a file shared from another app (WhatsApp, Gmail…), which only lets it be read
+     * this once, kept in the app's own storage so it can be opened again from Recent.
+     * The same file shared again reuses its copy.
+     */
+    fun keepReceived(context: Context, work: File, name: String): Uri {
+        val dir = File(context.filesDir, "received").apply { mkdirs() }
+        val safe = safeName(name)
+        var target = File(dir, safe)
+        var n = 2
+        while (target.exists() && target.length() != work.length()) {
+            target = File(dir, safe.substringBeforeLast('.') + " ($n)." + safe.substringAfterLast('.', "pdf"))
+            n++
+        }
+        work.copyTo(target, overwrite = true)
+        return Uri.fromFile(target)
+    }
+
     fun forget(context: Context, uri: Uri) {
         try {
             context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)

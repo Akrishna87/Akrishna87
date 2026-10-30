@@ -41,6 +41,6 @@ class MainActivity : ComponentActivity() {
             }
             else -> null
         }
-        if (uri != null) vm.open(uri)
+        if (uri != null) vm.open(uri, shared = true)
     }
 }
