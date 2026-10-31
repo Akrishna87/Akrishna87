@@ -277,8 +277,10 @@ object DocumentDetector {
             // Sides running along the picture's border can't be seen; let them through on their own.
             val onBorder = (a.x < 3 && b.x < 3) || (a.y < 3 && b.y < 3) || (a.x > w - 4 && b.x > w - 4) || (a.y > h - 4 && b.y > h - 4)
             val frac = if (inside == 0) 0f else hit.toFloat() / inside
-            if (frac < 0.45f && !onBorder) return null
-            total += len * (if (onBorder) 0.3f else frac)
+            // A side made of two different edges (a notebook's top and the box under it) is only partly
+            // on an edge; squaring the share favours sides that follow one edge all the way.
+            if (frac < 0.6f && !onBorder) return null
+            total += len * (if (onBorder) 0.2f else frac * frac)
         }
         return total
     }

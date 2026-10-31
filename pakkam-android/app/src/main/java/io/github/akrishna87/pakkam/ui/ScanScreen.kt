@@ -402,6 +402,7 @@ private fun LiveCamera(
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setJpegQuality(95)
             .setResolutionSelector(fourThree)
             .build()
     }

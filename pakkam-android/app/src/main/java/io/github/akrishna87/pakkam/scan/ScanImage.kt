@@ -159,6 +159,102 @@ object ScanImage {
     /** Cleans up a flattened page the way [look] says. */
     fun enhance(src: Pixels, look: ScanLook): Pixels {
         if (look == ScanLook.ORIGINAL) return src
+        val cleaned = clean(src, look)
+        // Black and white is already crisp; the others get a light sharpening for text and detail.
+        return if (look == ScanLook.BW) cleaned else sharpen(cleaned, 0.6f)
+    }
+
+    /**
+     * How much of a page looks like plain paper (bright and without colour): high for letters
+     * and forms, low for covers, photos and posters, which want their colours brought out instead.
+     */
+    fun paperShare(src: Pixels): Float {
+        // Measured against the paper's brightness nearby, so a shadow over the page doesn't count against it.
+        val small = src.shrunk(400)
+        val lum = small.luminance()
+        val light = paperLight(lum, small.width, small.height)
+        var paper = 0
+        for (i in lum.indices) {
+            val c = small.argb[i]
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+            val chroma = max(r, max(g, b)) - min(r, min(g, b))
+            if (lum[i] >= light[i] * 0.85f && chroma < 40 && light[i] > 90) paper++
+        }
+        return paper.toFloat() / lum.size
+    }
+
+    /**
+     * A colourful page made clear and natural, like a phone camera's own processing: the colour
+     * cast taken out and the darkest and brightest tones stretched to black and white per colour
+     * (a little is let through at each end so highlights don't burn out), then a little more colour.
+     */
+    private fun vivid(src: Pixels): Pixels {
+        val hist = Array(3) { IntArray(256) }
+        for (c in src.argb) {
+            hist[0][(c shr 16) and 0xFF]++
+            hist[1][(c shr 8) and 0xFF]++
+            hist[2][c and 0xFF]++
+        }
+        val n = src.argb.size
+        val lo = IntArray(3)
+        val hi = IntArray(3)
+        for (ch in 0 until 3) {
+            var acc = 0
+            lo[ch] = (0 until 256).first { acc += hist[ch][it]; acc > n * 0.006 }
+            acc = 0
+            hi[ch] = (255 downTo 0).first { acc += hist[ch][it]; acc > n * 0.006 }
+            if (hi[ch] - lo[ch] < 40) {
+                lo[ch] = 0
+                hi[ch] = 255
+            }
+        }
+        val out = IntArray(n)
+        for (i in 0 until n) {
+            val c = src.argb[i]
+            var r = (((c shr 16) and 0xFF) - lo[0]).toFloat() / (hi[0] - lo[0])
+            var g = (((c shr 8) and 0xFF) - lo[1]).toFloat() / (hi[1] - lo[1])
+            var b = ((c and 0xFF) - lo[2]).toFloat() / (hi[2] - lo[2])
+            val m = (r + g + b) / 3f
+            r = m + (r - m) * 1.15f
+            g = m + (g - m) * 1.15f
+            b = m + (b - m) * 1.15f
+            // A gentle S-curve for depth.
+            fun tone(v: Float): Int {
+                val x = v.coerceIn(0f, 1f)
+                return (255 * (x * x * (3 - 2 * x) * 0.35f + x * 0.65f)).roundToInt().coerceIn(0, 255)
+            }
+            out[i] = (0xFF shl 24) or (tone(r) shl 16) or (tone(g) shl 8) or tone(b)
+        }
+        return Pixels(out, src.width, src.height)
+    }
+
+    /** Unsharp masking: each pixel pushed away from the blur around it, so edges and letters stand out. */
+    fun sharpen(src: Pixels, amount: Float): Pixels {
+        val w = src.width
+        val h = src.height
+        val out = IntArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) {
+            var r = 0
+            var g = 0
+            var b = 0
+            for (dy in -1..1) for (dx in -1..1) {
+                val c = src.argb[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)]
+                r += (c shr 16) and 0xFF
+                g += (c shr 8) and 0xFF
+                b += c and 0xFF
+            }
+            val c = src.argb[y * w + x]
+            fun ch(v: Int, blur: Int) = (v + amount * (v - blur / 9f)).roundToInt().coerceIn(0, 255)
+            out[y * w + x] = (0xFF shl 24) or (ch((c shr 16) and 0xFF, r) shl 16) or (ch((c shr 8) and 0xFF, g) shl 8) or ch(c and 0xFF, b)
+        }
+        return Pixels(out, w, h)
+    }
+
+    private fun clean(src: Pixels, look: ScanLook): Pixels {
+        // Covers and photos aren't paper to whiten: bring their colours out instead.
+        if (look == ScanLook.AUTO && paperShare(src) < 0.35f) return vivid(src)
         val w = src.width
         val h = src.height
         val lum = src.luminance()
