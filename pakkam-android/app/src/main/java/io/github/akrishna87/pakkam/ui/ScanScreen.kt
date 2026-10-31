@@ -99,6 +99,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.asImageBitmap
@@ -299,7 +300,7 @@ fun ScanScreen(vm: AppViewModel) {
             vm.task("Making the PDF…", {
                 withContext(Dispatchers.IO) {
                     val tmp = Files.newWorkFile(context)
-                    PdfTools.imagesToPdf(pages.map { p -> { renderPage(context, p, 2200) } }, paper, 0f, tmp)
+                    PdfTools.imagesToPdf(pages.map { p -> { renderPage(context, p, 2600) } }, paper, 0f, tmp)
                     val uri = saveToDownloads(context, tmp, name)
                     tmp.delete()
                     uri
@@ -399,11 +400,17 @@ private fun LiveCamera(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER } }
     val fourThree = remember { ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build() }
+    // The photo itself at the camera's full resolution, for small print.
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
             .setJpegQuality(95)
-            .setResolutionSelector(fourThree)
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                    .build(),
+            )
             .build()
     }
     var camera by remember { mutableStateOf<Camera?>(null) }
@@ -650,7 +657,7 @@ private fun PageStack(page: ScanPage, count: Int, onClick: () -> Unit) {
     }
     Box(Modifier.size(width = 56.dp, height = 72.dp).clickable(onClick = onClick).semantics { contentDescription = "Review $count pages" }) {
         Surface(Modifier.fillMaxSize(), shape = RoundedCornerShape(6.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.White)) {
-            thumb?.let { Image(it.asImageBitmap(), null, contentScale = ContentScale.Crop) }
+            thumb?.let { Image(it.asImageBitmap(), null, contentScale = ContentScale.Crop, filterQuality = FilterQuality.High) }
         }
         Surface(Modifier.align(Alignment.TopEnd).padding(2.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
             Text("$count", Modifier.padding(horizontal = 7.dp, vertical = 1.dp), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
@@ -812,6 +819,8 @@ private fun PageResult(page: ScanPage, modifier: Modifier, thumb: Boolean = fals
                 b.asImageBitmap(),
                 contentDescription = if (thumb) null else "Scanned page",
                 contentScale = ContentScale.Fit,
+                // Smooth scaling to the screen, so small print isn't drawn jagged.
+                filterQuality = FilterQuality.High,
                 modifier = Modifier.fillMaxSize(),
             )
         }

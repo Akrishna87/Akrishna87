@@ -89,7 +89,7 @@ object ScanImage {
         // A hair inside the edges, so no sliver of the table shows along them.
         val cx = q.points.sumOf { it.x.toDouble() }.toFloat() / 4
         val cy = q.points.sumOf { it.y.toDouble() }.toFloat() / 4
-        val p = q.map { Pt((it.x + (cx - it.x) * 0.02f) * (src.width - 1), (it.y + (cy - it.y) * 0.02f) * (src.height - 1)) }
+        val p = q.map { Pt((it.x + (cx - it.x) * 0.006f) * (src.width - 1), (it.y + (cy - it.y) * 0.006f) * (src.height - 1)) }
         val m = homography(
             listOf(Pt(0f, 0f), Pt(w - 1f, 0f), Pt(w - 1f, h - 1f), Pt(0f, h - 1f)),
             p.points,
@@ -161,7 +161,7 @@ object ScanImage {
         if (look == ScanLook.ORIGINAL) return src
         val cleaned = clean(src, look)
         // Black and white is already crisp; the others get a light sharpening for text and detail.
-        return if (look == ScanLook.BW) cleaned else sharpen(cleaned, 0.6f)
+        return if (look == ScanLook.BW) cleaned else sharpen(cleaned, 0.4f)
     }
 
     /**
@@ -296,12 +296,19 @@ object ScanImage {
                     var r = (((c shr 16) and 0xFF) * wr * k).toFloat()
                     var g = (((c shr 8) and 0xFF) * wg * k).toFloat()
                     var b = ((c and 0xFF) * wb * k).toFloat()
-                    // A touch more colour, as ink on paper looks to the eye; mid-tones (photos, stamps) keep theirs.
+                    // Whiten the paper by brightness alone, scaling the three colours together, so pale
+                    // colours (a flag, a logo, a coloured band) keep their hue instead of bleaching out.
+                    val l = (r * 0.299f + g * 0.587f + b * 0.114f).coerceAtLeast(0.002f)
+                    val s = softCurve(l) / l
+                    r *= s
+                    g *= s
+                    b *= s
+                    // And a little richer, as colour on paper looks to the eye.
                     val m = (r + g + b) / 3f
-                    r = m + (r - m) * 1.08f
-                    g = m + (g - m) * 1.08f
-                    b = m + (b - m) * 1.08f
-                    out[i] = (0xFF shl 24) or (soft(r) shl 16) or (soft(g) shl 8) or soft(b)
+                    r = m + (r - m) * 1.25f
+                    g = m + (g - m) * 1.25f
+                    b = m + (b - m) * 1.25f
+                    out[i] = (0xFF shl 24) or (unit(r) shl 16) or (unit(g) shl 8) or unit(b)
                 }
             }
         }
@@ -310,6 +317,14 @@ object ScanImage {
 
     /** Paper at or near full brightness becomes white; darker tones keep their steps. */
     private fun stretch(n: Float): Int = (((n - 0.12f) / (0.86f - 0.12f)) * 255).roundToInt().coerceIn(0, 255)
+
+    private fun unit(v: Float): Int = (v * 255).roundToInt().coerceIn(0, 255)
+
+    /** Brightness (0–1 of the paper's) to how bright it is shown: paper white, ink dark, mid-tones kept. */
+    private fun softCurve(n: Float): Float {
+        val v = ((n - 0.04f) / (0.90f - 0.04f)).coerceIn(0f, 1f)
+        return v * (1.15f - 0.15f * v)
+    }
 
     /** For colour: paper turns white, but ink and pictures keep their depth instead of going harsh. */
     private fun soft(n: Float): Int {
