@@ -122,6 +122,32 @@ class ScannerTest {
         assertTrue(Pixels.lum(auto.argb[y * flat.width + (flat.width * 0.9).toInt()]) > 235)
     }
 
+    @Test fun aColourfulCoverIsBroughtOutNotWhitened() {
+        // A dull, hazy photo of a blue and green cover: low contrast, a purple cast.
+        val w = 200
+        val h = 260
+        val px = IntArray(w * h) { i ->
+            val y = i / w
+            if (y < h / 2) rgb(110, 115, 160) else rgb(90, 130, 95)
+        }
+        val cover = Pixels(px, w, h)
+        assertTrue(ScanImage.paperShare(cover) < 0.35f)
+        val out = ScanImage.enhance(cover, ScanLook.AUTO)
+        val sky = out.argb[10 * w + 10]
+        val grass = out.argb[(h - 10) * w + 10]
+        // The sky stays blue and the grass green, with more contrast than before, not turned white.
+        assertTrue((sky and 0xFF) > ((sky shr 16) and 0xFF) + 30)
+        assertTrue(((grass shr 8) and 0xFF) > ((grass shr 16) and 0xFF) + 30)
+        assertTrue(Pixels.lum(sky) < 235)
+    }
+
+    @Test fun aLetterIsTreatedAsPaper() {
+        assertTrue(ScanImage.paperShare(photo().shrunk(400)) > 0.0f)
+        val q = Quad(corners[0], corners[1], corners[2], corners[3]).map { Pt(it.x / (w - 1), it.y / (h - 1)) }
+        val flat = ScanImage.flatten(photo(), q, 600)
+        assertTrue("share ${ScanImage.paperShare(flat)}", ScanImage.paperShare(flat) > 0.35f)
+    }
+
     @Test fun cornersComeInOrder() {
         val q = Quad.ordered(listOf(Pt(1f, 1f), Pt(0f, 0f), Pt(0f, 1f), Pt(1f, 0f)))
         assertEquals(Pt(0f, 0f), q.tl)

@@ -18,6 +18,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -98,6 +99,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.asImageBitmap
@@ -298,7 +300,7 @@ fun ScanScreen(vm: AppViewModel) {
             vm.task("Making the PDF…", {
                 withContext(Dispatchers.IO) {
                     val tmp = Files.newWorkFile(context)
-                    PdfTools.imagesToPdf(pages.map { p -> { renderPage(context, p, 2200) } }, paper, 0f, tmp)
+                    PdfTools.imagesToPdf(pages.map { p -> { renderPage(context, p, 2600) } }, paper, 0f, tmp)
                     val uri = saveToDownloads(context, tmp, name)
                     tmp.delete()
                     uri
@@ -398,10 +400,17 @@ private fun LiveCamera(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FIT_CENTER } }
     val fourThree = remember { ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build() }
+    // The photo itself at the camera's full resolution, for small print.
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-            .setResolutionSelector(fourThree)
+            .setJpegQuality(95)
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                    .build(),
+            )
             .build()
     }
     var camera by remember { mutableStateOf<Camera?>(null) }
@@ -411,7 +420,12 @@ private fun LiveCamera(
     var frameAspect by remember { mutableStateOf(3f / 4f) }
     var steady by remember { mutableIntStateOf(0) }
     var torch by remember { mutableStateOf(false) }
-    var auto by remember { mutableStateOf(true) }
+    // Auto capture is off until asked for; once it takes a page it waits for the next one.
+    var auto by remember { mutableStateOf(false) }
+    var armed by remember { mutableStateOf(true) }
+    var missing by remember { mutableIntStateOf(0) }
+    var shotAt by remember { mutableStateOf<Pt?>(null) }
+    val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var flash by remember { mutableStateOf(false) }
 
@@ -455,7 +469,17 @@ private fun LiveCamera(
                         frameAspect = aspect
                         val before = live
                         // Steady when the corners hardly move between frames.
-                        steady = if (found != null && before != null && found.points.zip(before.points).all { (a, b) -> abs(a.x - b.x) < 0.02f && abs(a.y - b.y) < 0.02f }) steady + 1 else 0
+                        steady = if (found != null && before != null && found.points.zip(before.points).all { (a, b) -> abs(a.x - b.x) < 0.012f && abs(a.y - b.y) < 0.012f }) steady + 1 else 0
+                        // Ready for another page once the last one is taken away or a different one is framed.
+                        if (found == null) {
+                            missing++
+                            if (missing >= 4) armed = true
+                        } else {
+                            missing = 0
+                            val c = centre(found)
+                            val last = shotAt
+                            if (!armed && last != null && (abs(c.x - last.x) > 0.2f || abs(c.y - last.y) > 0.2f)) armed = true
+                        }
                         live = when {
                             found == null -> null
                             before == null -> found
@@ -480,10 +504,7 @@ private fun LiveCamera(
         Unit
     }
 
-    fun shoot() {
-        if (busy || camera == null) return
-        busy = true
-        flash = true
+    fun takeNowImpl() {
         val file = File(scanDir(context), "page-${System.currentTimeMillis()}.jpg")
         imageCapture.takePicture(
             ImageCapture.OutputFileOptions.Builder(file).build(),
@@ -492,6 +513,8 @@ private fun LiveCamera(
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     busy = false
                     steady = 0
+                    // Back to following the scene's focus for the next page.
+                    camera?.cameraControl?.cancelFocusAndMetering()
                     onPhoto(file)
                 }
 
@@ -502,9 +525,35 @@ private fun LiveCamera(
             },
         )
     }
-    // Taking the page on its own once it has been held steady for a moment.
-    LaunchedEffect(steady, auto) {
-        if (auto && steady >= 6 && !busy) shoot()
+    fun shoot() {
+        val cam = camera ?: return
+        if (busy) return
+        busy = true
+        scope.launch {
+            // Focus on the page first, so the text comes out sharp.
+            try {
+                val q = live
+                val c = if (q != null) centre(q) else Pt(0.5f, 0.5f)
+                val point = previewView.meteringPointFactory.createPoint(c.x * previewView.width, c.y * previewView.height)
+                val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                    .disableAutoCancel()
+                    .build()
+                kotlinx.coroutines.withTimeoutOrNull(2000) { cam.cameraControl.startFocusAndMetering(action).await() }
+            } catch (_: Exception) {
+            }
+            flash = true
+            takeNowImpl()
+        }
+    }
+
+    // Taking the page on its own once it has been held steady for a couple of seconds, once per page.
+    LaunchedEffect(steady, auto, armed) {
+        val q = live
+        if (auto && armed && steady >= 8 && !busy && q != null) {
+            armed = false
+            shotAt = centre(q)
+            shoot()
+        }
     }
     LaunchedEffect(flash) {
         if (flash) {
@@ -565,6 +614,7 @@ private fun LiveCamera(
                     failed -> "The camera isn't available. Choose photos instead."
                     busy -> "Taking the page…"
                     live == null -> "Fit the page in the frame"
+                    auto && !armed -> "Page taken. Turn to the next page"
                     auto -> "Hold steady…"
                     else -> "Page found: tap the button"
                 },
@@ -607,13 +657,15 @@ private fun PageStack(page: ScanPage, count: Int, onClick: () -> Unit) {
     }
     Box(Modifier.size(width = 56.dp, height = 72.dp).clickable(onClick = onClick).semantics { contentDescription = "Review $count pages" }) {
         Surface(Modifier.fillMaxSize(), shape = RoundedCornerShape(6.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.White)) {
-            thumb?.let { Image(it.asImageBitmap(), null, contentScale = ContentScale.Crop) }
+            thumb?.let { Image(it.asImageBitmap(), null, contentScale = ContentScale.Crop, filterQuality = FilterQuality.High) }
         }
         Surface(Modifier.align(Alignment.TopEnd).padding(2.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
             Text("$count", Modifier.padding(horizontal = 7.dp, vertical = 1.dp), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
+
+private fun centre(q: Quad) = Pt(q.points.sumOf { it.x.toDouble() }.toFloat() / 4, q.points.sumOf { it.y.toDouble() }.toFloat() / 4)
 
 /** Finds the page in a camera frame, from its brightness alone, as fractions of the upright frame. */
 private fun findInFrame(image: ImageProxy): Quad? {
@@ -767,6 +819,8 @@ private fun PageResult(page: ScanPage, modifier: Modifier, thumb: Boolean = fals
                 b.asImageBitmap(),
                 contentDescription = if (thumb) null else "Scanned page",
                 contentScale = ContentScale.Fit,
+                // Smooth scaling to the screen, so small print isn't drawn jagged.
+                filterQuality = FilterQuality.High,
                 modifier = Modifier.fillMaxSize(),
             )
         }
