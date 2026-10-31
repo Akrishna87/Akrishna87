@@ -200,12 +200,12 @@ object ScanImage {
                     var r = (((c shr 16) and 0xFF) * wr * k).toFloat()
                     var g = (((c shr 8) and 0xFF) * wg * k).toFloat()
                     var b = ((c and 0xFF) * wb * k).toFloat()
-                    // A little more colour, as ink on paper looks to the eye.
+                    // A touch more colour, as ink on paper looks to the eye; mid-tones (photos, stamps) keep theirs.
                     val m = (r + g + b) / 3f
-                    r = m + (r - m) * 1.25f
-                    g = m + (g - m) * 1.25f
-                    b = m + (b - m) * 1.25f
-                    out[i] = (0xFF shl 24) or (stretch(r) shl 16) or (stretch(g) shl 8) or stretch(b)
+                    r = m + (r - m) * 1.08f
+                    g = m + (g - m) * 1.08f
+                    b = m + (b - m) * 1.08f
+                    out[i] = (0xFF shl 24) or (soft(r) shl 16) or (soft(g) shl 8) or soft(b)
                 }
             }
         }
@@ -214,6 +214,13 @@ object ScanImage {
 
     /** Paper at or near full brightness becomes white; darker tones keep their steps. */
     private fun stretch(n: Float): Int = (((n - 0.12f) / (0.86f - 0.12f)) * 255).roundToInt().coerceIn(0, 255)
+
+    /** For colour: paper turns white, but ink and pictures keep their depth instead of going harsh. */
+    private fun soft(n: Float): Int {
+        val v = ((n - 0.04f) / (0.90f - 0.04f)).coerceIn(0f, 1f)
+        // A gentle curve: lifts the paper to white without crushing darker colours.
+        return (255 * (v * (1.15f - 0.15f * v))).roundToInt().coerceIn(0, 255)
+    }
 
     /**
      * How bright the paper is around each pixel (0–255), so shadows and uneven light can be
