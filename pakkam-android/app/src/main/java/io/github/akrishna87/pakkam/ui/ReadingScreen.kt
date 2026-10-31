@@ -292,6 +292,13 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
     var openMark by remember { mutableStateOf<Int?>(null) }
     var noteFor by remember { mutableStateOf<NoteFor?>(null) }
     var highlightColor by remember { mutableIntStateOf(vm.settings.highlightColor) }
+    // "Keep screen on" (the same setting as in page view) holds here too: a book is read for long stretches.
+    var keepScreenOn by remember { mutableStateOf(vm.settings.keepScreenOn) }
+    val window = (LocalContext.current as? Activity)?.window
+    DisposableEffect(keepScreenOn) {
+        if (keepScreenOn) window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
     // What was just changed, shown for a few seconds with Undo.
     var undoHint by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(undoHint) {
@@ -794,6 +801,11 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             onBack = { leave() },
                             onPageView = { toPageView() },
                             onComment = { toComment() },
+                            keepScreenOn = keepScreenOn,
+                            onKeepScreenOn = {
+                                keepScreenOn = !keepScreenOn
+                                vm.settings.keepScreenOn = keepScreenOn
+                            },
                             onReadAloud = {
                                 val ra = readAloud ?: ReadAloud(context) { p -> pageDone[0](p) }.also { readAloud = it }
                                 if (ra.speaking) {
@@ -988,6 +1000,8 @@ private fun ReadingChrome(
     onBack: () -> Unit,
     onPageView: () -> Unit,
     onComment: () -> Unit,
+    keepScreenOn: Boolean,
+    onKeepScreenOn: () -> Unit,
     onReadAloud: () -> Unit,
     onShare: () -> Unit,
     canUndo: Boolean,
@@ -1028,6 +1042,11 @@ private fun ReadingChrome(
                                 text = { Text("Chapters") },
                                 leadingIcon = { Icon(Icons.Filled.List, null) },
                                 onClick = { menu = false; onContents() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Keep screen on") },
+                                trailingIcon = { androidx.compose.material3.Checkbox(checked = keepScreenOn, onCheckedChange = null) },
+                                onClick = onKeepScreenOn,
                             )
                             DropdownMenuItem(
                                 text = { Text("Page view") },
