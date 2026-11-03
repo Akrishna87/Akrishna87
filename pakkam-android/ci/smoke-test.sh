@@ -54,6 +54,15 @@ wait_for() { # wait_for <dump name> <grep -E pattern> <seconds> <what>
 hide_keyboard() { if adb shell dumpsys input_method | grep -q "mInputShown=true"; then adb shell input keyevent KEYCODE_BACK; sleep 1; fi; }
 crashed() { adb logcat -d | grep -q "FATAL EXCEPTION"; }
 # Screen position of a point given in PDF points on page 1 (612 × 792), from the page's bounds on screen.
+line_xy() { # line_xy <dump name> <a line of Reading mode's text> <how far along it, 0–1>
+  local b
+  b=$(python3 "$HERE/find_text.py" "$OUT/$1.xml" "$2" bounds) || fail "the line '$2' isn't on screen in Reading mode"
+  python3 - $b "$3" <<'PY'
+import sys
+x1, y1, x2, y2 = map(int, sys.argv[1:5])
+print(int(x1 + (x2 - x1) * float(sys.argv[5])), (y1 + y2) // 2)
+PY
+}
 page_xy() { # page_xy <dump name> <x pt> <y pt from the bottom>
   local b
   b=$(python3 "$HERE/find_text.py" "$OUT/$1.xml" "Page 1" bounds) || fail "page 1 isn't on screen"
@@ -76,6 +85,8 @@ adb wait-for-device
 adb install -r "$APK"
 # The document scanner's camera, allowed up front so no permission prompt gets in the way.
 adb shell pm grant io.github.akrishna87.pakkam android.permission.CAMERA || true
+# Android's one-time "Viewing full screen" notice (Reading mode hides the bars) would cover the page.
+adb shell settings put secure immersive_mode_confirmations confirmed || true
 adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c
 
@@ -185,20 +196,23 @@ tap to-reading "Read mode"
 wait_for reading 'Page 1 of [0-9]+' 30 "Reading mode didn't lay out the text"
 shot 06-reading
 grep -q 'Highlight this sentence please' "$OUT/reading.xml" || fail "Reading mode doesn't show the PDF's text"
-# Long-press "test" in the title line for its meaning (found from the emulator's 1080×2400 layout).
-adb shell input swipe 516 196 516 196 900
+# Long-press "test" in the title line for its meaning (each line of the page is labelled for screen readers).
+read -r tx ty < <(line_xy reading "Pakkam smoke test" 0.88)
+adb shell input swipe "$tx" "$ty" "$tx" "$ty" 900
 wait_for reading-define 'trying something to find out about it' 20 "long-pressing a word in Reading mode didn't show its meaning"
 shot 06b-reading-define
 grep -q 'Search the web' "$OUT/reading-define.xml" || fail "the ways to look a word up further are missing"
 adb shell input keyevent KEYCODE_BACK
 sleep 2
 # Hold on "Highlight" in the first line, slide to "sentence", and pick yellow to highlight the words between.
-adb shell input motionevent DOWN 110 270
+read -r hx hy < <(line_xy reading "Highlight this sentence please." 0.12)
+read -r sx sy < <(line_xy reading "Highlight this sentence please." 0.61)
+adb shell input motionevent DOWN "$hx" "$hy"
 sleep 1.5
-adb shell input motionevent MOVE 250 272
-adb shell input motionevent MOVE 400 272
+adb shell input motionevent MOVE $(( (hx + sx) / 2 )) "$sy"
+adb shell input motionevent MOVE "$sx" "$sy"
 sleep 0.5
-adb shell input motionevent UP 400 272
+adb shell input motionevent UP "$sx" "$sy"
 wait_for reading-sel 'content-desc="Yellow"' 15 "choosing several words didn't show the highlight colours"
 shot 06c-reading-select
 tap reading-sel "Yellow"
@@ -214,7 +228,8 @@ sleep 1
 adb shell input tap $((rw / 2)) $((rh / 2))
 sleep 1
 # Hold on "elephant" and add a note to it from the dictionary card.
-adb shell input swipe 240 398 240 398 900
+read -r ex ey < <(line_xy reading "An elephant never forgets." 0.27)
+adb shell input swipe "$ex" "$ey" "$ex" "$ey" 900
 wait_for reading-word 'Add note' 20 "the dictionary card doesn't offer a note"
 tap reading-word "Add note"
 wait_for note-dialog 'Your note' 15 "the note box didn't open"
