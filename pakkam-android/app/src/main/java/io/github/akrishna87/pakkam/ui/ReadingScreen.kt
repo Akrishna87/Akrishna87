@@ -37,6 +37,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -145,6 +148,48 @@ import androidx.compose.runtime.SideEffect
 import kotlin.math.max
 import kotlin.math.min
 
+/** The faces the book is set in: the body text and its headings. */
+class BookFaces(val body: Typeface, val bold: Typeface)
+
+/**
+ * Literata (the typeface Google designed for reading books on screens, SIL Open Font License)
+ * when the build includes it, else the phone's own serif; or the phone's sans-serif.
+ */
+fun bookFaces(context: android.content.Context, serif: Boolean): BookFaces {
+    if (!serif) return BookFaces(Typeface.SANS_SERIF, Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD))
+    val has = try {
+        context.assets.list("fonts")?.contains("literata.ttf") == true
+    } catch (e: Exception) {
+        false
+    }
+    if (has) {
+        try {
+            fun face(weight: Int) = Typeface.Builder(context.assets, "fonts/literata.ttf")
+                .setFontVariationSettings("'wght' $weight, 'opsz' 12")
+                .build()
+            val body = face(400)
+            val bold = face(650)
+            if (body != null && bold != null) return BookFaces(body, bold)
+        } catch (e: Exception) {
+        }
+    }
+    return BookFaces(Typeface.SERIF, Typeface.create(Typeface.SERIF, Typeface.BOLD))
+}
+
+/** Sets text in a given face (headings in the book's bold, rather than a made-up bold). */
+private class FaceSpan(private val face: Typeface) : android.text.style.MetricAffectingSpan() {
+    override fun updateMeasureState(paint: TextPaint) {
+        paint.typeface = face
+    }
+
+    override fun updateDrawState(paint: TextPaint) {
+        paint.typeface = face
+    }
+}
+
+/** Footnote numbers run into the text after punctuation ("…to retire.5"): set small and raised. */
+private val FOOTNOTE = Regex("(?<=[.,;:!?\"”’)\\]])\\d{1,3}(?=\\s|$)")
+
 /** One screenful of the reflowed text: lines [startLine, endLine) of one chunk's layout. */
 data class ReadPage(val chunk: Int, val startLine: Int, val endLine: Int, val startOffset: Int)
 
@@ -197,10 +242,10 @@ class ReadBook(
         private const val CHUNK_SOFT = 12_000
         private const val CHUNK_HARD = 40_000
 
-        fun build(blocks: List<Block>, style: ReadStyle, widthPx: Int, heightPx: Int, density: Float): ReadBook {
+        fun build(blocks: List<Block>, style: ReadStyle, widthPx: Int, heightPx: Int, density: Float, faces: BookFaces): ReadBook {
             val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply {
                 textSize = style.sizeSp * density
-                typeface = if (style.serif) Typeface.SERIF else Typeface.SANS_SERIF
+                typeface = faces.body
                 color = style.theme.text.toInt()
             }
             val indent = (paint.textSize * 1.4f).roundToInt()
@@ -225,9 +270,13 @@ class ReadBook(
                     val start = sb.length
                     blockStarts[i] = base + start
                     sb.append(b.text).append("\n")
+                    for (m in FOOTNOTE.findAll(b.text)) {
+                        sb.setSpan(android.text.style.SuperscriptSpan(), start + m.range.first, start + m.range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        sb.setSpan(RelativeSizeSpan(0.65f), start + m.range.first, start + m.range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
                     if (b.kind == Block.Kind.HEADING) {
                         sb.setSpan(RelativeSizeSpan(1.3f), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        sb.setSpan(StyleSpan(Typeface.BOLD), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        sb.setSpan(FaceSpan(faces.bold), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     } else if (i > 0 && blocks[i - 1].kind == Block.Kind.PARAGRAPH) {
                         // Indent the first line of a paragraph that follows another, as books do.
                         // Fixed ends: a paragraph span would otherwise stretch over everything appended after it.
@@ -239,7 +288,8 @@ class ReadBook(
                     .setLineSpacing(0f, style.spacing)
                     .setIncludePad(false)
                     .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
-                    .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NORMAL)
+                    // Justified lines need words split more often, or the gaps between words grow wide.
+                    .setHyphenationFrequency(if (style.justify) Layout.HYPHENATION_FREQUENCY_FULL else Layout.HYPHENATION_FREQUENCY_NORMAL)
                 if (style.justify) builder.setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD)
                 val layout = builder.build()
                 layouts += layout
@@ -410,12 +460,26 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
         }
     }
 
+    // While reading, the phone's own bars are put away, as in an ebook reader; they come back with the menus.
+    DisposableEffect(chrome, sheet) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        if (chrome || sheet != null) {
+            controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller?.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+    }
+
     val density = LocalDensity.current
     val bg = Color(theme.background)
     val fg = Color(theme.text)
     BoxWithConstraints(Modifier.fillMaxSize().background(bg)) {
-        val topInset = WindowInsets.statusBars.getTop(density)
-        val bottomInset = WindowInsets.navigationBars.getBottom(density)
+        // The bars' room is kept even while they're hidden, so showing the menus doesn't move the text.
+        val topInset = WindowInsets.statusBarsIgnoringVisibility.getTop(density)
+        val bottomInset = WindowInsets.navigationBarsIgnoringVisibility.getBottom(density)
         val marginPx = with(density) { style.marginDp.dp.toPx() }.roundToInt()
         val topPad = topInset + with(density) { 14.dp.toPx() }.roundToInt()
         val bottomPad = bottomInset + with(density) { 30.dp.toPx() }.roundToInt()
@@ -426,7 +490,7 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
         val book by produceState<ReadBook?>(null, list, style.copy(theme = ReadTheme.WHITE, scroll = false), textW, textH) {
             value = null
             if (list != null && list.isNotEmpty()) {
-                value = withContext(Dispatchers.Default) { ReadBook.build(list, style, textW, textH, density.density) }
+                value = withContext(Dispatchers.Default) { ReadBook.build(list, style, textW, textH, density.density, bookFaces(context, style.serif)) }
             }
         }
 
@@ -727,12 +791,25 @@ fun ReadingScreen(vm: AppViewModel, session: DocSession) {
                             }
                         } else {
                             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { i ->
-                                val pageText = remember(b, i) { b.textOf(i).take(3000) }
-                                Canvas(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .semantics { contentDescription = pageText },
-                                ) { drawReadPage(i, topPad.toFloat()) }
+                                Box(Modifier.fillMaxSize()) {
+                                    Canvas(Modifier.fillMaxSize()) { drawReadPage(i, topPad.toFloat()) }
+                                    // Each line as its own piece of text, where it is, for screen readers.
+                                    val p = b.pages[i]
+                                    val l = b.layouts[p.chunk]
+                                    val pageTop = l.getLineTop(p.startLine)
+                                    for (line in p.startLine until p.endLine) {
+                                        val words = l.text.subSequence(l.getLineStart(line), l.getLineEnd(line)).toString().trim()
+                                        if (words.isEmpty()) continue
+                                        with(density) {
+                                            Box(
+                                                Modifier
+                                                    .offset((marginPx + l.getLineLeft(line)).toDp(), (topPad + l.getLineTop(line) - pageTop).toDp())
+                                                    .size((l.getLineRight(line) - l.getLineLeft(line)).toDp(), (l.getLineBottom(line) - l.getLineTop(line)).toDp())
+                                                    .semantics { contentDescription = words },
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                         readAloud?.takeIf { it.speaking && !chrome }?.let { ra ->

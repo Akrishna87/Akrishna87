@@ -96,6 +96,9 @@ Every change is made on a private copy first. The file you opened is only touche
 
 ## Building
 
+Reading mode sets books in [Literata](https://github.com/googlefonts/literata), the typeface Google designed for
+reading on screens (SIL Open Font License); the build fetches it from Google Fonts. Without it the phone's serif is used.
+
 The dictionary is built from [Open English WordNet](https://github.com/globalwordnet/english-wordnet) (© the Open English
 WordNet team, CC BY 4.0) and isn't kept in git. Make it once before building, or the app builds without a dictionary:
 
