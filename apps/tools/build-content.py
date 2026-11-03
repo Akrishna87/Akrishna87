@@ -113,7 +113,7 @@ def changes(app, sha):
         elif re.match(r'^Merge\b', title, re.I):
             title = ''
         title = re.sub(r'\s*\(#\d+\)\s*$', '', title).strip()
-        if not title or re.search(r'^(ci|tests?)\b|smoke test|emulator test|\bci:', title, re.I) or re.match(r'^move into its own repository', title, re.I):
+        if not title or re.search(r'^(ci|tests?)\b|smoke test|emulator test|\bci:|\bprobe\b', title, re.I) or re.match(r'^move into its own repository', title, re.I):
             continue
         if any(i['title'] == title for i in items):
             continue

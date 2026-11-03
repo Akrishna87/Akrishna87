@@ -208,6 +208,45 @@
       "hue": 140
     },
     {
+      "repo": "mail-android",
+      "tagPrefix": "v",
+      "apk": "Mailroom.apk",
+      "group": "Everyday",
+      "name": "Mailroom",
+      "tagline": "A simple email app for Gmail, Yahoo and Outlook. No server and no ads; your passwords stay encrypted on your phone.",
+      "emoji": "✉️",
+      "hue": 215
+    },
+    {
+      "repo": "expiro",
+      "tagPrefix": "v",
+      "group": "Everyday",
+      "name": "Expiro",
+      "tagline": "Track what you have and when it expires, with a reminder before the date.",
+      "emoji": "⏰",
+      "hue": 28
+    },
+    {
+      "repo": "Sievr",
+      "tag": "app-latest",
+      "apk": "Sievr.apk",
+      "group": "Everyday",
+      "name": "Sievr",
+      "tagline": "A free stock screener for Indian markets (NSE and BSE), with ready-made screens, alerts and backtesting.",
+      "emoji": "📈",
+      "hue": 160
+    },
+    {
+      "repo": "offline-dictionary-android",
+      "tag": "latest",
+      "apk": "OfflineDictionary.apk",
+      "group": "Everyday",
+      "name": "Offline Dictionary",
+      "tagline": "An English dictionary that works with no internet, plus a pocket library of classic books.",
+      "emoji": "📖",
+      "hue": 35
+    },
+    {
       "repo": "vaanilai",
       "tag": "weather-latest",
       "apk": "Vaanilai.apk",

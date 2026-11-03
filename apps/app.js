@@ -245,7 +245,7 @@
       if (/^Merge pull request/i.test(title)) title = (lines.slice(1).find(l => l.trim()) || '').trim();
       else if (/^Merge\b/i.test(title)) title = '';
       title = title.replace(/\s*\(#\d+\)\s*$/, '').trim();
-      if (!title || /^(ci|tests?)\b|smoke test|emulator test|\bci:/i.test(title) || /^move into its own repository/i.test(title)) continue;
+      if (!title || /^(ci|tests?)\b|smoke test|emulator test|\bci:|\bprobe\b/i.test(title) || /^move into its own repository/i.test(title)) continue;
       if (items.some(i => i.title === title)) continue;
       items.push({ title: clip(title, 140), date: c.commit.committer.date, url: c.html_url });
       if (items.length === 6) break;

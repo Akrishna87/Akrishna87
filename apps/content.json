@@ -58,7 +58,7 @@
    "Open with My Videos: file managers, Downloads and chat apps can open videos in the player.",
    "Details in a video's ⋮ menu shows its file name, folder, resolution, size and date."
   ],
-  "sha": "8206b77dbbb5be5e403955634162c176ece6e25e",
+  "sha": "e0a8fbcd715773433490882cc4318923272ecceb",
   "changes": [
    {
     "title": "My Videos test: use landscape clips instead of the colour-bar test pattern",
@@ -145,16 +145,16 @@
     "date": "2026-10-19T14:38:28Z"
    },
    {
-    "title": "Probe AIR list (temporary)",
-    "date": "2026-10-19T14:27:27Z"
+    "title": "Search also finds stations by FM frequency",
+    "date": "2026-10-19T14:05:48Z"
    },
    {
-    "title": "Probe radio sources (temporary)",
-    "date": "2026-10-19T14:16:58Z"
+    "title": "Show the player's controls on the lock screen",
+    "date": "2026-10-17T14:06:20Z"
    },
    {
-    "title": "Probe radio sources again (temporary)",
-    "date": "2026-10-19T14:15:26Z"
+    "title": "Wrap the notification provider instead of subclassing it",
+    "date": "2026-10-17T12:46:21Z"
    }
   ]
  },
@@ -212,14 +212,6 @@
     "date": "2026-10-26T00:38:54Z"
    },
    {
-    "title": "Temporary: probe Standard Ebooks markup and Internet Archive texts",
-    "date": "2026-10-25T17:18:39Z"
-   },
-   {
-    "title": "Temporary: probe public-domain catalogs from CI",
-    "date": "2026-10-25T17:15:24Z"
-   },
-   {
     "title": "Reading, audiobook and library features; trust gutenberg.org's new certificate",
     "date": "2026-10-25T14:13:25Z"
    },
@@ -230,6 +222,14 @@
    {
     "title": "Reader: turn into the next chapter like any other page",
     "date": "2026-10-25T13:22:33Z"
+   },
+   {
+    "title": "Reader: keep text selectable with Folio's toolbar; test it on a real paragraph",
+    "date": "2026-10-25T12:49:53Z"
+   },
+   {
+    "title": "Library: reading goals, Want to Read and Finished, sorting and a cover grid",
+    "date": "2026-10-25T12:33:27Z"
    }
   ]
  },
@@ -250,7 +250,7 @@
    "Swipe an article right to mark it read/unread, left to star it.",
    "Pull to refresh; refreshes automatically when opened (if older than 15 minutes)."
   ],
-  "sha": "554782f64c8e771468aa3f9831f2502ab0ee28f6",
+  "sha": "e0a8fbcd715773433490882cc4318923272ecceb",
   "changes": [
    {
     "title": "Android app: background refresh with notifications, home-screen widget, offline images",
@@ -653,31 +653,31 @@
    "Opens password-protected PDFs; \"Open with Pakkam\" from Files, Gmail, WhatsApp…",
    "Share, print, save a copy, document properties"
   ],
-  "sha": "f1f53295885177dfd7a028028f3465f475d3d095",
+  "sha": "ddee51a8cdf581c0b3974fb05756ed57195a94f0",
   "changes": [
    {
-    "title": "Pakkam: a size setting for the highlighter marker",
-    "date": "2026-10-19T15:46:59Z"
+    "title": "Pakkam: Keep screen on works in Reading mode too",
+    "date": "2026-10-31T11:02:06Z"
    },
    {
-    "title": "Pakkam Reading mode: quick actions at the top, with read aloud and share",
-    "date": "2026-10-19T14:42:25Z"
+    "title": "Pakkam scanner: sharper, truer scans of cards and forms",
+    "date": "2026-10-31T06:58:09Z"
    },
    {
-    "title": "Pakkam: undo and redo for highlights, in page view and Reading mode",
-    "date": "2026-10-19T11:22:27Z"
+    "title": "Pakkam scanner: auto colour for covers and photos, sharper pages, stricter edges",
+    "date": "2026-10-31T05:16:13Z"
    },
    {
-    "title": "Pakkam: Back in Reading mode closes the book instead of going to page view",
-    "date": "2026-10-17T11:27:10Z"
+    "title": "Pakkam scanner: one photo per page, focused, with gentler colour",
+    "date": "2026-10-31T04:02:57Z"
    },
    {
-    "title": "Pakkam: highlight colours wherever text is chosen; taps bring the menus back",
-    "date": "2026-10-17T10:51:07Z"
+    "title": "Pakkam: keep a copy of PDFs shared from WhatsApp and other apps",
+    "date": "2026-10-30T17:51:57Z"
    },
    {
-    "title": "Pakkam: pad the pages by the toolbars, so a fitted last page sits between them",
-    "date": "2026-10-17T08:04:11Z"
+    "title": "Pakkam scanner: trim a little more off the page edges",
+    "date": "2026-10-30T17:27:21Z"
    }
   ]
  },
@@ -711,6 +711,167 @@
    {
     "title": "Semippu: a Loans tab with EMI and part payments",
     "date": "2026-10-24T08:54:15Z"
+   }
+  ]
+ },
+ "mail-android": {
+  "about": [
+   "A simple email app for Android that works with Gmail, Yahoo Mail and Outlook / Hotmail. Built for personal use: no server, no ads, and your passwords stay encrypted on your phone."
+  ],
+  "features": [
+   "One Gmail, Yahoo or Outlook account",
+   "Inbox and all other folders, with unread counts",
+   "Read plain and formatted (HTML) email; links open in your browser, scripts are blocked",
+   "Write, reply, reply all and forward",
+   "Delete (moves to Trash)",
+   "Notification for new mail, checked about every 15 minutes"
+  ],
+  "sha": null,
+  "changes": [
+   {
+    "title": "Gmail-style notifications per email; select several emails",
+    "date": "2026-11-01T12:06:00Z"
+   },
+   {
+    "title": "Gmail-style search",
+    "date": "2026-11-01T07:30:33Z"
+   },
+   {
+    "title": "Background sync setting with push, like Thunderbird",
+    "date": "2026-11-01T06:23:18Z"
+   },
+   {
+    "title": "Open the new email when its notification is tapped",
+    "date": "2026-11-01T03:07:26Z"
+   },
+   {
+    "title": "Gmail-style interface: search bar, swipe with Undo, stars, new reader and compose",
+    "date": "2026-10-31T17:49:48Z"
+   },
+   {
+    "title": "Narrow wide emails to the screen instead of zooming out",
+    "date": "2026-10-31T17:38:57Z"
+   }
+  ]
+ },
+ "expiro": {
+  "about": [
+   "A simple Android app to track what you have and when it expires.",
+   "Requires Android 8.0 (API 26) or newer."
+  ],
+  "features": [],
+  "sha": "0cab1b35d6c15657aaae20e11bc87c5e2f650f2e",
+  "changes": [
+   {
+    "title": "Read expiry date from the pack with the camera; read GS1 barcodes",
+    "date": "2026-11-02T19:08:35Z"
+   },
+   {
+    "title": "Add in-app help guide",
+    "date": "2026-11-02T18:34:37Z"
+   },
+   {
+    "title": "Fix editor save button hidden behind the system navigation bar",
+    "date": "2026-11-02T18:29:36Z"
+   },
+   {
+    "title": "Publish a signed release automatically on every push to main",
+    "date": "2026-11-02T18:28:26Z"
+   },
+   {
+    "title": "Add home-screen widget and barcode scan",
+    "date": "2026-11-02T18:15:52Z"
+   },
+   {
+    "title": "Add backup/restore (JSON) and item photos",
+    "date": "2026-11-02T18:12:43Z"
+   }
+  ]
+ },
+ "Sievr": {
+  "about": [
+   "A free stock screener for Indian markets (NSE and BSE), for Android. No account, no paywall: the features other screeners charge for are calculated on the phone from one end-of-day data file that's rebuilt every weekday evening."
+  ],
+  "features": [
+   "120+ metrics: valuation, profitability, growth, financial health, cash flow, dividends, ownership, analyst targets, technicals and 17 candlestick…",
+   "39 ready-made screens: Magic Formula, Graham's defensive investor, Coffee Can, Piotroski 8+, Lynch GARP, Buffett-style moats, golden cross, 52-week…",
+   "Plain-English screens, worked out offline: \"profitable small caps with low debt, ROE above 20 and rising margins in pharma\"",
+   "Custom formulas: PE 20 AND Price > SMA200",
+   "Sector, industry, index (Nifty 50/100/500, Midcap 150, Smallcap 250…) and pattern filters",
+   "Sortable results with your own columns; CSV export",
+   "Screen alerts: a notification when stocks enter or leave a saved screen",
+   "Backtesting: replay any screen over 1–5 years with weekly, monthly or quarterly rebalancing against the Nifty 50, with CAGR, drawdown, volatility,…",
+   "Stock pages with interactive price charts (1M to 5Y, with 50/200-day averages), five factor scores (quality, value, growth, momentum, safety), an…",
+   "Fair value: interactive DCF, reverse DCF (\"what growth is priced in\"), Graham number, Graham growth formula, Lynch value, analyst targets"
+  ],
+  "sha": "f6acde800ce89c1e6762fa0c73798025adfd18e8",
+  "changes": [
+   {
+    "title": "Fix truncated and all-caps company names",
+    "date": "2026-11-01T12:00:07Z"
+   },
+   {
+    "title": "Tell people when a new build of the app is ready",
+    "date": "2026-11-01T07:16:52Z"
+   },
+   {
+    "title": "Add BSE: BSE-only companies, BSE codes, Sensex and BSE 500",
+    "date": "2026-11-01T06:44:26Z"
+   },
+   {
+    "title": "Friends-and-family distribution: drop Play Store listing, policy and AAB",
+    "date": "2026-10-31T17:41:49Z"
+   },
+   {
+    "title": "Shareholding from NSE filings; Play Store listing, privacy policy and AAB",
+    "date": "2026-10-31T17:27:36Z"
+   },
+   {
+    "title": "Point the app and README at the renamed Sievr repo",
+    "date": "2026-10-31T16:56:22Z"
+   }
+  ]
+ },
+ "offline-dictionary-android": {
+  "about": [
+   "An English dictionary that works with no internet at all. The app has no permissions, not even network. The whole dictionary (about 200,000 words) is built into the app, and it merges several open dictionaries so you get more than one view of each word."
+  ],
+  "features": [
+   "Instant search-as-you-type, common words first.",
+   "Finds the base word for inflections: abetted, abhorred, running, cities.",
+   "\"Did you mean…\" suggestions for misspelled words.",
+   "Word of the day, a random word button, and recent searches.",
+   "A pocket library of about 50 classic books to read offline (Austen, Dickens, Shakespeare, Sherlock Holmes, Alice, Dracula, Frankenstein, Moby Dick,…",
+   "The Library tab also keeps your own word collection: keep words on shelves you name (\"Exam words\", \"Book club\"…), add a private note to any word,…",
+   "Save words with the star; share a definition; hear a word read aloud with the phone's own text-to-speech voice.",
+   "Synonyms and antonyms under every definition, plus a Thesaurus tab: all synonyms and antonyms of the word, then each sense's similar, broader and…",
+   "Select a word in any app and choose Define from the text menu."
+  ],
+  "sha": "60b8439c5429d38d772b4ec12e1c54b97c803c16",
+  "changes": [
+   {
+    "title": "Books: skip front matter so the reader opens on Chapter 1; ignore __pycache__",
+    "date": "2026-10-29T18:16:18Z"
+   },
+   {
+    "title": "Fix setReader JVM signature clash",
+    "date": "2026-10-29T17:58:06Z"
+   },
+   {
+    "title": "Pocket library: ~50 offline public-domain books with a reader and tap-to-define",
+    "date": "2026-10-29T17:53:29Z"
+   },
+   {
+    "title": "Add the Library tab: shelves, notes, browse A-Z and flashcard review",
+    "date": "2026-10-29T15:58:11Z"
+   },
+   {
+    "title": "Add antonyms and a Thesaurus tab (similar, broader, narrower terms) from WordNet",
+    "date": "2026-10-29T15:48:56Z"
+   },
+   {
+    "title": "Offline English dictionary app: merged WordNet, Webster's 1913 and CMUdict",
+    "date": "2026-10-29T14:27:34Z"
    }
   ]
  },
