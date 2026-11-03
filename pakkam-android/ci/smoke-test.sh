@@ -85,6 +85,8 @@ adb wait-for-device
 adb install -r "$APK"
 # The document scanner's camera, allowed up front so no permission prompt gets in the way.
 adb shell pm grant io.github.akrishna87.pakkam android.permission.CAMERA || true
+# Android's one-time "Viewing full screen" notice (Reading mode hides the bars) would cover the page.
+adb shell settings put secure immersive_mode_confirmations confirmed || true
 adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c
 
