@@ -25,6 +25,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.BrandingWatermark
 import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Compress
@@ -112,6 +116,13 @@ fun HomeScreen(vm: AppViewModel) {
     )
 
     var starredOnly by rememberSaveable { mutableStateOf(false) }
+    // Finding a document by its name, typed or spoken.
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var find by rememberSaveable { mutableStateOf("") }
+    val listen = rememberVoiceInput("Say the document's name") { heard ->
+        searching = true
+        find = heard
+    }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -134,7 +145,11 @@ fun HomeScreen(vm: AppViewModel) {
             )
         },
     ) { pad ->
-        val shown = vm.recents.filter { !starredOnly || it.starred }
+        val words = find.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val shown = vm.recents.filter { f ->
+            val name = f.name.lowercase()
+            (!starredOnly || f.starred) && (!searching || words.all { name.contains(it) })
+        }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = pad) {
             item {
                 Text("Tools", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp))
@@ -150,15 +165,36 @@ fun HomeScreen(vm: AppViewModel) {
             item {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Recent", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    IconButton(onClick = {
+                        searching = !searching
+                        if (!searching) find = ""
+                    }) { Icon(if (searching) Icons.Filled.Close else Icons.Filled.Search, if (searching) "Close search" else "Search documents") }
                     FilterChip(selected = !starredOnly, onClick = { starredOnly = false }, label = { Text("All") })
                     Spacer(Modifier.width(8.dp))
                     FilterChip(selected = starredOnly, onClick = { starredOnly = true }, label = { Text("Starred") })
                 }
             }
+            if (searching) {
+                item {
+                    OutlinedTextField(
+                        value = find,
+                        onValueChange = { find = it },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        placeholder = { Text("Document name") },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Filled.Search, null) },
+                        trailingIcon = if (listen != null) {
+                        { IconButton(onClick = listen) { Icon(Icons.Filled.Mic, "Search by voice") } }
+                    } else {
+                        null
+                    },
+                    )
+                }
+            }
             if (shown.isEmpty()) {
                 item {
                     Text(
-                        if (starredOnly) "Star a file from its menu to keep it here." else "PDFs you open will be listed here.\nOpen one with the button below, or choose “Open with Pakkam” in Files, Gmail or WhatsApp.",
+                        if (searching) "No document called “${find.trim()}” in Recent. Open it with the button below." else if (starredOnly) "Star a file from its menu to keep it here." else "PDFs you open will be listed here.\nOpen one with the button below, or choose “Open with Pakkam” in Files, Gmail or WhatsApp.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,

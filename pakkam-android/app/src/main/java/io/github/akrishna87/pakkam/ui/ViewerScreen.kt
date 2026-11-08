@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -655,6 +656,11 @@ private fun Tool.hint() = when (this) {
 @Composable
 private fun SearchBar(vs: ViewerState) {
     val focus = remember { FocusRequester() }
+    // Say the words to find instead of typing them.
+    val listen = rememberVoiceInput("Say what to find") { heard ->
+        vs.query = heard
+        vs.search(heard)
+    }
     LaunchedEffect(Unit) { focus.requestFocus() }
     Surface(tonalElevation = 3.dp, shadowElevation = 4.dp) {
         Column(Modifier.fillMaxWidth().statusBarsPadding()) {
@@ -669,6 +675,11 @@ private fun SearchBar(vs: ViewerState) {
                     colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { vs.search(vs.query) }),
+                    trailingIcon = if (listen != null) {
+                        { IconButton(onClick = listen) { Icon(Icons.Filled.Mic, "Search by voice") } }
+                    } else {
+                        null
+                    },
                 )
                 val label = when {
                     vs.searchedFor.isEmpty() -> ""
