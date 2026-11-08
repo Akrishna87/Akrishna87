@@ -318,8 +318,20 @@ fun AppleTextField(
 
 /** Rounded search field ("Search") like UISearchBar. */
 @Composable
-fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: String = "Search", modifier: Modifier = Modifier) {
+fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String = "Search",
+    modifier: Modifier = Modifier,
+    /** Show a microphone that fills the field from speech (uses the phone's own speech recognizer). */
+    voice: Boolean = false,
+) {
     val apple = LocalApple.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val speech = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        val spoken = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (result.resultCode == android.app.Activity.RESULT_OK && !spoken.isNullOrBlank()) onValueChange(spoken.trim())
+    }
     Row(
         modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(10.dp)).background(apple.fill).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -329,6 +341,21 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: Str
         AppleTextField(value, onValueChange, placeholder, Modifier.weight(1f), style = AppleType.body)
         if (value.isNotEmpty()) {
             Icon(AppIcons.Close, "Clear", tint = apple.secondaryLabel, modifier = Modifier.size(16.dp).clickable { onValueChange("") })
+        } else if (voice) {
+            Icon(
+                AppIcons.Mic, "Search by voice", tint = apple.tint,
+                modifier = Modifier.size(24.dp).clip(RoundedCornerShape(12.dp)).clickable {
+                    val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, placeholder)
+                    }
+                    try {
+                        speech.launch(intent)
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        android.widget.Toast.makeText(context, "No speech recognizer on this phone", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }.padding(2.dp),
+            )
         }
     }
 }

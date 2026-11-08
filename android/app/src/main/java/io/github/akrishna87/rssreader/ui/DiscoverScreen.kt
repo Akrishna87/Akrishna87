@@ -141,7 +141,7 @@ fun DiscoverScreen(
         grouped = false,
         belowTitle = {
             item(key = "search") {
-                SearchField(query, { query = it }, "Search topics, sites or paste a feed link", Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                SearchField(query, { query = it }, "Search topics, sites or paste a feed link", Modifier.padding(horizontal = 16.dp, vertical = 4.dp), voice = true)
             }
         },
     ) {
