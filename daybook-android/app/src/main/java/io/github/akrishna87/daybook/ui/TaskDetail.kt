@@ -26,7 +26,9 @@ import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Label
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SubdirectoryArrowRight
 import androidx.compose.material3.DropdownMenu
@@ -99,6 +101,8 @@ fun TaskDetailPage(id: String, data: Data) {
     var pickingDate by remember { mutableStateOf(false) }
     var pickingTime by remember { mutableStateOf(false) }
     var repeatMenu by remember { mutableStateOf(false) }
+    var pickingStart by remember { mutableStateOf(false) }
+    var pickingEnd by remember { mutableStateOf(false) }
     var priorityMenu by remember { mutableStateOf(false) }
     var projectMenu by remember { mutableStateOf(false) }
     var labelsDialog by remember { mutableStateOf(false) }
@@ -196,13 +200,33 @@ fun TaskDetailPage(id: String, data: Data) {
                     onClick = { pickingTime = true },
                     onClear = if (task.time != null) ({ update { it.copy(time = null) } }) else null,
                 )
+                val seriesLabel = task.due?.let { Dates.seriesLabel(task, it) }
                 DetailRow(
                     Icons.Rounded.Repeat,
-                    task.repeat.label,
+                    task.repeat.label + (seriesLabel?.let { " · now on ${it.lowercase()}" } ?: ""),
                     if (task.repeat != Repeat.NONE) MaterialTheme.colorScheme.onSurface else muted,
                     onClick = { repeatMenu = true },
                 ) {
                     RepeatMenu(repeatMenu, task.repeat, { repeatMenu = false }) { r -> update { it.copy(repeat = r) } }
+                }
+                if (task.repeat != Repeat.NONE) {
+                    // When the series starts and ends.
+                    val start = Dates.seriesStart(task)
+                    DetailRow(
+                        Icons.Rounded.PlayArrow,
+                        "Starts " + (start?.let { Dates.dayLabel(it, clock.today) } ?: "today"),
+                        MaterialTheme.colorScheme.onSurface,
+                        onClick = { pickingStart = true },
+                    )
+                    val end = task.repeatEnd
+                    val total = Dates.occurrenceCount(task)
+                    DetailRow(
+                        Icons.Rounded.Stop,
+                        if (end == null) "Ends: never" else "Ends ${Dates.dayLabel(end, clock.today)}" + (total?.let { " · $it times in all" } ?: ""),
+                        if (end == null) muted else MaterialTheme.colorScheme.onSurface,
+                        onClick = { pickingEnd = true },
+                        onClear = if (end != null) ({ update { it.copy(repeatEnd = null) } }) else null,
+                    )
                 }
                 if (task.time != null) {
                     Row(
@@ -259,7 +283,8 @@ fun TaskDetailPage(id: String, data: Data) {
                 }
             }
             Text(
-                "Added ${Dates.shortDate(task.createdAt, clock.today)}" + if (task.done) " · Completed ${Dates.shortDate(task.doneAt, clock.today)}" else "",
+                (if (task.occurrenceLabel.isNotEmpty()) "${task.occurrenceLabel} · " else "") +
+                    "Added ${Dates.shortDate(task.createdAt, clock.today)}" + if (task.done) " · Completed ${Dates.shortDate(task.doneAt, clock.today)}" else "",
                 Modifier.padding(20.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
@@ -267,6 +292,22 @@ fun TaskDetailPage(id: String, data: Data) {
         }
     }
 
+    if (pickingStart) {
+        DatePickDialog(Dates.seriesStart(task), onPick = { d ->
+            update { t ->
+                // The task moves to the first date of the series that's still to come.
+                val series = t.copy(due = d, repeatStart = d)
+                val next = Dates.occurrences(series, maxOf(d, clock.today), maxOf(d, clock.today).plusYears(2)).firstOrNull() ?: d
+                val end = t.repeatEnd?.let { maxOf(it, d) }
+                t.copy(repeatStart = d, due = next, repeatEnd = end)
+            }
+        }, onDismiss = { pickingStart = false })
+    }
+    if (pickingEnd) {
+        DatePickDialog(task.repeatEnd ?: task.due?.plusMonths(1), onPick = { d ->
+            update { t -> t.copy(repeatEnd = maxOf(d, Dates.seriesStart(t) ?: d)) }
+        }, onDismiss = { pickingEnd = false })
+    }
     if (pickingDate) DatePickDialog(task.due, onPick = { d -> update { it.copy(due = d) } }, onDismiss = { pickingDate = false })
     if (pickingTime) {
         TimePickDialog(task.time ?: defaultTime(task.due, clock.now), clock.is24Hour, onPick = { t -> update { it.copy(time = t) } }, onDismiss = { pickingTime = false })

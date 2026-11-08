@@ -133,3 +133,36 @@ class RepeatCalendarTest {
         assertEquals(setOf(today.plusDays(1), today.plusDays(2)), cal.keys)
     }
 }
+
+class SeriesTest {
+    private val today = LocalDate.of(2026, 10, 3)
+
+    @Test
+    fun countsAndLabels() {
+        val weekly = Task(title = "Bins", due = today.plusWeeks(1), repeat = Repeat.WEEKLY, repeatStart = today, repeatEnd = today.plusWeeks(5))
+        assertEquals("Week 2 of 6", Dates.seriesLabel(weekly, weekly.due!!))
+        assertEquals("Week 6 of 6", Dates.seriesLabel(weekly, today.plusWeeks(5)))
+        assertNull(Dates.seriesLabel(weekly, today.plusDays(3)))
+        assertEquals(6, Dates.occurrenceCount(weekly))
+        val daily = Task(title = "Stretch", due = today, repeat = Repeat.DAILY)
+        assertEquals("Day 1", Dates.seriesLabel(daily, today))
+        assertEquals("Day 3", Dates.seriesLabel(daily, today.plusDays(2)))
+        assertEquals("Month 2", Dates.seriesLabel(Task(title = "Rent", due = today, repeat = Repeat.MONTHLY, repeatStart = today.minusMonths(1)), today))
+    }
+
+    @Test
+    fun theSeriesStopsAtItsEndDate() {
+        val weekly = Task(title = "Bins", due = today, repeat = Repeat.WEEKLY, repeatStart = today, repeatEnd = today.plusWeeks(1))
+        assertEquals(today.plusWeeks(1), Dates.nextOccurrence(weekly, today))
+        assertNull(Dates.nextOccurrence(weekly.copy(due = today.plusWeeks(1)), today))
+        assertEquals(listOf(today, today.plusWeeks(1)), Dates.occurrences(weekly, today, today.plusWeeks(10)))
+    }
+
+    @Test
+    fun monthlyRepeatsKeepTheirDayAfterShortMonths() {
+        val rent = Task(title = "Rent", due = LocalDate.of(2026, 2, 28), repeat = Repeat.MONTHLY, repeatStart = LocalDate.of(2026, 1, 31))
+        assertEquals(LocalDate.of(2026, 3, 31), Dates.nextOccurrence(rent, LocalDate.of(2026, 2, 28)))
+        val cal = Dates.calendar(listOf(rent), LocalDate.of(2026, 2, 1), LocalDate.of(2026, 5, 1), LocalDate.of(2026, 2, 1))
+        assertEquals(setOf(LocalDate.of(2026, 2, 28), LocalDate.of(2026, 3, 31), LocalDate.of(2026, 4, 30)), cal.keys)
+    }
+}

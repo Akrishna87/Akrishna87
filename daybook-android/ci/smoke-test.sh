@@ -126,7 +126,13 @@ wait_for upcoming 'text="Call dentist"' 10 "tomorrow's task isn't in the Upcomin
 [ "$(grep -o 'text="Stretch"' "$OUT/upcoming.xml" | wc -l)" -ge 3 ] || fail "the daily task doesn't show on each day of the list"
 shot 4-upcoming-list
 echo "PASS: repeating tasks show on every day they repeat"
-tap upcoming "Call dentist"
+grep -q 'text="Day 2"' "$OUT/upcoming.xml" || fail "the repeating task doesn't count its days"
+tap upcoming "Complete Stretch"
+sleep 1
+dump stretch-done
+grep -q 'text="Day 1 done. Next: [^"]*"' "$OUT/stretch-done.xml" || fail "completing a repeat didn't say which one it was"
+echo "PASS: completing a repeat moves it on"
+tap stretch-done "Call dentist"
 wait_for detail 'content-desc="Task options"' 10 "the task didn't open"
 grep -q 'text="Remind me at the due time"' "$OUT/detail.xml" || fail "the 9am task has no reminder switch"
 shot 5-task-detail
@@ -163,7 +169,14 @@ wait_for project-task 'text="Write report"' 10 "the task didn't go into the proj
 shot 7-project
 adb shell input keyevent KEYCODE_BACK
 sleep 1
-echo "PASS: projects"
+dump browse-again
+tap browse-again "Completed"
+wait_for completed-list 'text="Stretch"' 10 "the completed repeat isn't in Completed"
+grep -q 'text="Day 1"' "$OUT/completed-list.xml" || fail "the completed repeat doesn't say it was day 1"
+shot 7b-completed
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+echo "PASS: projects, and completed repeats are kept"
 
 echo "--- Notes"
 dump before-notes

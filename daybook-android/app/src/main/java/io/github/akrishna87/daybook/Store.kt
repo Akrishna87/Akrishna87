@@ -11,6 +11,7 @@ import io.github.akrishna87.daybook.model.Project
 import io.github.akrishna87.daybook.model.Repeat
 import io.github.akrishna87.daybook.model.Settings
 import io.github.akrishna87.daybook.model.Task
+import io.github.akrishna87.daybook.model.newId
 import io.github.akrishna87.daybook.widget.TodayWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,10 +71,21 @@ object Store {
 
     // Tasks
 
-    fun saveTask(t: Task) = update { d ->
+    fun saveTask(task: Task) = update { d ->
+        val t = normalise(task)
         val i = d.tasks.indexOfFirst { it.id == t.id }
         d.copy(tasks = if (i < 0) d.tasks + t else d.tasks.toMutableList().also { it[i] = t })
     }
+
+    /** A repeating task remembers its first date; a task that stops repeating forgets its start and end. */
+    private fun normalise(t: Task): Task = when {
+        t.repeat == Repeat.NONE || t.due == null -> if (t.repeatStart == null && t.repeatEnd == null) t else t.copy(repeatStart = null, repeatEnd = null)
+        t.repeatStart == null || t.repeatStart.isAfter(t.due) -> t.copy(repeatStart = t.due)
+        else -> t
+    }
+
+    /** What completing a task did, so it can be undone. */
+    data class Completion(val next: LocalDate?, val recordId: String?, val finished: Boolean)
 
     /** Puts tasks back exactly as they were (for Undo), adding any that were deleted. */
     fun restoreTasks(tasks: List<Task>) = update { d ->
@@ -89,21 +101,44 @@ object Store {
      * Completes a task and its subtasks. A repeating task with a date moves to its next date
      * instead, and that date is returned.
      */
-    fun completeTask(id: String, today: LocalDate = LocalDate.now()): LocalDate? {
-        var nextDate: LocalDate? = null
+    fun completeTask(id: String, today: LocalDate = LocalDate.now()): Completion {
+        var result = Completion(null, null, false)
         update { d ->
-            val t = d.task(id) ?: return@update d
+            val t = d.task(id)?.let(::normalise) ?: return@update d
             val now = System.currentTimeMillis()
             val due = t.due
             if (t.repeat != Repeat.NONE && due != null) {
-                val next = Dates.nextDue(due, t.repeat, today)
-                nextDate = next
-                d.copy(tasks = d.tasks.map { if (it.id == id) it.copy(due = next) else it })
+                val label = Dates.seriesLabel(t, due).orEmpty()
+                val next = Dates.nextOccurrence(t, today)
+                if (next == null) {
+                    // That was the last one before the end date: the whole series is done.
+                    result = Completion(null, null, true)
+                    d.copy(tasks = d.tasks.map {
+                        if (it.id == id) it.copy(done = true, doneAt = now, occurrenceLabel = label)
+                        else if (it.parentId == id && !it.done) it.copy(done = true, doneAt = now)
+                        else it
+                    })
+                } else {
+                    // Keep a record of this one in Completed, and move the task to its next date.
+                    val record = t.copy(
+                        id = newId(), repeat = Repeat.NONE, repeatStart = null, repeatEnd = null, reminder = false,
+                        parentId = null, done = true, doneAt = now, createdAt = now, occurrenceLabel = label,
+                    )
+                    result = Completion(next, record.id, false)
+                    d.copy(tasks = d.tasks.map { if (it.id == id) t.copy(due = next) else it } + record)
+                }
             } else {
                 d.copy(tasks = d.tasks.map { if (it.id == id || (it.parentId == id && !it.done)) it.copy(done = true, doneAt = now) else it })
             }
         }
-        return nextDate
+        return result
+    }
+
+    /** Undoes [completeTask]: puts the tasks back and drops the completed record it made. */
+    fun undoComplete(before: List<Task>, c: Completion) = update { d ->
+        val byId = before.associateBy { it.id }
+        val kept = d.tasks.filter { it.id != c.recordId }.map { byId[it.id] ?: it }
+        d.copy(tasks = kept + before.filter { t -> kept.none { it.id == t.id } })
     }
 
     fun uncompleteTask(id: String) = update { d ->

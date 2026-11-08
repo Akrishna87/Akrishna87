@@ -65,6 +65,12 @@ data class Task(
     /** Only meaningful with a [due] date. */
     val time: LocalTime? = null,
     val repeat: Repeat = Repeat.NONE,
+    /** For a repeating task: the first date of the series, which the "Week 2" count starts from. */
+    val repeatStart: LocalDate? = null,
+    /** For a repeating task: the last date it can fall on. Null repeats for ever. */
+    val repeatEnd: LocalDate? = null,
+    /** On the completed record of one repeat: which one it was, like "Week 2 of 6". */
+    val occurrenceLabel: String = "",
     /** Notify at the due time (only for tasks with a time). */
     val reminder: Boolean = true,
     /** Set on subtasks: the task they belong to. */
@@ -85,6 +91,9 @@ data class Task(
         .put("due", due?.toString() ?: "")
         .put("time", time?.toString() ?: "")
         .put("repeat", repeat.name)
+        .put("repeatStart", repeatStart?.toString() ?: "")
+        .put("repeatEnd", repeatEnd?.toString() ?: "")
+        .put("occurrenceLabel", occurrenceLabel)
         .put("reminder", reminder)
         .put("parentId", parentId ?: "")
         .put("noteId", noteId ?: "")
@@ -103,6 +112,9 @@ data class Task(
             due = o.optString("due").takeIf { it.isNotEmpty() }?.let(LocalDate::parse),
             time = o.optString("time").takeIf { it.isNotEmpty() }?.let(LocalTime::parse),
             repeat = runCatching { Repeat.valueOf(o.optString("repeat")) }.getOrDefault(Repeat.NONE),
+            repeatStart = o.optString("repeatStart").takeIf { it.isNotEmpty() }?.let(LocalDate::parse),
+            repeatEnd = o.optString("repeatEnd").takeIf { it.isNotEmpty() }?.let(LocalDate::parse),
+            occurrenceLabel = o.optString("occurrenceLabel"),
             reminder = o.optBoolean("reminder", true),
             parentId = o.optString("parentId").ifEmpty { null },
             noteId = o.optString("noteId").ifEmpty { null },

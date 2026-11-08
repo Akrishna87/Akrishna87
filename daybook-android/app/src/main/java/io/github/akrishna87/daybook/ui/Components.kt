@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Description
@@ -162,8 +163,11 @@ fun TaskRow(
                     else -> Dates.dueLabel(shown, clock.today, clock.is24Hour)
                 }
                 val repeats = showDue && task.due != null && task.repeat != Repeat.NONE
+                // "Week 2 of 6" on a repeating task, or on the completed record of one repeat.
+                val series = task.occurrenceLabel.ifEmpty { null }
+                    ?: if (repeats) Dates.seriesLabel(task, shown.due ?: clock.today) else null
                 val project = data.project(task.projectId).takeIf { showProject && (task.projectId != INBOX_ID || task.parentId == null) }
-                val hasMeta = due != null || repeats || subs.isNotEmpty() || task.labels.isNotEmpty() || task.noteId != null || task.parentId != null ||
+                val hasMeta = due != null || repeats || series != null || subs.isNotEmpty() || task.labels.isNotEmpty() || task.noteId != null || task.parentId != null ||
                     (showProject && task.projectId != INBOX_ID)
                 if (hasMeta) {
                     FlowRow(
@@ -174,6 +178,17 @@ fun TaskRow(
                         val c = toneColor(Dates.tone(shown, clock.now))
                         if (due != null) Meta(Icons.Rounded.CalendarToday, due, c)
                         if (repeats) Icon(Icons.Rounded.Repeat, task.repeat.label, Modifier.size(14.dp).align(Alignment.CenterVertically), tint = c)
+                        if (series != null) {
+                            Text(
+                                series,
+                                Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
                         if (subs.isNotEmpty()) Meta(Icons.Rounded.SubdirectoryArrowRight, "${subs.count { it.done }}/${subs.size}", muted)
                         if (task.noteId != null) {
                             Icon(Icons.Rounded.Description, "Linked note", Modifier.size(14.dp).align(Alignment.CenterVertically), tint = muted)

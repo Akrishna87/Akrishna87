@@ -94,6 +94,56 @@ object Dates {
         return next
     }
 
+    /**
+     * The date a repeating task moves to once its current date is done, or null when that was
+     * the last one before its end date. Monthly and yearly repeats count from the series' first
+     * date, so a task on the 31st stays on the last day of shorter months.
+     */
+    fun nextOccurrence(task: Task, today: LocalDate): LocalDate? {
+        val due = task.due ?: return null
+        if (task.repeat == Repeat.NONE) return null
+        val start = seriesStart(task) ?: due
+        val after = maxOf(due.plusDays(1), today)
+        // The first occurrence on or after both the day after the current one, and today.
+        val next = occurrences(task.copy(due = start, repeatEnd = null, done = false), after, after.plusYears(2).plusDays(2)).firstOrNull()
+            ?: return null
+        val end = task.repeatEnd
+        return if (end != null && next.isAfter(end)) null else next
+    }
+
+    /** The first date of a repeating task's series. */
+    fun seriesStart(task: Task): LocalDate? = if (task.repeat == Repeat.NONE) null else task.repeatStart ?: task.due
+
+    /** Which repeat [day] is, counting the series' first date as 1. Null if it isn't one. */
+    fun occurrenceNumber(task: Task, day: LocalDate): Int? {
+        val start = seriesStart(task) ?: return null
+        if (day.isBefore(start)) return null
+        val all = occurrences(task.copy(due = start, repeatEnd = null, done = false), start, day.plusDays(1))
+        return if (all.lastOrNull() == day) all.size else null
+    }
+
+    /** How many times the series repeats in all, or null if it has no end date. */
+    fun occurrenceCount(task: Task): Int? {
+        val start = seriesStart(task) ?: return null
+        val end = task.repeatEnd ?: return null
+        if (end.isBefore(start)) return 0
+        return occurrences(task.copy(due = start, repeatEnd = null, done = false), start, end.plusDays(1)).size
+    }
+
+    /** "Day 3", "Week 2 of 6", "Month 4"… for a repeating task on [day]; null if it isn't one of its days. */
+    fun seriesLabel(task: Task, day: LocalDate): String? {
+        val n = occurrenceNumber(task, day) ?: return null
+        val unit = when (task.repeat) {
+            Repeat.DAILY, Repeat.WEEKDAYS -> "Day"
+            Repeat.WEEKLY -> "Week"
+            Repeat.MONTHLY -> "Month"
+            Repeat.YEARLY -> "Year"
+            Repeat.NONE -> return null
+        }
+        val total = occurrenceCount(task)
+        return if (total != null) "$unit $n of $total" else "$unit $n"
+    }
+
     private fun step(day: LocalDate, repeat: Repeat): LocalDate = when (repeat) {
         Repeat.NONE -> day
         Repeat.DAILY -> day.plusDays(1)
@@ -119,7 +169,7 @@ object Dates {
         val out = ArrayList<LocalDate>()
         var k = 0L
         var weekday = due
-        while (k < 2000) {
+        while (k < 40_000) {
             val d = when (task.repeat) {
                 Repeat.DAILY -> due.plusDays(k)
                 Repeat.WEEKLY -> due.plusWeeks(k)
@@ -129,6 +179,8 @@ object Dates {
                 Repeat.NONE -> due
             }
             if (!d.isBefore(until)) break
+            val end = task.repeatEnd
+            if (end != null && d.isAfter(end)) break
             if (!d.isBefore(from)) out += d
             k++
         }
@@ -150,7 +202,9 @@ object Dates {
         for (t in tasks) {
             val due = t.due ?: continue
             if (t.done) continue
-            for (d in occurrences(t, start, until)) {
+            // Count repeats from the series' first date, but only show the current one and later.
+            val series = seriesStart(t)?.let { t.copy(due = it) } ?: t
+            for (d in occurrences(series, maxOf(start, due), until)) {
                 val real = d == due
                 if (!real && !d.isAfter(today)) continue
                 out.getOrPut(d) { ArrayList() } += Entry(t, d, !real)

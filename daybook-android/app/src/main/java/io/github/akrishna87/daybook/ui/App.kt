@@ -131,9 +131,14 @@ class TaskActions(private val scope: CoroutineScope, private val snackbar: Snack
 
     fun complete(task: Task) {
         val before = Store.taskFamily(task.id)
-        val next = Store.completeTask(task.id)
-        val message = if (next != null) "Completed. Next: ${Dates.dayLabel(next, LocalDate.now())}" else "Completed"
-        offerUndo(message) { Store.restoreTasks(before) }
+        val label = task.due?.let { Dates.seriesLabel(task, it) }
+        val c = Store.completeTask(task.id)
+        val message = when {
+            c.next != null -> "${label ?: "Completed"} done. Next: ${Dates.dayLabel(c.next, LocalDate.now())}"
+            c.finished -> "${label ?: "Completed"} done. That was the last one"
+            else -> "Completed"
+        }
+        offerUndo(message) { Store.undoComplete(before, c) }
     }
 
     fun delete(task: Task) {
