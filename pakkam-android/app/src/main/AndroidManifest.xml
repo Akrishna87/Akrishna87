@@ -12,6 +12,10 @@
         <intent>
             <action android:name="android.intent.action.WEB_SEARCH" />
         </intent>
+        <!-- The phone's speech input, for searching by voice. -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
     </queries>
 
     <!-- The document scanner's camera; the app still installs on devices without one. -->

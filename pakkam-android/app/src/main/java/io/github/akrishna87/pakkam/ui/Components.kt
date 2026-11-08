@@ -284,3 +284,40 @@ fun printPdf(context: Context, file: File, name: String) {
     }
     pm.print(name, adapter, null)
 }
+
+/**
+ * Speaking instead of typing, through the phone's own speech input (the one its keyboard's
+ * microphone uses, in whatever languages are set up there). Returns how to start listening, or
+ * null when the phone has no speech input, so the microphone can be left out.
+ */
+@Composable
+fun rememberVoiceInput(prompt: String, onText: (String) -> Unit): (() -> Unit)? {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val latest = androidx.compose.runtime.rememberUpdatedState(onText)
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val heard = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!heard.isNullOrBlank()) latest.value(heard.trim())
+    }
+    val intent = remember(prompt) {
+        android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, prompt)
+    }
+    val available = remember {
+        try {
+            @Suppress("DEPRECATION")
+            context.packageManager.queryIntentActivities(intent, 0).isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    if (!available) return null
+    return {
+        try {
+            launcher.launch(intent)
+        } catch (_: Exception) {
+        }
+    }
+}

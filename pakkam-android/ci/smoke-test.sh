@@ -455,6 +455,25 @@ adb shell input keyevent KEYCODE_BACK
 wait_for home-4 'text="Combine files"' 20 "leaving the document didn't return Home"
 echo "PASS: Reading mode remembered for each file"
 
+echo "--- Finding a document by name"
+dump home-find
+tap home-find "Search documents"
+wait_for find-box 'Document name' 10 "the document search box didn't open"
+tap find-box "Document name"
+adb shell input text "smoke"
+sleep 1
+dump found
+grep -q 'smoke.pdf' "$OUT/found.xml" || fail "searching for 'smoke' didn't find smoke.pdf"
+adb shell input text "zzz"
+sleep 1
+dump not-found
+grep -q 'No document called' "$OUT/not-found.xml" || fail "a search with no match didn't say so"
+hide_keyboard
+dump find-close
+tap find-close "Close search"
+sleep 1
+echo "PASS: document search"
+
 echo "--- Scanning a document"
 # The newest photo in the library: a page shot at an angle on a wooden table, with a shadow over it.
 adb push "$HERE/document-photo.jpg" /sdcard/Pictures/document-photo.jpg > /dev/null
