@@ -83,7 +83,7 @@ object Threads {
     fun title(caption: String?, user: String): String {
         val line = caption?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }
         if (line.isNullOrEmpty()) return "Threads video by $user"
-        return if (line.length <= 80) line else line.take(77).trimEnd() + "…"
+        return if (line.length <= 80) line else line.take(79).trimEnd() + "…"
     }
 
     /** A yt-dlp info file: one MP4 at [Post.videoUrl], titled from the caption, by the user. */
