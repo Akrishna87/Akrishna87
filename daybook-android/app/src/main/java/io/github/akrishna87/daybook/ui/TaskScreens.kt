@@ -1,6 +1,17 @@
 package io.github.akrishna87.daybook.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material.icons.rounded.CalendarViewMonth
+import androidx.compose.material.icons.rounded.ViewAgenda
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextAlign
+import io.github.akrishna87.daybook.model.Priority
+import java.time.YearMonth
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -108,7 +119,7 @@ fun TodayScreen(data: Data, padding: PaddingValues) {
             item(key = "today-header") { SectionHeader(Dates.dayHeading(today, today)) }
         }
         items(due, key = { it.id }) { t ->
-            SwipeTask(t, Modifier.animateItem()) { TaskRow(t, data, showDue = t.time != null, timeOnly = true) { nav.push(Page.TaskPage(t.id)) } }
+            SwipeTask(t, Modifier.animateItem()) { TaskRow(t, data, timeOnly = true) { nav.push(Page.TaskPage(t.id)) } }
         }
         if (overdue.isEmpty() && due.isEmpty()) {
             item(key = "empty") {
@@ -151,145 +162,248 @@ private sealed interface UpRow {
         override val key = "day-$day"
     }
 
-    data class Item(val task: Task) : UpRow {
-        override val key = "task-${task.id}"
+    data class Item(val entry: Dates.Entry) : UpRow {
+        override val key = "task-${entry.task.id}-${entry.day}"
+    }
+
+    data class Empty(val day: LocalDate) : UpRow {
+        override val key = "empty-$day"
     }
 }
 
-/** The next four weeks day by day, with a week strip to jump around. */
+/**
+ * What's coming up: a month calendar with dots on busy days (tap a day for its tasks), or a
+ * day-by-day list of the next four weeks. Repeating tasks show on every day they repeat on.
+ */
 @Composable
 fun UpcomingScreen(data: Data, padding: PaddingValues) {
     val nav = LocalNav.current
-    val extra = LocalExtra.current
     val today = LocalClock.current.today
-    val ws = Dates.weekStart(data.settings)
-    val firstWeek = Dates.startOfWeek(today, ws)
-    var weekStart by remember(ws, today) { mutableStateOf(firstWeek) }
+    var calendarView by rememberSaveable { mutableStateOf(true) }
+    var month by remember(today) { mutableStateOf(YearMonth.from(today)) }
     var selected by remember(today) { mutableStateOf(today) }
-    var scrollTo by remember { mutableStateOf<LocalDate?>(null) }
-    var picking by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    val thisMonth = YearMonth.from(today)
 
-    val overdue = Dates.overdue(data.tasks, today)
-    val rows: List<UpRow> = buildList {
-        if (overdue.isNotEmpty() && weekStart == firstWeek) {
-            add(UpRow.Overdue)
-            overdue.forEach { add(UpRow.Item(it)) }
-        }
-        for (k in 0 until 28) {
-            val d = weekStart.plusDays(k.toLong())
-            if (d.isBefore(today)) continue
-            add(UpRow.Day(d))
-            Dates.dueOn(data.tasks, d).forEach { add(UpRow.Item(it)) }
-        }
-    }
-    fun jump(day: LocalDate) {
-        val d = if (day.isBefore(today)) today else day
-        selected = d
-        weekStart = Dates.startOfWeek(d, ws)
-        scrollTo = d
-    }
-    LaunchedEffect(scrollTo, rows.size) {
-        val target = scrollTo ?: return@LaunchedEffect
-        val i = rows.indexOfFirst { it is UpRow.Day && it.day == target }
-        if (i >= 0) listState.animateScrollToItem(i)
-        scrollTo = null
+    fun showMonth(m: YearMonth) {
+        if (m.isBefore(thisMonth)) return
+        month = m
+        selected = if (m == thisMonth) today else m.atDay(1)
     }
 
     Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
         ScreenHeader(
             "Upcoming",
-            selected.month.getDisplayName(TextStyle.FULL_STANDALONE, Locale.getDefault()) + " " + selected.year,
+            if (calendarView) monthName(month) else "Next four weeks",
         ) {
-            if (weekStart != firstWeek) TextButton(onClick = { jump(today) }) { Text("Today") }
-            IconButton(onClick = { picking = true }, Modifier.semantics { contentDescription = "Pick a date" }) { Icon(Icons.Rounded.CalendarMonth, null) }
+            if (calendarView && selected != today) TextButton(onClick = { showMonth(thisMonth) }) { Text("Today") }
+            IconButton(
+                onClick = { calendarView = !calendarView },
+                Modifier.semantics { contentDescription = if (calendarView) "Show as list" else "Show as calendar" },
+            ) { Icon(if (calendarView) Icons.Rounded.ViewAgenda else Icons.Rounded.CalendarViewMonth, null) }
             SearchAction { nav.push(Page.Search) }
         }
-        WeekStrip(weekStart, selected, today, data, ws, onWeek = { weekStart = it }, onDay = { jump(it) })
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        LazyColumn(
-            Modifier.weight(1f),
-            state = listState,
-            contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 88.dp),
-        ) {
-            items(rows, key = { it.key }) { row ->
-                when (row) {
-                    UpRow.Overdue -> SectionHeader("Overdue", color = extra.overdue)
-                    is UpRow.Day -> DayHeader(row.day, today) { nav.quickAdd = QuickAddDefaults(due = row.day) }
-                    is UpRow.Item -> SwipeTask(row.task, Modifier.animateItem()) {
-                        val overdueRow = row.task.due?.isBefore(today) == true
-                        TaskRow(row.task, data, showDue = row.task.time != null || overdueRow, timeOnly = !overdueRow) {
-                            nav.push(Page.TaskPage(row.task.id))
-                        }
+        if (calendarView) {
+            CalendarView(data, padding, month, selected, today, onMonth = { showMonth(it) }, onSelect = { selected = it })
+        } else {
+            ListView(data, padding, today)
+        }
+    }
+}
+
+private fun monthName(m: YearMonth): String =
+    m.month.getDisplayName(TextStyle.FULL_STANDALONE, Locale.getDefault()) + " " + m.year
+
+@Composable
+private fun ColumnScope.CalendarView(
+    data: Data,
+    padding: PaddingValues,
+    month: YearMonth,
+    selected: LocalDate,
+    today: LocalDate,
+    onMonth: (YearMonth) -> Unit,
+    onSelect: (LocalDate) -> Unit,
+) {
+    val nav = LocalNav.current
+    val extra = LocalExtra.current
+    val ws = Dates.weekStart(data.settings)
+    val days = remember(data.tasks, month, today) { Dates.calendar(data.tasks, month.atDay(1), month.atEndOfMonth().plusDays(1), today) }
+    val overdue = Dates.overdue(data.tasks, today)
+    val entries = days[selected].orEmpty()
+    val currentMonth by rememberUpdatedState(month)
+    val changeMonth by rememberUpdatedState(onMonth)
+    val canGoBack = month.isAfter(YearMonth.from(today))
+
+    // The month: swipe sideways or use the arrows to change it.
+    Column(
+        Modifier.padding(horizontal = 8.dp).pointerInput(Unit) {
+            var drag = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { drag = 0f },
+                onDragEnd = {
+                    if (drag > 120f) changeMonth(currentMonth.minusMonths(1))
+                    if (drag < -120f) changeMonth(currentMonth.plusMonths(1))
+                },
+            ) { _, dx -> drag += dx }
+        },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onMonth(month.minusMonths(1)) },
+                enabled = canGoBack,
+                modifier = Modifier.semantics { contentDescription = "Previous month" },
+            ) { Icon(Icons.Rounded.ChevronLeft, null) }
+            Text(monthName(month), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            IconButton(
+                onClick = { onMonth(month.plusMonths(1)) },
+                modifier = Modifier.semantics { contentDescription = "Next month" },
+            ) { Icon(Icons.Rounded.ChevronRight, null) }
+        }
+        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+            for (letter in Dates.weekdayLetters(ws)) {
+                Text(
+                    letter,
+                    Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        for (week in Dates.monthGrid(month, ws)) {
+            Row(Modifier.fillMaxWidth()) {
+                for (day in week) {
+                    Box(Modifier.weight(1f).height(50.dp), contentAlignment = Alignment.Center) {
+                        if (day != null) DayCell(day, today, selected, days[day].orEmpty(), overdue.isNotEmpty() && day == today) { onSelect(day) }
                     }
                 }
             }
         }
     }
-    if (picking) DatePickDialog(selected, onPick = { jump(it) }, onDismiss = { picking = false })
+    HorizontalDivider(Modifier.padding(top = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+    // The selected day's tasks.
+    LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 88.dp)) {
+        if (selected == today && overdue.isNotEmpty()) {
+            item(key = "overdue") { SectionHeader("Overdue", color = extra.overdue) }
+            items(overdue, key = { "o-" + it.id }) { t ->
+                SwipeTask(t, Modifier.animateItem()) { TaskRow(t, data) { nav.push(Page.TaskPage(t.id)) } }
+            }
+        }
+        item(key = "day-$selected") { DayHeader(selected, today) { nav.quickAdd = QuickAddDefaults(due = selected) } }
+        if (entries.isEmpty()) {
+            item(key = "empty-$selected") { NothingPlanned() }
+        }
+        items(entries, key = { "e-${it.task.id}-${it.day}" }) { e -> EntryRow(e, data, Modifier.animateItem()) }
+    }
 }
 
 @Composable
-private fun WeekStrip(
-    weekStart: LocalDate,
-    selected: LocalDate,
-    today: LocalDate,
-    data: Data,
-    ws: java.time.DayOfWeek,
-    onWeek: (LocalDate) -> Unit,
-    onDay: (LocalDate) -> Unit,
-) {
-    val busy = remember(data.tasks, weekStart) {
-        (0 until 7).map { weekStart.plusDays(it.toLong()) }.filter { d -> data.tasks.any { !it.done && it.due == d } }.toSet()
+private fun DayCell(day: LocalDate, today: LocalDate, selected: LocalDate, entries: List<Dates.Entry>, overdue: Boolean, onClick: () -> Unit) {
+    val past = day.isBefore(today)
+    val isSelected = day == selected
+    val fg = when {
+        isSelected -> MaterialTheme.colorScheme.onPrimary
+        past -> MaterialTheme.colorScheme.outline
+        day == today -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
     }
-    val firstWeek = Dates.startOfWeek(today, ws)
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(
-            onClick = { onWeek(weekStart.minusWeeks(1)) },
-            enabled = weekStart.isAfter(firstWeek),
-            modifier = Modifier.semantics { contentDescription = "Previous week" },
-        ) { Icon(Icons.Rounded.ChevronLeft, null) }
-        Row(Modifier.weight(1f)) {
-            for (k in 0 until 7) {
-                val d = weekStart.plusDays(k.toLong())
-                val isSelected = d == selected
-                val past = d.isBefore(today)
-                Column(
+    val label = Dates.dayHeading(day, today) + when (entries.size) {
+        0 -> ""
+        1 -> ", 1 task"
+        else -> ", ${entries.size} tasks"
+    }
+    Column(
+        Modifier
+            .size(46.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(enabled = !past, onClick = onClick)
+            .semantics { contentDescription = label },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                day.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (day == today || isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = fg,
+            )
+        }
+        // One dot per task (up to three), in its priority colour; red if there are overdue tasks today.
+        Row(Modifier.height(6.dp).padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (overdue) Box(Modifier.size(4.dp).clip(CircleShape).background(LocalExtra.current.overdue))
+            for (e in entries.take(if (overdue) 2 else 3)) {
+                val p = e.task.priority
+                Box(
                     Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                        .clickable(enabled = !past) { onDay(d) }
-                        .padding(vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    val fg = when {
-                        isSelected -> MaterialTheme.colorScheme.onPrimary
-                        past -> MaterialTheme.colorScheme.outline
-                        d == today -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
-                    Text(d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()), style = MaterialTheme.typography.labelSmall, color = fg)
-                    Text(
-                        d.dayOfMonth.toString(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (d == today || isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = fg,
-                    )
-                    Box(
-                        Modifier
-                            .padding(top = 2.dp)
-                            .size(4.dp)
-                            .clip(CircleShape)
-                            .background(if (d in busy) (if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary) else Color.Transparent),
-                    )
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(if (p < Priority.NONE) Color(Priority.color(p)) else MaterialTheme.colorScheme.onSurfaceVariant),
+                )
+            }
+        }
+    }
+}
+
+/** A task on the calendar: the real one can be ticked off or swiped; a later repeat just opens the task. */
+@Composable
+private fun EntryRow(e: Dates.Entry, data: Data, modifier: Modifier = Modifier) {
+    val nav = LocalNav.current
+    if (e.projected) {
+        TaskRow(e.task, data, modifier, timeOnly = true, occurrence = e.day) { nav.push(Page.TaskPage(e.task.id)) }
+    } else {
+        SwipeTask(e.task, modifier) { TaskRow(e.task, data, timeOnly = true) { nav.push(Page.TaskPage(e.task.id)) } }
+    }
+}
+
+@Composable
+private fun NothingPlanned() {
+    Text(
+        "Nothing planned. Tap + to add a task for this day.",
+        Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** The next four weeks day by day, with overdue tasks first. */
+@Composable
+private fun ColumnScope.ListView(data: Data, padding: PaddingValues, today: LocalDate) {
+    val nav = LocalNav.current
+    val extra = LocalExtra.current
+    val overdue = Dates.overdue(data.tasks, today)
+    val days = remember(data.tasks, today) { Dates.calendar(data.tasks, today, today.plusDays(28), today) }
+    val rows: List<UpRow> = buildList {
+        if (overdue.isNotEmpty()) {
+            add(UpRow.Overdue)
+            overdue.forEach { add(UpRow.Item(Dates.Entry(it, it.due!!, false))) }
+        }
+        for (k in 0 until 28) {
+            val d = today.plusDays(k.toLong())
+            add(UpRow.Day(d))
+            days[d].orEmpty().forEach { add(UpRow.Item(it)) }
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 88.dp)) {
+        items(rows, key = { it.key }) { row ->
+            when (row) {
+                UpRow.Overdue -> SectionHeader("Overdue", color = extra.overdue)
+                is UpRow.Day -> DayHeader(row.day, today) { nav.quickAdd = QuickAddDefaults(due = row.day) }
+                is UpRow.Empty -> NothingPlanned()
+                is UpRow.Item -> if (row.entry.day.isBefore(today)) {
+                    SwipeTask(row.entry.task, Modifier.animateItem()) { TaskRow(row.entry.task, data) { nav.push(Page.TaskPage(row.entry.task.id)) } }
+                } else {
+                    EntryRow(row.entry, data, Modifier.animateItem())
                 }
             }
         }
-        IconButton(
-            onClick = { onWeek(weekStart.plusWeeks(1)) },
-            modifier = Modifier.semantics { contentDescription = "Next week" },
-        ) { Icon(Icons.Rounded.ChevronRight, null) }
     }
 }
 

@@ -94,6 +94,9 @@ sleep 1
 adb shell input text "Call%sdentist%stomorrow%s9am"
 adb shell input keyevent KEYCODE_ENTER
 sleep 1
+adb shell input text "Stretch%stomorrow%severy%sday"
+adb shell input keyevent KEYCODE_ENTER
+sleep 1
 close_panel
 wait_for today-tasks 'text="Buy milk"' 10 "the new task isn't on Today"
 grep -q 'text="@errands"' "$OUT/today-tasks.xml" || fail "the task's label isn't shown"
@@ -111,8 +114,18 @@ echo "PASS: completing a task"
 
 echo "--- Upcoming and task details"
 tap completed "Upcoming" last
-wait_for upcoming 'text="Call dentist"' 10 "tomorrow's task isn't in Upcoming"
-shot 4-upcoming
+wait_for calendar 'content-desc="Next month"' 10 "Upcoming doesn't open on the month calendar"
+shot 4-upcoming-calendar
+# Near the end of a month tomorrow is on the next page of the calendar, so only check mid-month.
+if [ "$(date -u -d '+2 days' +%m)" = "$(date -u +%m)" ]; then
+  grep -q 'content-desc="Tomorrow[^"]*, 2 tasks"' "$OUT/calendar.xml" || fail "the calendar doesn't count tomorrow's 2 tasks"
+  grep -Eq 'content-desc="[^"]*, 1 task"' "$OUT/calendar.xml" || fail "the daily task doesn't repeat on later days of the calendar"
+fi
+tap calendar "Show as list"
+wait_for upcoming 'text="Call dentist"' 10 "tomorrow's task isn't in the Upcoming list"
+[ "$(grep -o 'text="Stretch"' "$OUT/upcoming.xml" | wc -l)" -ge 3 ] || fail "the daily task doesn't show on each day of the list"
+shot 4-upcoming-list
+echo "PASS: repeating tasks show on every day they repeat"
 tap upcoming "Call dentist"
 wait_for detail 'content-desc="Task options"' 10 "the task didn't open"
 grep -q 'text="Remind me at the due time"' "$OUT/detail.xml" || fail "the 9am task has no reminder switch"

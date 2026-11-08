@@ -90,3 +90,46 @@ class DatesTest {
         assertNull(Dates.reminderAt(Task(title = "x", due = today, time = LocalTime.of(9, 0), done = true)))
     }
 }
+
+class RepeatCalendarTest {
+    private val today = LocalDate.of(2026, 10, 3)
+
+    @Test
+    fun occurrencesOfRepeatingTasks() {
+        val daily = Task(title = "Stretch", due = today, repeat = Repeat.DAILY)
+        assertEquals(5, Dates.occurrences(daily, today, today.plusDays(5)).size)
+        val monthly = Task(title = "Rent", due = LocalDate.of(2026, 1, 31), repeat = Repeat.MONTHLY)
+        // Counted from the original date: the 31st, or the last day of a shorter month.
+        assertEquals(
+            listOf(LocalDate.of(2026, 10, 31), LocalDate.of(2026, 11, 30), LocalDate.of(2026, 12, 31)),
+            Dates.occurrences(monthly, today, LocalDate.of(2027, 1, 1)),
+        )
+        val weekdays = Task(title = "Standup", due = LocalDate.of(2026, 10, 2), repeat = Repeat.WEEKDAYS)
+        assertEquals(
+            listOf(LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 5), LocalDate.of(2026, 10, 6)),
+            Dates.occurrences(weekdays, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7)),
+        )
+        assertEquals(emptyList<LocalDate>(), Dates.occurrences(daily.copy(done = true), today, today.plusDays(5)))
+        assertEquals(listOf(today), Dates.occurrences(Task(title = "once", due = today), today, today.plusDays(5)))
+    }
+
+    @Test
+    fun calendarShowsLaterRepeats() {
+        val weekly = Task(title = "Bins", due = today.plusDays(1), repeat = Repeat.WEEKLY)
+        val once = Task(title = "Dentist", due = today.plusDays(1))
+        val cal = Dates.calendar(listOf(weekly, once), today, today.plusDays(15), today)
+        assertEquals(listOf("Bins", "Dentist"), cal[today.plusDays(1)]?.map { it.task.title })
+        assertEquals(false, cal[today.plusDays(1)]?.first()?.projected)
+        assertEquals(true, cal[today.plusDays(8)]?.single()?.projected)
+        assertEquals(true, cal[today.plusDays(15 - 1)]?.isEmpty() ?: true)
+        assertEquals(setOf(today.plusDays(1), today.plusDays(8)), cal.keys)
+    }
+
+    @Test
+    fun overdueRepeatsStartAfterToday() {
+        // An overdue daily task is in the Overdue section, and repeats again from tomorrow.
+        val daily = Task(title = "Stretch", due = today.minusDays(2), repeat = Repeat.DAILY)
+        val cal = Dates.calendar(listOf(daily), today.minusDays(5), today.plusDays(3), today)
+        assertEquals(setOf(today.plusDays(1), today.plusDays(2)), cal.keys)
+    }
+}

@@ -42,6 +42,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -92,14 +93,14 @@ fun toneColor(tone: DueTone?): Color {
 
 /** Todoist's round checkbox: the ring takes the priority colour, and a tick appears once done. */
 @Composable
-fun PriorityCheck(task: Task, onToggle: () -> Unit, size: Dp = 22.dp) {
+fun PriorityCheck(task: Task, onToggle: () -> Unit, size: Dp = 22.dp, enabled: Boolean = true) {
     val color = Color(Priority.color(task.priority))
     val prioritised = task.priority < Priority.NONE
     Box(
         Modifier
             .size(size + 20.dp)
             .clip(CircleShape)
-            .clickable(role = Role.Checkbox, onClick = onToggle)
+            .clickable(enabled = enabled, role = Role.Checkbox, onClick = onToggle)
             .semantics { contentDescription = if (task.done) "Mark ${task.title} as not done" else "Complete ${task.title}" },
         contentAlignment = Alignment.Center,
     ) {
@@ -127,18 +128,22 @@ fun TaskRow(
     showDue: Boolean = true,
     /** Under a day's heading, show just the time rather than repeating the day. */
     timeOnly: Boolean = false,
+    /** For a later repeat of a repeating task shown on the calendar: that day. It can't be ticked off there. */
+    occurrence: java.time.LocalDate? = null,
     onClick: () -> Unit,
 ) {
     val clock = LocalClock.current
     val actions = LocalActions.current
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val subs = if (task.parentId == null) data.subtasks(task.id) else emptyList()
-    Column(modifier.background(MaterialTheme.colorScheme.surface)) {
+    val projected = occurrence != null && occurrence != task.due
+    val shown = if (projected) task.copy(due = occurrence) else task
+    Column(modifier.background(MaterialTheme.colorScheme.surface).alpha(if (projected) 0.6f else 1f)) {
         Row(
             Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 6.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            PriorityCheck(task, onToggle = { actions.toggle(task) })
+            PriorityCheck(task, onToggle = { actions.toggle(task) }, enabled = !projected)
             Column(Modifier.weight(1f).padding(top = 10.dp)) {
                 Text(
                     task.title,
@@ -153,11 +158,12 @@ fun TaskRow(
                 }
                 val due = when {
                     !showDue -> null
-                    timeOnly && task.time != null -> Dates.timeFormatter(clock.is24Hour).format(task.time)
-                    else -> Dates.dueLabel(task, clock.today, clock.is24Hour)
+                    timeOnly -> task.time?.let { Dates.timeFormatter(clock.is24Hour).format(it) }
+                    else -> Dates.dueLabel(shown, clock.today, clock.is24Hour)
                 }
+                val repeats = showDue && task.due != null && task.repeat != Repeat.NONE
                 val project = data.project(task.projectId).takeIf { showProject && (task.projectId != INBOX_ID || task.parentId == null) }
-                val hasMeta = due != null || subs.isNotEmpty() || task.labels.isNotEmpty() || task.noteId != null || task.parentId != null ||
+                val hasMeta = due != null || repeats || subs.isNotEmpty() || task.labels.isNotEmpty() || task.noteId != null || task.parentId != null ||
                     (showProject && task.projectId != INBOX_ID)
                 if (hasMeta) {
                     FlowRow(
@@ -165,11 +171,9 @@ fun TaskRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        if (due != null) {
-                            val c = toneColor(Dates.tone(task, clock.now))
-                            Meta(Icons.Rounded.CalendarToday, due, c)
-                            if (task.repeat != Repeat.NONE) Icon(Icons.Rounded.Repeat, task.repeat.label, Modifier.size(14.dp).align(Alignment.CenterVertically), tint = c)
-                        }
+                        val c = toneColor(Dates.tone(shown, clock.now))
+                        if (due != null) Meta(Icons.Rounded.CalendarToday, due, c)
+                        if (repeats) Icon(Icons.Rounded.Repeat, task.repeat.label, Modifier.size(14.dp).align(Alignment.CenterVertically), tint = c)
                         if (subs.isNotEmpty()) Meta(Icons.Rounded.SubdirectoryArrowRight, "${subs.count { it.done }}/${subs.size}", muted)
                         if (task.noteId != null) {
                             Icon(Icons.Rounded.Description, "Linked note", Modifier.size(14.dp).align(Alignment.CenterVertically), tint = muted)

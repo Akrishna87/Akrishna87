@@ -107,6 +107,58 @@ object Dates {
         Repeat.YEARLY -> day.plusYears(1)
     }
 
+    /**
+     * The days a task falls on between [from] and [until] (exclusive): its due date, and for a
+     * repeating task every later date it repeats on. Counted from the original date, so a task due
+     * on the 31st stays on the last day of shorter months.
+     */
+    fun occurrences(task: Task, from: LocalDate, until: LocalDate): List<LocalDate> {
+        val due = task.due ?: return emptyList()
+        if (task.done) return emptyList()
+        if (task.repeat == Repeat.NONE) return if (!due.isBefore(from) && due.isBefore(until)) listOf(due) else emptyList()
+        val out = ArrayList<LocalDate>()
+        var k = 0L
+        var weekday = due
+        while (k < 2000) {
+            val d = when (task.repeat) {
+                Repeat.DAILY -> due.plusDays(k)
+                Repeat.WEEKLY -> due.plusWeeks(k)
+                Repeat.MONTHLY -> due.plusMonths(k)
+                Repeat.YEARLY -> due.plusYears(k)
+                Repeat.WEEKDAYS -> if (k == 0L) due else step(weekday, Repeat.WEEKDAYS).also { weekday = it }
+                Repeat.NONE -> due
+            }
+            if (!d.isBefore(until)) break
+            if (!d.isBefore(from)) out += d
+            k++
+        }
+        return out
+    }
+
+    /** A task on one day of the calendar: [projected] when it's a later repeat, not the task's real due date. */
+    data class Entry(val task: Task, val day: LocalDate, val projected: Boolean)
+
+    /**
+     * Open tasks for each day from [from] to [until] (exclusive), today onwards. A repeating task
+     * shows on its due date and on each later date it repeats on, after today. Overdue tasks aren't
+     * included; they have their own section.
+     */
+    fun calendar(tasks: List<Task>, from: LocalDate, until: LocalDate, today: LocalDate): Map<LocalDate, List<Entry>> {
+        val start = maxOf(from, today)
+        if (!start.isBefore(until)) return emptyMap()
+        val out = HashMap<LocalDate, MutableList<Entry>>()
+        for (t in tasks) {
+            val due = t.due ?: continue
+            if (t.done) continue
+            for (d in occurrences(t, start, until)) {
+                val real = d == due
+                if (!real && !d.isAfter(today)) continue
+                out.getOrPut(d) { ArrayList() } += Entry(t, d, !real)
+            }
+        }
+        return out.mapValues { (_, list) -> list.sortedWith { a, b -> taskOrder.compare(a.task, b.task) } }
+    }
+
     /** Todoist order: by date (undated last), timed tasks first within a day, then priority, then the order they were added. */
     val taskOrder: Comparator<Task> = compareBy<Task>(
         { it.due == null },
