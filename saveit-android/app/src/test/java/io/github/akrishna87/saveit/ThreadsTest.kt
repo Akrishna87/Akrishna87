@@ -21,6 +21,25 @@ class ThreadsTest {
     }
 
     @Test
+    fun recognisesShortShareLinks() {
+        // What the Threads app's Share button gives.
+        assertTrue(Threads.isPost("https://www.threads.com/share/BBOvTai8tl"))
+        assertTrue(Threads.isPost("https://threads.net/share/BBOvTai8tl?x=1"))
+        assertNull(Threads.parts("https://www.threads.com/share/BBOvTai8tl"))
+        assertEquals("https://www.threads.com/share/BBOvTai8tl", Links.find("https://www.threads.com/share/BBOvTai8tl"))
+    }
+
+    @Test
+    fun findsThePostAShareLinkLeadsTo() {
+        assertEquals(
+            "@some.one" to "DAbc12_xY",
+            Threads.postNamedIn("""<link rel="canonical" href="https://www.threads.com/@some.one/post/DAbc12_xY" />"""),
+        )
+        assertEquals("@me" to "XYZ", Threads.postNamedIn("""{"url":"https:\/\/www.threads.net\/@me\/post\/XYZ"}"""))
+        assertNull(Threads.postNamedIn("<html>Log in</html>"))
+    }
+
+    @Test
     fun findsTheVideoInThePagesData() {
         val html = """<html><script type="application/json">{"post":{"caption":{"text":"Sunset jam 🌅\nsecond line"},""" +
             """"video_versions":[{"type":101,"url":"https:\/\/scontent.cdninstagram.com\/v\/clip.mp4?a=1&b=2"}]}}</script>""" +

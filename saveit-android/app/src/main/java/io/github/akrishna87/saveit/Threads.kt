@@ -22,30 +22,54 @@ object Threads {
 
     private val postLink = Regex("""^https?://(?:www\.)?threads\.(?:net|com)/(@[\w.]+)/post/([\w-]+)""", RegexOption.IGNORE_CASE)
 
+    /** The short links the Threads app's Share button gives, e.g. threads.com/share/BBOvTai8tl. */
+    private val shareLink = Regex("""^https?://(?:www\.)?threads\.(?:net|com)/share/([\w-]+)""", RegexOption.IGNORE_CASE)
+
+    /** A post link anywhere in a page (its canonical link, or JSON with escaped slashes). */
+    private val postInPage = Regex("""threads\.(?:net|com)\\?/(@[\w.]+)\\?/post\\?/([\w-]+)""", RegexOption.IGNORE_CASE)
+
     private const val BROWSER =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36"
 
-    fun isPost(url: String): Boolean = postLink.containsMatchIn(url)
+    fun isPost(url: String): Boolean = postLink.containsMatchIn(url) || shareLink.containsMatchIn(url)
+
+    /** "@user" and the post's code named in a page, for a share link's page. */
+    fun postNamedIn(html: String): Pair<String, String>? = postInPage.find(html)?.let { it.groupValues[1] to it.groupValues[2] }
 
     /** "@user" and the post's code, from a post link. */
     fun parts(url: String): Pair<String, String>? = postLink.find(url)?.let { it.groupValues[1] to it.groupValues[2] }
 
-    /** Writes a yt-dlp info file for the post's video into [dir] and returns it. */
+    /**
+     * Writes a yt-dlp info file for the post's video into [dir] and returns it. A short share link
+     * is opened first to find the post it leads to: Threads redirects it to the post, or names
+     * the post in the page it returns.
+     */
     fun infoFile(url: String, dir: File): File {
-        val (user, code) = parts(url) ?: throw NoVideoException("That isn't a link to a Threads post.")
-        val page = "https://www.threads.com/$user/post/$code"
-        val html = try {
-            fetch(page)
-        } catch (e: IOException) {
-            throw IOException("Couldn't open the Threads post. Check your connection and try again.", e)
+        var sharePage: String? = null
+        val (user, code) = parts(url) ?: run {
+            if (!shareLink.containsMatchIn(url)) throw NoVideoException("That isn't a link to a Threads post.")
+            val (finalUrl, html) = open(url)
+            sharePage = html
+            parts(finalUrl) ?: postNamedIn(html) ?: throw NoVideoException(
+                "Couldn't find the post this Threads link leads to. In Threads, open the post, tap ⋯ → Copy link, and paste that link here.",
+            )
         }
-        val post = parse(html) ?: throw NoVideoException(
+        val page = "https://www.threads.com/$user/post/$code"
+        // The share link may have landed on the post already; otherwise open the post itself.
+        val post = sharePage?.let(::parse) ?: parse(open(page).second) ?: throw NoVideoException(
             "Couldn't find a video in this Threads post. It may be a photo or text post, or Threads may only show it to people who are signed in.",
         )
         return File(dir, "threads-$code.info.json").apply { writeText(infoJson(post, user, code, page)) }
     }
 
-    private fun fetch(address: String): String {
+    /** Opens a page as a phone browser does, following redirects: where it ended up, and the page. */
+    private fun open(address: String): Pair<String, String> = try {
+        fetch(address)
+    } catch (e: IOException) {
+        throw IOException("Couldn't open the Threads post. Check your connection and try again.", e)
+    }
+
+    private fun fetch(address: String): Pair<String, String> {
         val connection = URL(address).openConnection() as HttpURLConnection
         try {
             connection.instanceFollowRedirects = true
@@ -53,7 +77,8 @@ object Threads {
             connection.readTimeout = 20_000
             connection.setRequestProperty("User-Agent", BROWSER)
             if (connection.responseCode !in 200..299) throw IOException("HTTP ${connection.responseCode}")
-            return connection.inputStream.bufferedReader().use { it.readText() }
+            val html = connection.inputStream.bufferedReader().use { it.readText() }
+            return connection.url.toString() to html
         } finally {
             connection.disconnect()
         }
