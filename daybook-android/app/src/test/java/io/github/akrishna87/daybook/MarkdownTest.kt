@@ -57,6 +57,8 @@ class MarkdownTest {
         assertEquals("3. c\n4. " to 8, Markdown.continueList("3. c", "3. c\n", 5))
         // Enter on an empty item ends the list.
         assertEquals("- a\n" to 4, Markdown.continueList("- a\n- ", "- a\n- \n", 7))
+        // The keyboard sent the last word and the enter in one go.
+        assertEquals("[ ] Review budget\n[ ] " to 22, Markdown.continueList("[ ] Review bud", "[ ] Review budget\n", 18))
         // Plain lines and other edits are left alone.
         assertNull(Markdown.continueList("plain", "plain\n", 6))
         assertNull(Markdown.continueList("- a", "- ab", 4))

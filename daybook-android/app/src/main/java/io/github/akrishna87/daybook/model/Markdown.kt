@@ -114,16 +114,19 @@ object Markdown {
      * Returns the text and cursor to use instead, or null to keep the edit as typed.
      */
     fun continueList(old: String, new: String, cursor: Int): Pair<String, Int>? {
-        if (new.length != old.length + 1 || cursor < 1 || cursor > new.length || new[cursor - 1] != '\n') return null
-        if (old.substring(0, cursor - 1) != new.substring(0, cursor - 1) || old.substring(cursor - 1) != new.substring(cursor)) return null
-        val lineStart = old.lastIndexOf('\n', cursor - 2) + 1
-        val line = old.substring(lineStart, cursor - 1)
+        // Keyboards may send the enter together with the last word, so look only at the result:
+        // one more line than before, and the cursor at the start of a new line.
+        if (cursor < 1 || cursor > new.length || new[cursor - 1] != '\n') return null
+        if (new.count { it == '\n' } != old.count { it == '\n' } + 1) return null
+        val lineStart = new.lastIndexOf('\n', cursor - 2) + 1
+        val line = new.substring(lineStart, cursor - 1)
         val prefix = listPrefix(line)
         if (prefix.isEmpty()) return null
+        val nextLineEnd = new.indexOf('\n', cursor).let { if (it < 0) new.length else it }
+        if (listPrefix(new.substring(cursor, nextLineEnd)).isNotEmpty()) return null
         if (line.substring(prefix.length).isBlank()) {
             // Enter on an empty item: drop its marker instead of starting another.
-            val text = old.substring(0, lineStart) + old.substring(cursor - 1)
-            return text to lineStart
+            return new.substring(0, lineStart) + new.substring(cursor) to lineStart
         }
         val nextPrefix = when {
             prefix.contains('[') -> prefix.replace(Regex("\\[[xX]]"), "[ ]")
@@ -133,8 +136,7 @@ object Markdown {
             }
             else -> prefix
         }
-        val text = new.substring(0, cursor) + nextPrefix + new.substring(cursor)
-        return text to cursor + nextPrefix.length
+        return new.substring(0, cursor) + nextPrefix + new.substring(cursor) to cursor + nextPrefix.length
     }
 
     /**
