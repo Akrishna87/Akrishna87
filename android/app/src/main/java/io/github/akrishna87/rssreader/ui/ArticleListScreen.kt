@@ -178,7 +178,7 @@ fun ArticleListScreen(
                     }
                 }
                 query?.let { q ->
-                    SearchField(q, { query = it }, "Search ${title.lowercase()}", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+                    SearchField(q, { query = it }, "Search ${title.lowercase()}", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp), voice = true)
                 }
                 Hairline()
             }

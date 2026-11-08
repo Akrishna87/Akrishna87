@@ -42,6 +42,7 @@ object AppIcons {
     val Close = stroke("Close", 2.2f, "M6.5,6.5L17.5,17.5M17.5,6.5L6.5,17.5")
     val Muted = stroke("Muted", 1.8f, "M4,9.5H7.5L12,5.5V18.5L7.5,14.5H4Z", "M16,9.5L20,13.5M20,9.5L16,13.5")
 
+    val Mic = stroke("Mic", 1.8f, "M12,3.5A3,3 0 0 1 15,6.5V12A3,3 0 0 1 9,12V6.5A3,3 0 0 1 12,3.5Z", "M6,11A6,6 0 0 0 18,11", "M12,17V20.5", "M9,20.5H15")
     val Menu = stroke("Menu", 2f, "M4,7H20", "M4,12H20", "M4,17H20")
     private const val BOOKMARK = "M7,4.5H17A1,1 0 0 1 18,5.5V20L12,16L6,20V5.5A1,1 0 0 1 7,4.5Z"
     val Bookmark = stroke("Bookmark", 1.8f, BOOKMARK)
