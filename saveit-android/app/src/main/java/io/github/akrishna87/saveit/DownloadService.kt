@@ -120,17 +120,18 @@ class DownloadService : Service() {
             dir.deleteRecursively()
             dir.mkdirs()
             change(job.id) { it.copy(stage = Stage.Starting) }
+            // Threads isn't a yt-dlp site: read the post first (a failure here isn't fixed by updating yt-dlp).
+            val infoFile = if (Threads.isPost(job.url)) Threads.infoFile(job.url, dir) else null
             val result = try {
-                grab(job, dir)
+                grab(job, dir, infoFile)
             } catch (e: YoutubeDL.CanceledException) {
                 throw e
             } catch (e: Exception) {
                 // YouTube often changes in ways only a newer yt-dlp can handle: update and try once more.
                 if (Jobs.get(job.id)?.stage == Stage.Cancelled || !Grabber.mightBeFixedByUpdate(e) || !Engine.updateAfterFailure(this)) throw e
                 change(job.id) { it.copy(stage = Stage.Starting, progress = -1f, retried = true) }
-                dir.deleteRecursively()
-                dir.mkdirs()
-                grab(job, dir)
+                dir.listFiles()?.filter { it != infoFile }?.forEach { it.deleteRecursively() }
+                grab(job, dir, infoFile)
             }
             if (Jobs.get(job.id)?.stage == Stage.Cancelled) return
             change(job.id) { it.copy(stage = Stage.Saving) }
@@ -167,8 +168,8 @@ class DownloadService : Service() {
         }
     }
 
-    private fun grab(job: Job, dir: File): Grabber.Result = Engine.use(this) {
-        Grabber.grab(job.url, job.format, job.quality, dir, job.id) { event ->
+    private fun grab(job: Job, dir: File, infoFile: File?): Grabber.Result = Engine.use(this) {
+        Grabber.grab(job.url, job.format, job.quality, dir, job.id, infoFile) { event ->
             when (event) {
                 is Grabber.Event.Found -> change(job.id) { it.copy(title = event.info.title, artist = event.info.artist) }
                 is Grabber.Event.Progress -> change(job.id) { it.copy(stage = Stage.Downloading, progress = event.percent) }

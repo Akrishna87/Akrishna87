@@ -241,7 +241,7 @@ private fun SaveCard(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Paste a YouTube, Instagram or Facebook link") },
+                placeholder = { Text("Paste a YouTube, Instagram, Facebook or Threads link") },
                 singleLine = true,
                 isError = text.isNotBlank() && url == null,
                 supportingText = if (text.isNotBlank() && url == null) {
@@ -318,7 +318,7 @@ private fun SaveCard(
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                "Tip: in YouTube, Instagram or Facebook, tap Share → SaveIt to save without copying the link.",
+                "Tip: in YouTube, Instagram, Facebook or Threads, tap Share → SaveIt to save without copying the link.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Palette.Faint,
             )
@@ -381,7 +381,7 @@ private fun EmptySongs() {
         Text("No songs yet", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Paste a link above, or share a video from YouTube, Instagram or Facebook to SaveIt. Songs are saved in Music/${Saver.FOLDER} and videos in Movies/${Saver.FOLDER}, so your other apps can play them too.",
+            "Paste a link above, or share a video from YouTube, Instagram, Facebook or Threads to SaveIt. Songs are saved in Music/${Saver.FOLDER} and videos in Movies/${Saver.FOLDER}, so your other apps can play them too.",
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.SubText,
             textAlign = TextAlign.Center,
@@ -619,7 +619,7 @@ private fun AboutDialog(engine: SaveItViewModel.EngineState, onUpdate: () -> Uni
         text = {
             Column {
                 Text(
-                    "Saves a video's sound from YouTube, Instagram, Facebook and many other sites as a song in Music/${Saver.FOLDER}, or the whole video in Movies/${Saver.FOLDER}, using yt-dlp and ffmpeg.",
+                    "Saves a video's sound from YouTube, Instagram, Facebook, Threads and many other sites as a song in Music/${Saver.FOLDER}, or the whole video in Movies/${Saver.FOLDER}, using yt-dlp and ffmpeg.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(12.dp))

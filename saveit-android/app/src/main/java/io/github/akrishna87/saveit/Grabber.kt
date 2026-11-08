@@ -59,11 +59,15 @@ object Grabber {
         addAll(listOf("-o", File(dir, "%(id)s.%(ext)s").absolutePath))
     }
 
-    /** Downloads [url] into [dir]. [processId] lets [cancel] stop it. Blocks until done. */
-    fun grab(url: String, format: Format, quality: Quality, dir: File, processId: String, onEvent: (Event) -> Unit): Result {
-        val request = YoutubeDLRequest(url)
+    /**
+     * Downloads [url] into [dir], or, given [infoFile] (a yt-dlp info file, as for Threads), the
+     * video that file describes. [processId] lets [cancel] stop it. Blocks until done.
+     */
+    fun grab(url: String, format: Format, quality: Quality, dir: File, processId: String, infoFile: File? = null, onEvent: (Event) -> Unit): Result {
+        val request = if (infoFile != null) YoutubeDLRequest(emptyList<String>()) else YoutubeDLRequest(url)
         val opts = options(format, dir, quality)
         request.addCommands(opts)
+        if (infoFile != null) request.addCommands(listOf("--load-info-json", infoFile.absolutePath))
         var info: Info? = null
         var path: String? = null
         var parts = 0
@@ -80,7 +84,7 @@ object Grabber {
             }
         }
         val audio = path?.let(::File)?.takeIf { it.isFile }
-            ?: dir.listFiles()?.firstOrNull { it.extension.equals(format.ext, ignoreCase = true) }
+            ?: dir.listFiles()?.firstOrNull { it.extension.equals(format.ext, ignoreCase = true) && !it.name.endsWith(".info.json") }
             ?: throw YoutubeDLException("The download finished but no ${format.label} file was made.")
         val thumbnail = dir.listFiles()?.firstOrNull { it.extension.lowercase() in setOf("jpg", "jpeg", "png") }
         return Result(audio, thumbnail, info ?: Info(audio.nameWithoutExtension, audio.nameWithoutExtension, "", 0))

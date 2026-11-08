@@ -2,7 +2,7 @@
 
 *(Called SongGrab in its first builds. SaveIt installs over SongGrab and keeps your list.)*
 
-SaveIt saves videos from **YouTube, Instagram, Facebook** and
+SaveIt saves videos from **YouTube, Instagram, Facebook, Threads** and
 [many other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) on your
 phone. It can save just the sound as a song, as an **MP3** or an
 **M4A**, with the title, artist and cover art filled in, or saves the **whole video** as an
@@ -67,6 +67,10 @@ SaveIt folders.)
   shows to signed-in people, can't be saved, because SaveIt doesn't sign in.
 - **Facebook:** public videos and reels, including `fb.watch` links. Videos in private groups
   or from private profiles can't be saved.
+- **Threads:** video posts that Threads shows to people who aren't signed in. yt-dlp can't read
+  Threads, so SaveIt opens the post's public page once, like a phone browser, and saves the
+  video if it's there. Threads often asks visitors to sign in instead; then SaveIt says it
+  couldn't find a video, and that post can't be saved.
 - Most other sites that [yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
   work too (X/Twitter, Vimeo, SoundCloud and many more).
 
