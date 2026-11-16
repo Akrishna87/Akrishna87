@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +51,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -59,7 +62,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,7 +81,8 @@ import androidx.compose.ui.unit.dp
 import io.github.akrishna87.pakkam.data.Files
 import io.github.akrishna87.pakkam.data.RecentFile
 
-private data class HomeTool(val label: String, val icon: ImageVector, val tint: Color, val run: () -> Unit)
+private data class HomeTool(val label: String, val icon: ImageVector, val run: () -> Unit)
+private data class HomeToolGroup(val title: String, val description: String, val tools: List<HomeTool>)
 
 @Composable
 fun HomeScreen(vm: AppViewModel) {
@@ -100,19 +103,25 @@ fun HomeScreen(vm: AppViewModel) {
         openPdf.launch(arrayOf("application/pdf"))
     }
 
-    val tools = listOf(
-        HomeTool("Combine files", Icons.Filled.MergeType, Color(0xFF1565C0)) { vm.go(Screen.Merge) },
-        HomeTool("Photos to PDF", Icons.Filled.Image, Color(0xFF2E7D32)) { vm.go(Screen.Images(camera = false)) },
-        HomeTool("Scan", Icons.Filled.PhotoCamera, Color(0xFF00838F)) { vm.go(Screen.Scan) },
-        HomeTool("Fill & Sign", Icons.Filled.Draw, Color(0xFF6A1B9A)) { pick(sign = true) },
-        HomeTool("Organize pages", Icons.Filled.ViewModule, Color(0xFFEF6C00)) { pick(ToolKind.ORGANIZE) },
-        HomeTool("Compress", Icons.Filled.Compress, Color(0xFF5D4037)) { pick(ToolKind.COMPRESS) },
-        HomeTool("Protect", Icons.Filled.Lock, Color(0xFFC62828)) { pick(ToolKind.PROTECT) },
-        HomeTool("Split", Icons.Filled.CallSplit, Color(0xFF283593)) { pick(ToolKind.SPLIT) },
-        HomeTool("Export", Icons.Filled.FileDownload, Color(0xFF00695C)) { pick(ToolKind.EXPORT) },
-        HomeTool("Watermark", Icons.Filled.BrandingWatermark, Color(0xFFAD1457)) { pick(ToolKind.WATERMARK) },
-        HomeTool("Page numbers", Icons.Filled.FormatListNumbered, Color(0xFF4527A0)) { pick(ToolKind.PAGE_NUMBERS) },
-        HomeTool("Fill in form", Icons.Filled.EditNote, Color(0xFF558B2F)) { pick(ToolKind.FILL_FORM) },
+    val toolGroups = listOf(
+        HomeToolGroup("Create PDFs", "Scan, combine, or turn photos into a PDF", listOf(
+            HomeTool("Scan", Icons.Filled.PhotoCamera) { vm.go(Screen.Scan) },
+            HomeTool("Photos to PDF", Icons.Filled.Image) { vm.go(Screen.Images(camera = false)) },
+            HomeTool("Combine files", Icons.Filled.MergeType) { vm.go(Screen.Merge) },
+        )),
+        HomeToolGroup("Fill & sign", "Add a signature or complete a PDF form", listOf(
+            HomeTool("Fill & Sign", Icons.Filled.Draw) { pick(sign = true) },
+            HomeTool("Fill in form", Icons.Filled.EditNote) { pick(ToolKind.FILL_FORM) },
+        )),
+        HomeToolGroup("Organize & export", "Change pages, protect, compress, or export", listOf(
+            HomeTool("Organize pages", Icons.Filled.ViewModule) { pick(ToolKind.ORGANIZE) },
+            HomeTool("Compress", Icons.Filled.Compress) { pick(ToolKind.COMPRESS) },
+            HomeTool("Protect", Icons.Filled.Lock) { pick(ToolKind.PROTECT) },
+            HomeTool("Split", Icons.Filled.CallSplit) { pick(ToolKind.SPLIT) },
+            HomeTool("Export", Icons.Filled.FileDownload) { pick(ToolKind.EXPORT) },
+            HomeTool("Watermark", Icons.Filled.BrandingWatermark) { pick(ToolKind.WATERMARK) },
+            HomeTool("Page numbers", Icons.Filled.FormatListNumbered) { pick(ToolKind.PAGE_NUMBERS) },
+        )),
     )
 
     var starredOnly by rememberSaveable { mutableStateOf(false) }
@@ -137,13 +146,6 @@ fun HomeScreen(vm: AppViewModel) {
                 scrollBehavior = scroll,
             )
         },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { pick() },
-                icon = { Icon(Icons.Filled.FolderOpen, null) },
-                text = { Text("Open a PDF") },
-            )
-        },
     ) { pad ->
         val words = find.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
         val shown = vm.recents.filter { f ->
@@ -152,19 +154,31 @@ fun HomeScreen(vm: AppViewModel) {
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = pad) {
             item {
-                Text("Tools", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp))
-                FlowRow(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    maxItemsInEachRow = 4,
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    tools.forEach { ToolTile(it, Modifier.weight(1f)) }
+                    Button(onClick = { pick() }, modifier = Modifier.weight(1f).heightIn(min = 56.dp)) {
+                        Icon(Icons.Filled.FolderOpen, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Open PDF")
+                    }
+                    FilledTonalButton(onClick = { vm.go(Screen.Scan) }, modifier = Modifier.weight(1f).heightIn(min = 56.dp)) {
+                        Icon(Icons.Filled.PhotoCamera, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Scan")
+                    }
                 }
             }
             item {
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Recent", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) {
+                    Text("Recent documents", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Pick up where you left off", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.weight(1f))
                     IconButton(onClick = {
                         searching = !searching
                         if (!searching) find = ""
@@ -194,7 +208,7 @@ fun HomeScreen(vm: AppViewModel) {
             if (shown.isEmpty()) {
                 item {
                     Text(
-                        if (searching) "No document called “${find.trim()}” in Recent. Open it with the button below." else if (starredOnly) "Star a file from its menu to keep it here." else "PDFs you open will be listed here.\nOpen one with the button below, or choose “Open with Pakkam” in Files, Gmail or WhatsApp.",
+                        if (searching) "No recent PDF matches “${find.trim()}”. Open a PDF above or choose “Open with Pakkam” in another app." else if (starredOnly) "Star a file from its menu to keep it here." else "PDFs you open will appear here. Open one above, or choose “Open with Pakkam” in Files, Gmail or WhatsApp.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -203,7 +217,27 @@ fun HomeScreen(vm: AppViewModel) {
                 }
             }
             items(shown, key = { it.uri }) { f -> RecentRow(vm, f) }
-            item { Spacer(Modifier.height(96.dp)) }
+            item {
+                Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 24.dp)) {
+                    Text("All tools", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 16.dp))
+                    Text("Every PDF tool, ready when you need it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    toolGroups.forEach { group ->
+                        Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+                            Text(group.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 16.dp))
+                            Text(group.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+                            FlowRow(
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                maxItemsInEachRow = 3,
+                            ) {
+                                group.tools.forEach { ToolTile(it, Modifier.weight(1f)) }
+                            }
+                        }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(16.dp)) }
         }
     }
 }
@@ -214,14 +248,17 @@ private fun ToolTile(t: HomeTool, modifier: Modifier) {
         modifier
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = t.run)
-            .padding(vertical = 10.dp, horizontal = 2.dp),
+            .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(16.dp))
+            .padding(vertical = 12.dp, horizontal = 4.dp)
+            .heightIn(min = 96.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Box(Modifier.size(48.dp).background(t.tint.copy(alpha = 0.14f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-            Icon(t.icon, null, tint = t.tint)
+        Box(Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+            Icon(t.icon, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
         Spacer(Modifier.height(6.dp))
-        Text(t.label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 2)
+        Text(t.label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 2, minLines = 2)
     }
 }
 
