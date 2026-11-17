@@ -208,7 +208,7 @@ fun HomeScreen(vm: AppViewModel) {
             if (shown.isEmpty()) {
                 item {
                     Text(
-                        if (searching) "No recent PDF matches “${find.trim()}”. Open a PDF above or choose “Open with Pakkam” in another app." else if (starredOnly) "Star a file from its menu to keep it here." else "PDFs you open will appear here. Open one above, or choose “Open with Pakkam” in Files, Gmail or WhatsApp.",
+                        if (searching) "No document called “${find.trim()}” in Recent. Open a PDF above or choose “Open with Pakkam” in another app." else if (starredOnly) "Star a file from its menu to keep it here." else "PDFs you open will appear here. Open one above, or choose “Open with Pakkam” in Files, Gmail or WhatsApp.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
